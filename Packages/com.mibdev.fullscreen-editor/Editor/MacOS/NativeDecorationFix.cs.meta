@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 21f7f7a798bda4b69b8a2f36fdf6c322
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69534
+  packageName: Fullscreen Editor
+  packageVersion: 2.2.11
+  assetPath: Packages/com.mibdev.fullscreen-editor/Editor/MacOS/NativeDecorationFix.cs
+  uploadId: 955670

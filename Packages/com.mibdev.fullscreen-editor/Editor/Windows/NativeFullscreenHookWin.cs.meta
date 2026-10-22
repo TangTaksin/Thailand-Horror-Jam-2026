@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cc4025c3d0c57f61e8e111e0b087f2e7
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 69534
+  packageName: Fullscreen Editor
+  packageVersion: 2.2.11
+  assetPath: Packages/com.mibdev.fullscreen-editor/Editor/Windows/NativeFullscreenHookWin.cs
+  uploadId: 955670
