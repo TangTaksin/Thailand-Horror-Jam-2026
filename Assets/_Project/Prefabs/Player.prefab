@@ -83,7 +83,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7551218612100083373, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  m_Sprite: {fileID: 6417973203142015010, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -118,6 +118,13 @@ MonoBehaviour:
   - {fileID: -3410672223334927688, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   - {fileID: 2061893793, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _walkSprites:
+  - {fileID: 313080370057419823, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -8086626681894203737, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -8050462381099678961, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4374256872242248994, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4795871217518782806, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -4640297688425572588, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _haulWalkSprites:
   - {fileID: 6920706530876565666, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   - {fileID: -6363570057842233811, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   - {fileID: 6178380841081427924, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
@@ -141,6 +148,7 @@ MonoBehaviour:
   - {fileID: 3651719337381808633, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
   _idleFps: 6.6
   _walkFps: 6.4
+  _haulWalkFps: 6.4
   _haulingWalkFpsMultiplier: 0.8
   _jumpFps: 12
   _fallFps: 50
@@ -152,6 +160,19 @@ MonoBehaviour:
   _jumpStretch: {x: 0.86, y: 1.18, z: 1}
   _landSquash: {x: 1.22, y: 0.8, z: 1}
   _squashRecoverySpeed: 10
+  _enableHaulTilt: 1
+  _haulForwardTiltAngle: -13
+  _haulBraceTiltAngle: 6
+  _tiltSpeed: 12
+  _enableThrowRecoil: 1
+  _throwRecoilDistance: 0.06
+  _throwRecoilSquash: {x: 1.16, y: 0.88, z: 1}
+  _recoilRecoverySpeed: 16
+  _enableAimLean: 1
+  _maxAimTiltAngle: 7
+  _enableAirStretch: 1
+  _fallStretchThreshold: -3.5
+  _maxFallStretchY: 1.15
 --- !u!1 &5737250694710447164
 GameObject:
   m_ObjectHideFlags: 0
@@ -250,7 +271,7 @@ Rigidbody2D:
     m_Bits: 0
   m_Interpolate: 1
   m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
   m_Constraints: 4
 --- !u!114 &3054172141830632971
 MonoBehaviour:

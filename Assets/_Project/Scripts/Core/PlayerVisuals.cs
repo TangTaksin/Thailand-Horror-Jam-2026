@@ -9,6 +9,7 @@ namespace ThailandHorrorJam.Core
         {
             Idle,
             Walk,
+            HaulWalk,
             Jump,
             Fall,
             FallLoop
@@ -23,15 +24,18 @@ namespace ThailandHorrorJam.Core
         [Header("Sprite Clips")]
         [SerializeField] private Sprite[] _idleSprites;
         [SerializeField] private Sprite[] _walkSprites;
+        [Tooltip("Dedicated bent/crouching pulling animation clip when hauling tethered objects.")]
+        [SerializeField] private Sprite[] _haulWalkSprites;
         [SerializeField] private Sprite[] _jumpSprites;
         [SerializeField] private Sprite[] _fallSprites;
         [SerializeField] private Sprite[] _fallLoopSprites;
 
         [Header("Frame Rates (FPS)")]
-        [SerializeField] private float _idleFps = 8f;
-        [SerializeField] private float _walkFps = 10f;
-        [SerializeField] private float _haulingWalkFpsMultiplier = 0.6f;
-        [SerializeField] private float _jumpFps = 16f;
+        [SerializeField] private float _idleFps = 6.6f;
+        [SerializeField] private float _walkFps = 6.4f;
+        [SerializeField] private float _haulWalkFps = 6.4f;
+        [SerializeField] private float _haulingWalkFpsMultiplier = 0.8f;
+        [SerializeField] private float _jumpFps = 12f;
         [SerializeField] private float _fallFps = 12f;
         [SerializeField] private float _fallLoopFps = 10f;
 
@@ -50,6 +54,32 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private Vector3 _landSquash = new Vector3(1.22f, 0.80f, 1f);
         [SerializeField] private float _squashRecoverySpeed = 10f;
 
+        [Header("Haul Strain (Juice)")]
+        [SerializeField] private bool _enableHaulTilt = true;
+        [Tooltip("Forward torso tilt angle while walking with a tethered load.")]
+        [SerializeField] private float _haulForwardTiltAngle = -13f;
+        [Tooltip("Backward bracing tilt angle while holding tether tension at rest.")]
+        [SerializeField] private float _haulBraceTiltAngle = 6f;
+        [SerializeField] private float _tiltSpeed = 12f;
+
+        [Header("Needle Throw Recoil (Juice)")]
+        [SerializeField] private bool _enableThrowRecoil = true;
+        [Tooltip("Backward physical kick distance along opposite aim trajectory.")]
+        [SerializeField] private float _throwRecoilDistance = 0.06f;
+        [SerializeField] private Vector3 _throwRecoilSquash = new Vector3(1.16f, 0.88f, 1f);
+        [SerializeField] private float _recoilRecoverySpeed = 16f;
+
+        [Header("Aim Pitch Lean (Juice)")]
+        [SerializeField] private bool _enableAimLean = true;
+        [Tooltip("Maximum torso tilt angle up or down towards aim cursor.")]
+        [SerializeField] private float _maxAimTiltAngle = 7f;
+
+        [Header("Airborne Fall Stretch (Juice)")]
+        [SerializeField] private bool _enableAirStretch = true;
+        [Tooltip("Downward vertical velocity threshold where body starts stretching.")]
+        [SerializeField] private float _fallStretchThreshold = -3.5f;
+        [SerializeField] private float _maxFallStretchY = 1.15f;
+
         private VisualState _currentState = VisualState.Idle;
         private Sprite[] _currentClip;
         private int _currentFrame;
@@ -57,6 +87,8 @@ namespace ThailandHorrorJam.Core
         private bool _isFacingRight = true;
         private Vector3 _scaleModifier = Vector3.one;
         private Vector3 _baseScale = Vector3.one;
+        private float _currentTiltAngle;
+        private Vector3 _recoilOffset = Vector3.zero;
 
         public VisualState CurrentState => _currentState;
         public bool IsFacingRight => _isFacingRight;
@@ -114,6 +146,11 @@ namespace ThailandHorrorJam.Core
                 _controller.OnJumped += HandlePlayerJumped;
                 _controller.OnLanded += HandlePlayerLanded;
             }
+
+            if (_needleController != null)
+            {
+                _needleController.OnNeedleLaunched += HandleNeedleLaunched;
+            }
         }
 
         private void OnDisable()
@@ -123,6 +160,11 @@ namespace ThailandHorrorJam.Core
                 _controller.OnJumped -= HandlePlayerJumped;
                 _controller.OnLanded -= HandlePlayerLanded;
             }
+
+            if (_needleController != null)
+            {
+                _needleController.OnNeedleLaunched -= HandleNeedleLaunched;
+            }
         }
 
         private void Start()
@@ -131,6 +173,8 @@ namespace ThailandHorrorJam.Core
             {
                 float dirX = _isFacingRight ? 1f : -1f;
                 _visualHolder.localScale = new Vector3(dirX * _baseScale.x, _baseScale.y, 1f);
+                _visualHolder.localRotation = Quaternion.identity;
+                _visualHolder.localPosition = Vector3.zero;
             }
             SetState(VisualState.Idle, forceRestart: true);
         }
@@ -142,6 +186,8 @@ namespace ThailandHorrorJam.Core
             UpdateFacingDirection();
             UpdateVisualState();
             AnimateCurrentFrame();
+            UpdateProceduralTilt();
+            UpdateProceduralRecoil();
             UpdateSquashAndStretch();
         }
 
@@ -204,7 +250,15 @@ namespace ThailandHorrorJam.Core
             {
                 // เช็คจากความเร็วจริงเพื่อป้องกันอาการซอยเท้าอยู่กับที่เวลาเดินชนกำแพง
                 bool isMoving = Mathf.Abs(_controller.Velocity.x) > 0.1f;
-                SetState(isMoving ? VisualState.Walk : VisualState.Idle);
+                if (isMoving)
+                {
+                    bool isHaulingWithSprites = _controller.IsHauling && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
+                    SetState(isHaulingWithSprites ? VisualState.HaulWalk : VisualState.Walk);
+                }
+                else
+                {
+                    SetState(VisualState.Idle);
+                }
             }
         }
 
@@ -232,6 +286,10 @@ namespace ThailandHorrorJam.Core
                     return _idleSprites;
                 case VisualState.Walk:
                     return _walkSprites != null && _walkSprites.Length > 0 ? _walkSprites : _idleSprites;
+                case VisualState.HaulWalk:
+                    return _haulWalkSprites != null && _haulWalkSprites.Length > 0
+                        ? _haulWalkSprites
+                        : (_walkSprites != null && _walkSprites.Length > 0 ? _walkSprites : _idleSprites);
                 case VisualState.Jump:
                     return _jumpSprites != null && _jumpSprites.Length > 0 ? _jumpSprites : _idleSprites;
                 case VisualState.Fall:
@@ -283,9 +341,9 @@ namespace ThailandHorrorJam.Core
                         return;
                     }
                 }
-                else if (_currentState == VisualState.Walk && IsWalkingBackwards())
+                else if ((_currentState == VisualState.Walk || _currentState == VisualState.HaulWalk) && IsWalkingBackwards())
                 {
-                    // เล่นอนิเมชันเดินย้อนกลับเมื่อผู้เล่นก้าวถอยหลังขณะเล็งเข็ม
+                    // เล่นอนิเมชันเดินย้อนกลับเมื่อผู้เล่นก้าวถอยหลังขณะเล็งเข็มหรือลากของ
                     _currentFrame = (_currentFrame - 1 + _currentClip.Length) % _currentClip.Length;
                 }
                 else
@@ -319,6 +377,8 @@ namespace ThailandHorrorJam.Core
                     return _controller != null && _controller.IsHauling
                         ? _walkFps * _haulingWalkFpsMultiplier
                         : _walkFps;
+                case VisualState.HaulWalk:
+                    return _haulWalkFps;
                 case VisualState.Jump:
                     return _jumpFps;
                 case VisualState.Fall:
@@ -328,6 +388,100 @@ namespace ThailandHorrorJam.Core
                 default:
                     return 10f;
             }
+        }
+
+        #endregion
+
+        #region Procedural Juice (Tilt, Recoil, Stretch)
+
+        private void UpdateProceduralTilt()
+        {
+            if (_visualHolder == null) return;
+
+            float targetAngle = 0f;
+            float facingSign = _isFacingRight ? 1f : -1f;
+
+            // 1. Hauling state takes highest priority
+            if (_enableHaulTilt && _controller != null && _controller.IsHauling)
+            {
+                float velX = _controller.Velocity.x;
+                bool isMovingHorizontally = Mathf.Abs(velX) > 0.1f;
+
+                if (isMovingHorizontally)
+                {
+                    // In Unity Transform hierarchy, localRotation is evaluated in parent space (T * R * S).
+                    // Facing right: negative Z (-13°) tilts forward (right).
+                    // Facing left: positive Z (+13°) tilts forward (left).
+                    bool movingForward = (velX > 0f) == _isFacingRight;
+                    targetAngle = movingForward
+                        ? facingSign * _haulForwardTiltAngle
+                        : facingSign * _haulBraceTiltAngle;
+                }
+                else
+                {
+                    // When stopped, check if the tethered object is behind the player
+                    bool isTetherBehind = false;
+                    if (_needleController != null && _needleController.TetheredStitchable != null)
+                    {
+                        float objectDirX = _needleController.TetheredStitchable.CurrentPosition.x - transform.position.x;
+                        isTetherBehind = _isFacingRight ? (objectDirX < -0.1f) : (objectDirX > 0.1f);
+                    }
+
+                    if (isTetherBehind)
+                    {
+                        targetAngle = facingSign * _haulBraceTiltAngle;
+                    }
+                }
+            }
+            // 2. Aim pitch lean when aiming needle (if not hauling)
+            else if (_enableAimLean && _needleController != null && _needleController.IsPinning)
+            {
+                Vector3 aimPos = _needleController.GetAimWorldPosition();
+                Vector2 aimDir = (aimPos - transform.position);
+                if (aimDir.sqrMagnitude > 0.01f)
+                {
+                    aimDir.Normalize();
+                    // Facing right: aiming up tilts chest back (+Z).
+                    // Facing left: aiming up tilts chest back (-Z).
+                    targetAngle = facingSign * (aimDir.y * _maxAimTiltAngle);
+                }
+            }
+
+            _currentTiltAngle = Mathf.MoveTowards(_currentTiltAngle, targetAngle, _tiltSpeed * Time.deltaTime);
+            _visualHolder.localRotation = Quaternion.Euler(0f, 0f, _currentTiltAngle);
+        }
+
+        private void HandleNeedleLaunched(Vector2 aimDir)
+        {
+            if (!_enableThrowRecoil) return;
+
+            if (aimDir.sqrMagnitude > 0.001f)
+            {
+                aimDir.Normalize();
+                // Kick backward along opposite aim trajectory
+                _recoilOffset = -(Vector3)(aimDir * _throwRecoilDistance);
+            }
+
+            if (_enableSquashAndStretch)
+            {
+                _scaleModifier = _throwRecoilSquash;
+            }
+        }
+
+        private void UpdateProceduralRecoil()
+        {
+            if (_visualHolder == null) return;
+
+            if (_recoilOffset.sqrMagnitude > 0.00001f)
+            {
+                _recoilOffset = Vector3.MoveTowards(_recoilOffset, Vector3.zero, _recoilRecoverySpeed * Time.deltaTime);
+            }
+            else
+            {
+                _recoilOffset = Vector3.zero;
+            }
+
+            _visualHolder.localPosition = _recoilOffset;
         }
 
         #endregion
@@ -359,7 +513,20 @@ namespace ThailandHorrorJam.Core
 
             if (_enableSquashAndStretch)
             {
-                _scaleModifier = Vector3.MoveTowards(_scaleModifier, Vector3.one, _squashRecoverySpeed * Time.deltaTime);
+                // Dynamic vertical stretch while falling fast
+                if (_enableAirStretch && _controller != null && !_controller.IsGrounded && _controller.Velocity.y < _fallStretchThreshold)
+                {
+                    float t = Mathf.Clamp01((-_controller.Velocity.y - Mathf.Abs(_fallStretchThreshold)) / 12f);
+                    float targetStretchY = Mathf.Lerp(1f, _maxFallStretchY, t);
+                    float targetSquashX = Mathf.Lerp(1f, 1f - (t * 0.10f), t);
+
+                    Vector3 airTarget = new Vector3(targetSquashX, targetStretchY, 1f);
+                    _scaleModifier = Vector3.Lerp(_scaleModifier, airTarget, Time.deltaTime * 10f);
+                }
+                else
+                {
+                    _scaleModifier = Vector3.MoveTowards(_scaleModifier, Vector3.one, _squashRecoverySpeed * Time.deltaTime);
+                }
             }
             else
             {

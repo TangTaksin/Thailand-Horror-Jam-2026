@@ -94,7 +94,10 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public bool IsPinning => _isPinning;
         public bool IsTetheredToPlayer => _tetheredStitchable != null;
+        public IStitchable TetheredStitchable => _tetheredStitchable;
         public float RemainingThreadLength => Mathf.Max(0f, _maxThreadLength - GetUsedThreadLength());
+
+        public event System.Action<Vector2> OnNeedleLaunched;
 
         private void Awake()
         {
@@ -422,6 +425,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _activeTarget.UpdateInFlightNeedle(startPos);
 
             CameraController2D.Instance?.Punch(aimDir, 0.03f);
+            OnNeedleLaunched?.Invoke(aimDir);
             Log($"[Needle] Threw needle projectile from Waypoint 1 at {_projectileSpeed}m/s towards {aimDir}!");
         }
 
