@@ -20,6 +20,7 @@ namespace ThailandHorrorJam.Core
         [Header("Shake Settings")]
         [SerializeField] private float _maxShakeOffset = 0.35f;
 
+        private Rigidbody2D _targetRb;
         private Vector3 _currentVelocity;
         private float _currentLookAheadX;
         private float _targetLookAheadX;
@@ -46,6 +47,11 @@ namespace ThailandHorrorJam.Core
                     _target = player.transform;
                 }
             }
+
+            if (_target != null)
+            {
+                _targetRb = _target.GetComponent<Rigidbody2D>();
+            }
         }
 
         private void LateUpdate()
@@ -54,10 +60,9 @@ namespace ThailandHorrorJam.Core
 
             // 1. Calculate lookahead based on horizontal movement
             float targetDir = 0f;
-            var rb = _target.GetComponent<Rigidbody2D>();
-            if (rb != null && Mathf.Abs(rb.linearVelocity.x) > 0.5f)
+            if (_targetRb != null && Mathf.Abs(_targetRb.linearVelocity.x) > 0.5f)
             {
-                targetDir = Mathf.Sign(rb.linearVelocity.x);
+                targetDir = Mathf.Sign(_targetRb.linearVelocity.x);
             }
 
             _targetLookAheadX = targetDir * _lookAheadDistance;
@@ -112,6 +117,7 @@ namespace ThailandHorrorJam.Core
         public void SetTarget(Transform target)
         {
             _target = target;
+            _targetRb = target != null ? target.GetComponent<Rigidbody2D>() : null;
         }
     }
 }
