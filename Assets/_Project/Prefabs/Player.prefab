@@ -300,7 +300,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
   _maxThreadLength: 9.5
-  _maxWaypoints: 3
+  _maxInteractionDistance: 3.5
+  _maxWaypoints: 2
   _requireSurfaceToPin: 1
   _singleCircuitLimit: 1
   _stitchableLayer:
@@ -309,6 +310,8 @@ MonoBehaviour:
   _anchorSurfaceLayer:
     serializedVersion: 2
     m_Bits: 0
+  _projectileSpeed: 16
+  _needleProjectile: {fileID: 0}
   _previewLine: {fileID: 0}
   _mainCamera: {fileID: 0}
   _reticleTransform: {fileID: 0}
