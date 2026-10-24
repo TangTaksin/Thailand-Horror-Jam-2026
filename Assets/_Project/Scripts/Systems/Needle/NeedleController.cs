@@ -11,7 +11,7 @@ namespace ThailandHorrorJam.Systems.Needle
     /// <summary>
     /// Controls the needle tool with strict level design constraints:
     /// - Max waypoints budget (default: 3 points)
-    /// - Max thread length budget (default: 9.0 meters)
+    /// - Max thread length budget (default: 9.5 meters)
     /// - Surface validation (cannot pin in thin air; must anchor to physical walls/ground/objects)
     /// </summary>
     public sealed class NeedleController : MonoBehaviour
@@ -20,18 +20,26 @@ namespace ThailandHorrorJam.Systems.Needle
         private const float k_AutoPinDistance = 0.5f;
         private const float k_HitSearchRadius = 0.45f;
         private const float k_PlayerAimRadius = 1.25f;
+        private const int k_PreviewCurveSteps = 20;
 
         private static readonly Color s_ValidColor = new Color(0.95f, 0.95f, 1f, 0.95f);
         private static readonly Color s_PlayerTetherColor = new Color(0.4f, 0.95f, 1f, 0.95f);
         private static readonly Color s_InvalidColor = new Color(1f, 0.35f, 0.35f, 0.9f);
 
+        private static readonly int s_BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int s_ScrollSpeedId = Shader.PropertyToID("_ScrollSpeed");
+        private static readonly int s_TilingId = Shader.PropertyToID("_Tiling");
+
         [Header("Constraints & Budget")]
         [Tooltip("Maximum allowed total thread length across all segments.")]
         [SerializeField] private float _maxThreadLength = 9.5f;
 
-        [Tooltip("Maximum number of waypoints per stitch (e.g. 3 = Start -> Pivot -> End).")]
+        [Tooltip("Maximum distance the player can be from an object to start stitching (Waypoint 1). Set <= 0 for unlimited range.")]
+        [SerializeField] private float _maxInteractionDistance = 3.5f;
+
+        [Tooltip("Maximum number of waypoints per stitch (default: 2 = Start -> Destination).")]
         [FormerlySerializedAs("maxWaypoints")]
-        [SerializeField] private int _maxWaypoints = 3;
+        [SerializeField] private int _maxWaypoints = 2;
 
         [Tooltip("Whether pins must snap to a physical surface (prevents stitching in mid-air).")]
         [SerializeField] private bool _requireSurfaceToPin = true;
@@ -46,6 +54,13 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Surfaces where needles can anchor (Walls, Ceilings, Ground, Platforms).")]
         [SerializeField] private LayerMask _anchorSurfaceLayer;
 
+        [Header("Projectile Settings")]
+        [Tooltip("Optional reference to NeedleProjectile component. Auto-created if null.")]
+        [SerializeField] private NeedleProjectile _needleProjectile;
+
+        [Tooltip("Linear flight speed of the needle projectile in meters/second.")]
+        [SerializeField] private float _projectileSpeed = 16.0f;
+
         [Header("Aiming & Visuals")]
         [FormerlySerializedAs("previewLine")]
         [SerializeField] private LineRenderer _previewLine;
@@ -58,13 +73,22 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private Transform _playerTransform;
         private Rigidbody2D _playerRb;
+        private Collider2D _playerCol;
         private PlayerController2D _playerController;
+
         private IStitchable _activeTarget;
         private IStitchable _currentlyLoopingTarget;
         private IStitchable _tetheredStitchable;
-        private readonly List<Vector2> _pinnedWaypoints = new List<Vector2>();
-        private readonly List<Vector3> _previewPointsBuffer = new List<Vector3>(32);
+
+        private readonly List<Vector2> _pinnedWaypoints = new List<Vector2>(8);
+        private readonly Vector3[] _previewPointsBuffer = new Vector3[k_PreviewCurveSteps + 1];
+        private readonly Collider2D[] _hitBuffer = new Collider2D[8];
+
+        private ContactFilter2D _stitchableFilter;
+        private ContactFilter2D _anchorFilter;
+
         private bool _isPinning;
+        private bool _isNeedleInFlight;
         private Material _previewMaterial;
         private SpriteRenderer _reticleSprite;
 
@@ -90,7 +114,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 _reticleSprite = _reticleTransform.GetComponent<SpriteRenderer>();
             }
 
-            // Ensure layer masks are never empty
             if (_stitchableLayer.value == 0)
             {
                 int stitchLayer = LayerMask.NameToLayer("Stitchable");
@@ -109,6 +132,16 @@ namespace ThailandHorrorJam.Systems.Needle
                 _anchorSurfaceLayer = mask != 0 ? mask : ~0;
             }
 
+            _stitchableFilter = new ContactFilter2D();
+            _stitchableFilter.SetLayerMask(_stitchableLayer);
+            _stitchableFilter.useLayerMask = true;
+            _stitchableFilter.useTriggers = true;
+
+            _anchorFilter = new ContactFilter2D();
+            _anchorFilter.SetLayerMask(_anchorSurfaceLayer);
+            _anchorFilter.useLayerMask = true;
+            _anchorFilter.useTriggers = false;
+
             if (_previewLine == null)
             {
                 _previewLine = GetComponent<LineRenderer>();
@@ -119,6 +152,23 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             ConfigurePreviewLine();
+            EnsureNeedleProjectile();
+        }
+
+        private void EnsureNeedleProjectile()
+        {
+            if (_needleProjectile == null)
+            {
+                _needleProjectile = GetComponentInChildren<NeedleProjectile>(true);
+                if (_needleProjectile == null)
+                {
+                    GameObject projObj = new GameObject("NeedleProjectile");
+                    projObj.transform.SetParent(transform);
+                    projObj.transform.localPosition = Vector3.zero;
+                    _needleProjectile = projObj.AddComponent<NeedleProjectile>();
+                }
+            }
+            _needleProjectile.gameObject.SetActive(false);
         }
 
         private void ConfigurePreviewLine()
@@ -145,18 +195,42 @@ namespace ThailandHorrorJam.Systems.Needle
             if (shader != null)
             {
                 _previewMaterial = new Material(shader);
-                _previewMaterial.SetColor("_BaseColor", s_ValidColor);
-                _previewMaterial.SetFloat("_ScrollSpeed", 3.2f);
+                _previewMaterial.SetColor(s_BaseColorId, s_ValidColor);
+                _previewMaterial.SetFloat(s_ScrollSpeedId, 3.2f);
                 _previewLine.material = _previewMaterial;
             }
         }
 
         private void Update()
         {
+            SyncFirstWaypointWithActiveTarget();
+
             Vector3 worldAimPos = GetAimWorldPosition();
             UpdateReticle(worldAimPos);
             HandleInput(worldAimPos);
             UpdatePreviewVisual(worldAimPos);
+            UpdateInFlightThread();
+        }
+
+        private void UpdateInFlightThread()
+        {
+            if (_isPinning && _isNeedleInFlight && _activeTarget != null && _needleProjectile != null)
+            {
+                Vector2 needlePos = _needleProjectile.CurrentPosition;
+                if (_pinnedWaypoints.Count >= 2)
+                {
+                    _pinnedWaypoints[1] = needlePos;
+                }
+                _activeTarget.UpdateInFlightNeedle(needlePos);
+            }
+        }
+
+        private void SyncFirstWaypointWithActiveTarget()
+        {
+            if (_isPinning && _activeTarget != null && _pinnedWaypoints.Count > 0)
+            {
+                _pinnedWaypoints[0] = _activeTarget.CurrentPosition;
+            }
         }
 
         public Vector3 GetAimWorldPosition()
@@ -169,11 +243,36 @@ namespace ThailandHorrorJam.Systems.Needle
             return worldPos;
         }
 
+        public bool IsPlayerNearObject(IStitchable stitchable)
+        {
+            if (_maxInteractionDistance <= 0f) return true;
+            if (_playerTransform == null || stitchable == null || stitchable.ObjectTransform == null) return false;
+
+            Vector2 playerPos = _playerTransform.position;
+            Collider2D col = stitchable.ObjectTransform.GetComponent<Collider2D>();
+            Vector2 targetPoint = col != null ? col.ClosestPoint(playerPos) : stitchable.CurrentPosition;
+
+            return Vector2.Distance(playerPos, targetPoint) <= _maxInteractionDistance;
+        }
+
         private void UpdateReticle(Vector3 worldAimPos)
         {
             if (_reticleTransform != null)
             {
                 _reticleTransform.position = worldAimPos;
+            }
+
+            if (!_isPinning && _reticleSprite != null)
+            {
+                IStitchable hovered = FindStitchableAt(worldAimPos);
+                if (hovered != null)
+                {
+                    _reticleSprite.color = IsPlayerNearObject(hovered) ? s_ValidColor : s_InvalidColor;
+                }
+                else
+                {
+                    _reticleSprite.color = s_ValidColor;
+                }
             }
         }
 
@@ -181,13 +280,11 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (Mouse.current != null)
             {
-                // Primary Click (Left): Select object / Pin waypoint / Tether to self / Anchor
                 if (Mouse.current.leftButton.wasPressedThisFrame)
                 {
                     OnPrimaryClick(worldAimPos);
                 }
 
-                // Secondary Click (Right): Cancel pinning, untether from self, or sever thread
                 if (Mouse.current.rightButton.wasPressedThisFrame)
                 {
                     OnSecondaryClick(worldAimPos);
@@ -214,18 +311,25 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (!_isPinning)
             {
-                // If already tethered to player, clicking on an anchor surface transfers it to a wall!
                 if (_tetheredStitchable != null)
                 {
-                    if (TryGetValidAnchorPoint(worldAimPos, out Vector2 anchorPos) && !IsAimingAtPlayer(worldAimPos))
+                    if (IsAimingAtPlayer(worldAimPos) || FindStitchableAt(worldAimPos) == _tetheredStitchable)
                     {
-                        TransferTetherToAnchor(anchorPos);
+                        ReleasePlayerTether();
                         return;
                     }
-                    else if (IsAimingAtPlayer(worldAimPos) || FindStitchableAt(worldAimPos) == _tetheredStitchable)
+
+                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos))
                     {
-                        // Clicking on player or the burden again untethers
-                        ReleasePlayerTether();
+                        float tetherTransferDist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
+                        if (tetherTransferDist >= k_MinWaypointDistance && tetherTransferDist <= _maxThreadLength)
+                        {
+                            TransferTetherToAnchor(anchorPos);
+                        }
+                        else
+                        {
+                            LogWarning("[Needle] Cannot transfer tether: target wall is out of thread budget or too close.");
+                        }
                         return;
                     }
                 }
@@ -233,61 +337,167 @@ namespace ThailandHorrorJam.Systems.Needle
                 IStitchable stitchable = FindStitchableAt(worldAimPos);
                 if (stitchable != null)
                 {
-                    StartStitching(stitchable);
+                    if (IsPlayerNearObject(stitchable))
+                    {
+                        StartStitching(stitchable);
+                    }
+                    else
+                    {
+                        float dist = Vector2.Distance(_playerTransform.position, stitchable.CurrentPosition);
+                        LogWarning($"[Needle] Too far from {stitchable.ObjectTransform.name} to stitch! Distance: {dist:F1}m (Max: {_maxInteractionDistance:F1}m). Move closer.");
+                        CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                    }
                 }
             }
             else
             {
-                // 1. Check if clicking on Player to tether object to self!
+                if (_isNeedleInFlight) return;
+
+                Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
+
+                // 1. Check if clicking on Player to tether object to self (must be within thread budget!)
                 if (IsAimingAtPlayer(worldAimPos))
                 {
-                    StartPlayerTether(_activeTarget);
+                    float distToPlayer = Vector2.Distance(lastPoint, _playerTransform.position);
+                    if (distToPlayer <= RemainingThreadLength)
+                    {
+                        StartPlayerTether(_activeTarget);
+                    }
+                    else
+                    {
+                        LogWarning("[Needle] Player is too far from the object to tether!");
+                    }
                     return;
                 }
 
-                // 2. Check if clicking on original target to complete a loop
-                IStitchable clickedTarget = FindStitchableAt(worldAimPos);
-                if (clickedTarget != null && clickedTarget == _activeTarget && _pinnedWaypoints.Count >= 2)
-                {
-                    CompleteStitchingRail();
-                    return;
-                }
-
-                // 3. Surface Validation (Cannot pin in empty air)
-                if (!TryGetValidAnchorPoint(worldAimPos, out Vector2 anchorPos))
-                {
-                    LogWarning("[Needle] Cannot pin in empty air! Must pin to a wall, ceiling, ground, or yourself.");
-                    return;
-                }
-
-                // 4. Thread Length Budget Check
-                Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
-                float segDist = Vector2.Distance(lastPoint, anchorPos);
-
-                if (segDist < k_MinWaypointDistance) return;
-
-                if (segDist > RemainingThreadLength)
-                {
-                    LogWarning("[Needle] Out of thread! Cannot reach that far.");
-                    return;
-                }
-
-                // Add waypoint
-                _pinnedWaypoints.Add(anchorPos);
-                Log($"[Needle] Added Waypoint #{_pinnedWaypoints.Count} at {anchorPos} (Remaining thread: {RemainingThreadLength:F1}m)");
-
-                CameraController2D.Instance?.Punch(-(anchorPos - lastPoint).normalized, 0.035f);
-
-                if (_activeTarget != null)
-                {
-                    _activeTarget.UpdatePinnedWaypoints(_pinnedWaypoints);
-                }
-
-                if (_pinnedWaypoints.Count >= _maxWaypoints)
-                {
-                    CompleteStitchingRail();
-                }
+                // 2. Launch Needle Projectile towards cursor
+                LaunchNeedleProjectile(worldAimPos);
             }
+        }
+
+        private void LaunchNeedleProjectile(Vector3 worldAimPos)
+        {
+            EnsureNeedleProjectile();
+            if (_needleProjectile == null || _activeTarget == null) return;
+
+            Vector2 launchOrigin = _pinnedWaypoints[0];
+            Vector2 aimVector = (Vector2)worldAimPos - launchOrigin;
+            Vector2 aimDir = aimVector.sqrMagnitude > 0.001f ? aimVector.normalized : Vector2.right;
+
+            _isNeedleInFlight = true;
+
+            if (_pinnedWaypoints.Count < 2)
+            {
+                _pinnedWaypoints.Add(launchOrigin);
+            }
+            else
+            {
+                _pinnedWaypoints[1] = launchOrigin;
+            }
+
+            float maxFlightDist = _maxThreadLength + 1.5f;
+
+            // Offset start slightly outside the box collider so swept cast doesn't start overlapping with it
+            Vector2 startPos = launchOrigin;
+            Collider2D targetCol = _activeTarget.ObjectTransform != null ? _activeTarget.ObjectTransform.GetComponent<Collider2D>() : null;
+            if (targetCol != null)
+            {
+                startPos = (Vector2)targetCol.bounds.center + aimDir * (Mathf.Max(targetCol.bounds.extents.x, targetCol.bounds.extents.y) + 0.1f);
+            }
+
+            _needleProjectile.Launch(
+                origin: startPos,
+                direction: aimDir,
+                speed: _projectileSpeed,
+                maxDistance: maxFlightDist,
+                returnTransform: _activeTarget.ObjectTransform != null ? _activeTarget.ObjectTransform : _playerTransform,
+                targetToIgnore: _activeTarget.ObjectTransform,
+                collisionFilter: _anchorFilter,
+                onHit: OnNeedleHitSurface,
+                onRewindComplete: OnNeedleRewindComplete,
+                playerTransform: _playerTransform
+            );
+
+            _activeTarget.UpdateInFlightNeedle(startPos);
+
+            CameraController2D.Instance?.Punch(aimDir, 0.03f);
+            Log($"[Needle] Threw needle projectile from Waypoint 1 at {_projectileSpeed}m/s towards {aimDir}!");
+        }
+
+        private void OnNeedleHitSurface(Vector2 hitPoint, Vector2 hitNormal, Collider2D hitCol)
+        {
+            if (!_isPinning || _activeTarget == null)
+            {
+                if (_needleProjectile != null) _needleProjectile.Cancel();
+                _isNeedleInFlight = false;
+                return;
+            }
+
+            // Calculate surface-inset offset for the stitchable box so it rests flush
+            Vector2 anchorPos = hitPoint;
+            Collider2D targetCol = _activeTarget.ObjectTransform.GetComponent<Collider2D>();
+            if (targetCol != null)
+            {
+                Vector2 normal = hitNormal.sqrMagnitude > 0.001f ? hitNormal : Vector2.up;
+                float halfHeight = targetCol.bounds.extents.y;
+                float halfWidth = targetCol.bounds.extents.x;
+
+                Vector2 offset = Vector2.zero;
+                if (Mathf.Abs(normal.y) > 0.5f)
+                {
+                    offset.y = Mathf.Sign(normal.y) * halfHeight;
+                }
+                else
+                {
+                    offset.x = Mathf.Sign(normal.x) * halfWidth;
+                }
+
+                anchorPos += offset;
+            }
+
+            // Check thread length budget from Box (Waypoint 0)
+            Vector2 boxPos = _pinnedWaypoints[0];
+            float segDist = Vector2.Distance(boxPos, anchorPos);
+
+            if (segDist < k_MinWaypointDistance || segDist > _maxThreadLength)
+            {
+                LogWarning($"[Needle] Hit point is out of thread budget ({segDist:F1}m > {_maxThreadLength:F1}m). Rewinding!");
+                _needleProjectile.StartRewind();
+                return;
+            }
+
+            // Anchor successfully!
+            if (_pinnedWaypoints.Count < 2)
+            {
+                _pinnedWaypoints.Add(anchorPos);
+            }
+            else
+            {
+                _pinnedWaypoints[1] = anchorPos;
+            }
+
+            _needleProjectile.Cancel();
+            _isNeedleInFlight = false;
+
+            CameraController2D.Instance?.Shake(0.04f, 0.1f);
+            Log($"[Needle] Needle embedded into surface at {anchorPos}! Completing rail.");
+            CompleteStitchingRail();
+        }
+
+        private void OnNeedleRewindComplete()
+        {
+            _isNeedleInFlight = false;
+            if (_pinnedWaypoints.Count > 1)
+            {
+                _pinnedWaypoints.RemoveAt(1);
+            }
+
+            if (_activeTarget != null)
+            {
+                _activeTarget.UpdatePinnedWaypoints(_pinnedWaypoints);
+            }
+
+            Log("[Needle] Needle auto-rewound to Waypoint 1. Ready to re-aim.");
         }
 
         private void OnSecondaryClick(Vector3 worldAimPos)
@@ -302,7 +512,6 @@ namespace ThailandHorrorJam.Systems.Needle
             }
             else
             {
-                // Check if clicking near any active suture thread to sever it!
                 if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
                 {
                     CameraController2D.Instance?.Shake(0.04f, 0.08f);
@@ -316,7 +525,6 @@ namespace ThailandHorrorJam.Systems.Needle
             if (target == null) return;
             EnsurePlayerComponents();
 
-            // Single Circuit Limit: sever any previous loop circuit
             if (_singleCircuitLimit && _currentlyLoopingTarget != null && _currentlyLoopingTarget != target)
             {
                 Log($"[Needle] Severed previous circuit on {_currentlyLoopingTarget.ObjectTransform.name} to tether new entity.");
@@ -365,6 +573,11 @@ namespace ThailandHorrorJam.Systems.Needle
             IStitchable target = _tetheredStitchable;
             ReleasePlayerTether();
 
+            if (_singleCircuitLimit && _currentlyLoopingTarget != null && _currentlyLoopingTarget != target)
+            {
+                _currentlyLoopingTarget.CutThread();
+            }
+
             _pinnedWaypoints.Clear();
             _pinnedWaypoints.Add(target.CurrentPosition);
             _pinnedWaypoints.Add(anchorPos);
@@ -392,8 +605,17 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_isPinning)
             {
                 Log("[Needle] Canceled current stitch.");
+                if (_needleProjectile != null)
+                {
+                    _needleProjectile.Cancel();
+                }
+                _isNeedleInFlight = false;
                 if (_activeTarget != null)
                 {
+                    if (_currentlyLoopingTarget == _activeTarget)
+                    {
+                        _currentlyLoopingTarget = null;
+                    }
                     _activeTarget.CutThread();
                 }
                 ResetPinningState();
@@ -408,9 +630,9 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            if (_pinnedWaypoints.Count > 0)
+            if (_pinnedWaypoints.Count > 0 && _pinnedWaypoints.Count < _maxWaypoints)
             {
-                if (TryGetValidAnchorPoint(worldAimPos, out Vector2 anchorPos))
+                if (TryGetValidAnchorPoint(worldAimPos, _activeTarget, out Vector2 anchorPos) && !IsAimingAtPlayer(worldAimPos))
                 {
                     Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
                     float dist = Vector2.Distance(lastPoint, anchorPos);
@@ -437,11 +659,10 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private bool TryGetValidAnchorPoint(Vector3 worldAimPos, out Vector2 anchorPoint)
+        private bool TryGetValidAnchorPoint(Vector3 worldAimPos, IStitchable ignoredStitchable, out Vector2 anchorPoint)
         {
             anchorPoint = worldAimPos;
 
-            // Player body is always a valid anchor/tether target
             if (IsAimingAtPlayer(worldAimPos))
             {
                 if (_playerTransform != null) anchorPoint = _playerTransform.position;
@@ -450,28 +671,74 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (!_requireSurfaceToPin) return true;
 
-            // 1. Check if clicking on an IStitchable object
-            if (FindStitchableAt(worldAimPos) != null)
+            // 1. Check if clicking on another valid IStitchable object
+            IStitchable stitchable = FindStitchableAt(worldAimPos);
+            if (stitchable != null && stitchable != ignoredStitchable)
             {
+                anchorPoint = stitchable.CurrentPosition;
                 return true;
             }
 
-            // 2. Check overlap with physical surface (Walls, Ceilings, Ground)
-            Collider2D hit = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _anchorSurfaceLayer);
-            if (hit != null)
+            // 2. Zero-alloc check with physical surfaces (excluding player and ignoredStitchable)
+            int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _anchorFilter, _hitBuffer);
+            float closestDistSq = float.MaxValue;
+            bool foundValid = false;
+
+            for (int i = 0; i < hitCount; i++)
             {
-                // Snap to closest point on collider
-                anchorPoint = hit.ClosestPoint(worldAimPos);
-                return true;
+                Collider2D hit = _hitBuffer[i];
+                if (hit == null || hit == _playerCol) continue;
+
+                if (ignoredStitchable != null && ignoredStitchable.ObjectTransform != null &&
+                    hit.transform.IsChildOf(ignoredStitchable.ObjectTransform))
+                {
+                    continue;
+                }
+
+                Vector2 candidatePoint = hit.ClosestPoint(worldAimPos);
+                float distSq = ((Vector2)worldAimPos - candidatePoint).sqrMagnitude;
+                if (distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    anchorPoint = candidatePoint;
+                    foundValid = true;
+                }
             }
 
-            return false;
+            // ชดเชยจุด Waypoint ให้อิงตามขนาดขอบเขต (Extents) ของวัตถุ เพื่อให้ขอบวัตถุแนบสนิทกับผิวพื้นพอดีเป๊ะ (Flush 0 cm)
+            if (foundValid && ignoredStitchable != null && ignoredStitchable.ObjectTransform != null)
+            {
+                Collider2D targetCol = ignoredStitchable.ObjectTransform.GetComponent<Collider2D>();
+                if (targetCol != null)
+                {
+                    Vector2 normal = ((Vector2)worldAimPos - anchorPoint).normalized;
+                    if (normal.sqrMagnitude < 0.001f) normal = Vector2.up;
+
+                    float halfHeight = targetCol.bounds.extents.y;
+                    float halfWidth = targetCol.bounds.extents.x;
+
+                    Vector2 offset = Vector2.zero;
+                    if (Mathf.Abs(normal.y) > 0.5f)
+                    {
+                        offset.y = Mathf.Sign(normal.y) * halfHeight;
+                    }
+                    if (Mathf.Abs(normal.x) > 0.5f)
+                    {
+                        offset.x = Mathf.Sign(normal.x) * halfWidth;
+                    }
+
+                    anchorPoint += offset;
+                }
+            }
+
+            return foundValid;
         }
 
         private void EnsurePlayerComponents()
         {
             if (_playerTransform == null) _playerTransform = transform;
             if (_playerRb == null) _playerRb = GetComponent<Rigidbody2D>();
+            if (_playerCol == null) _playerCol = GetComponent<Collider2D>();
             if (_playerController == null) _playerController = GetComponent<PlayerController2D>();
         }
 
@@ -484,17 +751,19 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private IStitchable FindStitchableAt(Vector3 worldAimPos)
         {
-            Collider2D hit = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _stitchableLayer);
-            if (hit != null)
+            // Zero-allocation search on Stitchable layer first
+            int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _stitchableFilter, _hitBuffer);
+            for (int i = 0; i < hitCount; i++)
             {
-                IStitchable stitchable = hit.GetComponentInParent<IStitchable>();
+                IStitchable stitchable = _hitBuffer[i].GetComponentInParent<IStitchable>();
                 if (stitchable != null) return stitchable;
             }
 
-            Collider2D[] allHits = Physics2D.OverlapCircleAll(worldAimPos, k_HitSearchRadius);
-            for (int i = 0; i < allHits.Length; i++)
+            // Fallback: Zero-allocation search across all layers
+            hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, ContactFilter2D.noFilter, _hitBuffer);
+            for (int i = 0; i < hitCount; i++)
             {
-                IStitchable stitchable = allHits[i].GetComponentInParent<IStitchable>();
+                IStitchable stitchable = _hitBuffer[i].GetComponentInParent<IStitchable>();
                 if (stitchable != null) return stitchable;
             }
 
@@ -518,7 +787,6 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (_activeTarget != null && _pinnedWaypoints.Count >= 2)
             {
-                // Sever previous loop circuit if stitching a new entity! (Single Circuit Rule / Faustian Sacrifice)
                 if (_singleCircuitLimit && _currentlyLoopingTarget != null && _currentlyLoopingTarget != _activeTarget)
                 {
                     Log($"[Needle] Severed previous circuit on {_currentlyLoopingTarget.ObjectTransform.name} to power new circuit.");
@@ -539,6 +807,11 @@ namespace ThailandHorrorJam.Systems.Needle
             _isPinning = false;
             _activeTarget = null;
             _pinnedWaypoints.Clear();
+            if (_needleProjectile != null)
+            {
+                _needleProjectile.Cancel();
+            }
+            _isNeedleInFlight = false;
             if (_previewLine != null)
             {
                 _previewLine.positionCount = 0;
@@ -563,67 +836,87 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (!_isPinning || _pinnedWaypoints.Count == 0 || _previewLine == null)
             {
-                if (_previewLine != null) _previewLine.positionCount = 0;
+                if (_previewLine != null && _previewLine.positionCount != 0)
+                {
+                    _previewLine.positionCount = 0;
+                }
                 return;
             }
 
-            Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
-            Vector2 cursor = (Vector2)worldAimPos;
-            Vector2 dir = cursor - lastPoint;
-            float rawDist = dir.magnitude;
-
-            // 1. Thread Budget Clamp
-            float remainingBudget = RemainingThreadLength;
-            float clampedDist = Mathf.Min(rawDist, remainingBudget);
-            Vector2 clampedTarget = rawDist > 0.001f ? lastPoint + (dir / rawDist) * clampedDist : lastPoint;
-
-            bool isAimingPlayer = IsAimingAtPlayer(worldAimPos);
-            if (isAimingPlayer && _playerTransform != null)
+            // Hide aim guide line while needle is actively flying in the air
+            if (_isNeedleInFlight)
             {
-                clampedTarget = _playerTransform.position;
-                clampedDist = Vector2.Distance(lastPoint, clampedTarget);
+                _previewLine.positionCount = 0;
+                return;
             }
 
-            // 2. Surface Validation Check
-            bool isValidSurface = isAimingPlayer || TryGetValidAnchorPoint(clampedTarget, out Vector2 anchorPos);
-            bool isOverBudget = rawDist > remainingBudget + 0.1f;
-            bool canPlace = isValidSurface && (!isOverBudget || isAimingPlayer);
+            Vector2 launchOrigin = _pinnedWaypoints[0];
+            Vector2 playerPos = _playerTransform.position;
+            Vector2 aimVector = (Vector2)worldAimPos - launchOrigin;
+            float aimDist = aimVector.magnitude;
+            Vector2 aimDir = aimDist > 0.001f ? aimVector / aimDist : Vector2.right;
 
-            // Tint feedback
-            Color activeColor = isAimingPlayer ? s_PlayerTetherColor : (canPlace ? s_ValidColor : s_InvalidColor);
+            // 1. Check if aiming at player (to tether)
+            bool isAimingPlayer = IsAimingAtPlayer(worldAimPos);
+            if (isAimingPlayer)
+            {
+                float distToPlayer = Vector2.Distance(launchOrigin, playerPos);
+                bool canTether = distToPlayer <= RemainingThreadLength;
+                Color col = canTether ? s_PlayerTetherColor : s_InvalidColor;
+
+                DrawAimTrajectory(launchOrigin, playerPos, col);
+                if (_reticleSprite != null) _reticleSprite.color = col;
+                return;
+            }
+
+            // 2. Aim guide from Waypoint 1 (Box) to predicted impact point
+            Vector2 rayOrigin = launchOrigin;
+            Collider2D targetCol = _activeTarget?.ObjectTransform != null ? _activeTarget.ObjectTransform.GetComponent<Collider2D>() : null;
+            if (targetCol != null)
+            {
+                rayOrigin = (Vector2)targetCol.bounds.center + aimDir * (Mathf.Max(targetCol.bounds.extents.x, targetCol.bounds.extents.y) + 0.05f);
+            }
+
+            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, aimDir, _maxThreadLength, _anchorSurfaceLayer);
+            Vector2 endPoint;
+            bool canPlace = false;
+
+            if (hit.collider != null && hit.collider != _playerCol && (targetCol == null || hit.collider != targetCol))
+            {
+                endPoint = hit.point;
+                float totalDist = Vector2.Distance(launchOrigin, endPoint);
+                canPlace = totalDist >= k_MinWaypointDistance && totalDist <= _maxThreadLength;
+            }
+            else
+            {
+                endPoint = launchOrigin + aimDir * Mathf.Min(aimDist, _maxThreadLength);
+                canPlace = false;
+            }
+
+            Color activeColor = canPlace ? s_ValidColor : s_InvalidColor;
             if (_reticleSprite != null)
             {
                 _reticleSprite.color = activeColor;
             }
-            if (_previewMaterial != null)
-            {
-                _previewMaterial.SetColor("_BaseColor", activeColor);
-            }
 
-            // Draw curved preview arc
-            float sag = Mathf.Min(clampedDist * 0.08f, 0.45f);
-            Vector2 midControl = (lastPoint + clampedTarget) * 0.5f + (Vector2.down * sag);
+            DrawAimTrajectory(launchOrigin, endPoint, activeColor);
+        }
 
-            const int steps = 20;
-            _previewPointsBuffer.Clear();
+        private void DrawAimTrajectory(Vector2 start, Vector2 end, Color color)
+        {
+            if (_previewLine == null) return;
 
-            for (int i = 0; i <= steps; i++)
-            {
-                float t = (float)i / steps;
-                float u = 1f - t;
-                Vector2 pt = (u * u * lastPoint) + (2f * u * t * midControl) + (t * t * clampedTarget);
-                _previewPointsBuffer.Add(new Vector3(pt.x, pt.y, 0f));
-            }
-
-            _previewLine.positionCount = _previewPointsBuffer.Count;
-            for (int i = 0; i < _previewPointsBuffer.Count; i++)
-            {
-                _previewLine.SetPosition(i, _previewPointsBuffer[i]);
-            }
+            _previewLine.positionCount = 2;
+            _previewPointsBuffer[0] = new Vector3(start.x, start.y, 0f);
+            _previewPointsBuffer[1] = new Vector3(end.x, end.y, 0f);
+            _previewLine.SetPosition(0, _previewPointsBuffer[0]);
+            _previewLine.SetPosition(1, _previewPointsBuffer[1]);
 
             if (_previewMaterial != null)
             {
-                _previewMaterial.SetFloat("_Tiling", Mathf.Max(1f, clampedDist * 2.5f));
+                _previewMaterial.SetColor(s_BaseColorId, color);
+                float lineLen = Vector2.Distance(start, end);
+                _previewMaterial.SetFloat(s_TilingId, Mathf.Max(1f, lineLen * 2.5f));
             }
         }
 

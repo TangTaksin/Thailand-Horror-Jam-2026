@@ -35,7 +35,7 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private int _constraintIterations = 6;
 
         [Tooltip("Gravity acceleration pulling down on the rope particles.")]
-        [SerializeField] private float _gravity = 7.5f;
+        [SerializeField] private float _gravity = 5.0f;
 
         [Tooltip("Air drag damping factor (0 = frictionless, 10 = heavy syrup).")]
         [SerializeField] private float _airDamping = 3.2f;
@@ -48,6 +48,20 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("_twangImpulse")]
         [SerializeField] private float _twangImpulse = 4.2f;
 
+        [Header("Ground & Surface Collision")]
+        [Tooltip("Whether the thread collides with and piles up on physical surfaces (Ground, Walls).")]
+        [SerializeField] private bool _enableGroundCollision = true;
+
+        [Tooltip("Surface layer mask that the thread collides with.")]
+        [SerializeField] private LayerMask _collisionMask;
+
+        [Tooltip("Friction applied to rope particles resting on surfaces (0 = slippery, 1 = sticky pile).")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _groundFriction = 0.65f;
+
+        [Tooltip("Offset distance of the rope above the collision surface.")]
+        [SerializeField] private float _surfaceOffset = 0.035f;
+
         [Header("Catmull-Rom Spline Rendering")]
         [Tooltip("Subdivisions between each Verlet particle node for silk smoothness.")]
         [SerializeField] private int _splineSubdivisions = 4;
@@ -58,7 +72,8 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _scrollSpeed = 2.5f;
         [SerializeField] private float _tilingFrequency = 2.5f;
 
-        private class VerletNode
+        // เปลี่ยนเป็น struct เพื่อป้องกัน Heap Allocation ทุกครั้งที่สร้างเส้นด้ายใหม่
+        private struct VerletNode
         {
             public Vector2 Position;
             public Vector2 OldPosition;
@@ -77,6 +92,9 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private static Sprite s_PinSprite;
         private Material _threadMaterial;
+        private IStitchable _cachedOwner;
+        private ContactFilter2D _collisionFilter;
+        private readonly Collider2D[] _pointHitBuffer = new Collider2D[2];
 
         private readonly List<GameObject> _pinMarkers = new List<GameObject>();
         private readonly List<Vector2> _cachedWaypoints = new List<Vector2>();
@@ -85,20 +103,61 @@ namespace ThailandHorrorJam.Systems.Needle
         private readonly List<VerletNode> _nodes = new List<VerletNode>(48);
         private readonly List<VerletLink> _links = new List<VerletLink>(48);
         private readonly List<Vector3> _renderBuffer = new List<Vector3>(128);
+        private Vector3[] _linePositionsArray = new Vector3[128];
         private readonly List<float> _cumulativeLengths = new List<float>(128);
         private float _totalPathLength;
+        private bool _isSplineDirty;
+        private bool _isTautMode;
+        private bool _isInFlightMode;
 
         public int NodeCount => _nodes.Count;
         public float TotalPathLength => _totalPathLength;
+        public bool IsTaut => _isTautMode;
+        public IReadOnlyList<Vector2> CachedWaypoints => _cachedWaypoints;
 
         private void Awake()
+        {
+            EnsureComponents();
+            EnsureCollisionFilter();
+            ConfigureLineRenderer();
+        }
+
+        private void EnsureComponents()
         {
             if (_lineRenderer == null)
             {
                 _lineRenderer = GetComponent<LineRenderer>();
+                if (_lineRenderer == null)
+                {
+                    _lineRenderer = gameObject.AddComponent<LineRenderer>();
+                }
             }
 
-            ConfigureLineRenderer();
+            if (_cachedOwner == null)
+            {
+                _cachedOwner = GetComponentInParent<IStitchable>();
+            }
+
+            if (_linePositionsArray == null || _linePositionsArray.Length == 0)
+            {
+                _linePositionsArray = new Vector3[128];
+            }
+        }
+
+        private void EnsureCollisionFilter()
+        {
+            if (_collisionFilter.useLayerMask) return;
+
+            if (_collisionMask.value == 0)
+            {
+                int groundLayer = LayerMask.NameToLayer("Ground");
+                _collisionMask = groundLayer != -1 ? (1 << groundLayer) : LayerMask.GetMask("Ground", "Default");
+            }
+
+            _collisionFilter = new ContactFilter2D();
+            _collisionFilter.SetLayerMask(_collisionMask);
+            _collisionFilter.useLayerMask = true;
+            _collisionFilter.useTriggers = false;
         }
 
         private void ConfigureLineRenderer()
@@ -108,20 +167,18 @@ namespace ThailandHorrorJam.Systems.Needle
             _lineRenderer.sortingOrder = 10;
             _lineRenderer.textureMode = LineTextureMode.Tile;
 
-            // Organic Webbed Width Profile: Anchor-flare at endpoints, slender in the middle
             AnimationCurve widthProfile = new AnimationCurve();
-            widthProfile.AddKey(0.00f, 1.45f); // Start pin flare
+            widthProfile.AddKey(0.00f, 1.45f);
             widthProfile.AddKey(0.05f, 1.05f);
-            widthProfile.AddKey(0.50f, 0.75f); // Sleek middle section
+            widthProfile.AddKey(0.50f, 0.75f);
             widthProfile.AddKey(0.95f, 1.05f);
-            widthProfile.AddKey(1.00f, 1.45f); // End pin flare
+            widthProfile.AddKey(1.00f, 1.45f);
             _lineRenderer.widthCurve = widthProfile;
             _lineRenderer.widthMultiplier = _threadWidth;
 
             _lineRenderer.startColor = _threadColor;
             _lineRenderer.endColor = _threadColor;
 
-            // Material initialization
             if (_materialOverride != null)
             {
                 _threadMaterial = new Material(_materialOverride);
@@ -148,24 +205,30 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void FixedUpdate()
         {
-            if (_nodes.Count < 2) return;
+            if (_nodes.Count < 2 || _isInFlightMode) return;
 
             float dt = Time.fixedDeltaTime;
             SimulateVerlet(dt);
             SolveConstraints();
-            DrawCatmullRomSpline();
+            RebuildSplineData();
+            _isSplineDirty = true;
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             if (_nodes.Count < 2) return;
 
-            DrawCatmullRomSpline();
-            UpdateShaderTiling();
+            if (_isSplineDirty)
+            {
+                ApplySplineToLineRenderer();
+                UpdateShaderTiling();
+                _isSplineDirty = false;
+            }
         }
 
         public void RenderPath(IReadOnlyList<Vector2> waypoints)
         {
+            _isInFlightMode = false;
             if (waypoints == null || waypoints.Count < 2)
             {
                 Clear();
@@ -173,20 +236,204 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             _cachedWaypoints.Clear();
-            _cachedWaypoints.AddRange(waypoints);
+            for (int i = 0; i < waypoints.Count; i++)
+            {
+                Vector2 towardsDir = Vector2.right;
+                if (waypoints.Count > 1)
+                {
+                    if (i == 0) towardsDir = (waypoints[1] - waypoints[0]).normalized;
+                    else towardsDir = (waypoints[i] - waypoints[i - 1]).normalized;
+                }
+                Vector2 snapped = SnapToNearestObjectEdge(waypoints[i], towardsDir, i == 0);
+                _cachedWaypoints.Add(snapped);
+            }
 
             BuildVerletRope();
             UpdatePinMarkers(_cachedWaypoints);
-            DrawCatmullRomSpline();
+            RebuildSplineData();
+            ApplySplineToLineRenderer();
             UpdateShaderTiling();
+            _isSplineDirty = false;
+        }
+
+        /// <summary>
+        /// สั่งให้เส้นด้ายขึงตึงเปรี๊ยะทันที (Snap Taut) สำหรับโหมดรางลูป (Looping Rail)
+        /// ดึงโหนดทั้งหมดให้ตรงเป๊ะเป็นแนวราง ไม่หย่อนลงดิน พร้อมเอฟเฟกต์ดีดสายสั่นสะเทือนแบบฮาร์มอนิก
+        /// </summary>
+        public void SnapTaut(float twangImpulse = 4.0f)
+        {
+            _isInFlightMode = false;
+            _isTautMode = true;
+
+            int segmentCount = _cachedWaypoints.Count - 1;
+            if (segmentCount <= 0 || _nodes.Count < 2) return;
+
+            float dt = Time.fixedDeltaTime > 0f ? Time.fixedDeltaTime : 0.02f;
+
+            for (int seg = 0; seg < segmentCount; seg++)
+            {
+                Vector2 pStart = _cachedWaypoints[seg];
+                Vector2 pEnd = _cachedWaypoints[seg + 1];
+                Vector2 segDelta = pEnd - pStart;
+                float segDist = segDelta.magnitude;
+                Vector2 segDir = segDist > 0.001f ? segDelta / segDist : Vector2.right;
+                Vector2 segNormal = new Vector2(-segDir.y, segDir.x);
+
+                int startNodeIdx = _pinnedWaypointIndices[seg];
+                int endNodeIdx = _pinnedWaypointIndices[seg + 1];
+                int nodeSpan = endNodeIdx - startNodeIdx;
+                float linkRest = segDist / Mathf.Max(1, nodeSpan);
+
+                for (int i = 0; i <= nodeSpan; i++)
+                {
+                    int nIdx = startNodeIdx + i;
+                    float t = (float)i / nodeSpan;
+                    Vector2 straightPos = Vector2.Lerp(pStart, pEnd, t);
+
+                    // ดีดสายสั่นแบบสายกีตาร์ที่เพิ่งถูกขันตึง
+                    float envelope = Mathf.Sin(t * Mathf.PI);
+                    Vector2 pluckVel = segNormal * (twangImpulse * envelope);
+                    Vector2 pluckOffset = pluckVel * (0.04f * envelope);
+
+                    VerletNode node = _nodes[nIdx];
+                    node.Position = straightPos + pluckOffset;
+                    node.OldPosition = straightPos - (pluckVel * dt);
+                    _nodes[nIdx] = node;
+                }
+
+                for (int l = 0; l < _links.Count; l++)
+                {
+                    VerletLink link = _links[l];
+                    if (link.NodeA >= startNodeIdx && link.NodeB <= endNodeIdx)
+                    {
+                        link.RestLength = linkRest;
+                        _links[l] = link;
+                    }
+                }
+            }
+
+            RebuildSplineData();
+            ApplySplineToLineRenderer();
+            _isSplineDirty = true;
+        }
+
+        /// <summary>
+        /// Continuously updates trailing suture thread connected to an in-flight needle projectile.
+        /// Stretches smoothly and straight between the origin (box) and the flying needle without snapping to nearby terrain.
+        /// </summary>
+        public void UpdateInFlightNeedle(Vector2 origin, Vector2 needlePos)
+        {
+            _isInFlightMode = true;
+            _isTautMode = true;
+
+            if (_cachedWaypoints.Count < 2)
+            {
+                _cachedWaypoints.Clear();
+                _cachedWaypoints.Add(origin);
+                _cachedWaypoints.Add(needlePos);
+            }
+            else
+            {
+                _cachedWaypoints[0] = origin;
+                _cachedWaypoints[1] = needlePos;
+            }
+
+            int nodesCount = Mathf.Max(4, _nodesPerSegment);
+            if (_nodes.Count != nodesCount || _pinnedWaypointIndices.Count < 2)
+            {
+                _nodes.Clear();
+                _links.Clear();
+                _pinnedWaypointIndices.Clear();
+
+                for (int i = 0; i < nodesCount; i++)
+                {
+                    float t = (float)i / (nodesCount - 1);
+                    Vector2 pos = Vector2.Lerp(origin, needlePos, t);
+                    _nodes.Add(new VerletNode
+                    {
+                        Position = pos,
+                        OldPosition = pos,
+                        IsPinned = (i == 0 || i == nodesCount - 1)
+                    });
+                }
+                _pinnedWaypointIndices.Add(0);
+                _pinnedWaypointIndices.Add(nodesCount - 1);
+
+                for (int i = 0; i < nodesCount - 1; i++)
+                {
+                    _links.Add(new VerletLink
+                    {
+                        NodeA = i,
+                        NodeB = i + 1,
+                        RestLength = Vector2.Distance(origin, needlePos) / (nodesCount - 1)
+                    });
+                }
+            }
+            else
+            {
+                int firstIdx = _pinnedWaypointIndices[0];
+                int lastIdx = _pinnedWaypointIndices[1];
+                int span = lastIdx - firstIdx;
+                float segDist = Vector2.Distance(origin, needlePos);
+                float linkRest = segDist / Mathf.Max(1, span);
+
+                for (int i = 0; i <= span; i++)
+                {
+                    float t = (float)i / span;
+                    Vector2 pos = Vector2.Lerp(origin, needlePos, t);
+                    VerletNode node = _nodes[firstIdx + i];
+                    node.Position = pos;
+                    node.OldPosition = pos;
+                    _nodes[firstIdx + i] = node;
+                }
+
+                for (int i = 0; i < _links.Count; i++)
+                {
+                    VerletLink link = _links[i];
+                    link.RestLength = linkRest;
+                    _links[i] = link;
+                }
+            }
+
+            UpdatePinMarkersInFlight(origin);
+            RebuildSplineData();
+            ApplySplineToLineRenderer();
+            UpdateShaderTiling();
+            _isSplineDirty = false;
+        }
+
+        private void UpdatePinMarkersInFlight(Vector2 origin)
+        {
+            if (_pinMarkers.Count == 0)
+            {
+                GameObject pin = CreatePinMarker();
+                _pinMarkers.Add(pin);
+            }
+
+            if (!_pinMarkers[0].activeSelf)
+            {
+                _pinMarkers[0].transform.localScale = Vector3.one * 0.38f;
+                _pinMarkers[0].SetActive(true);
+            }
+            _pinMarkers[0].transform.position = origin;
+
+            for (int i = 1; i < _pinMarkers.Count; i++)
+            {
+                if (_pinMarkers[i] != null)
+                {
+                    _pinMarkers[i].SetActive(false);
+                }
+            }
         }
 
         /// <summary>
         /// Continuously updates start and end positions for a dynamic 2-point thread (e.g., tethered to the player hauling a burden).
-        /// Dynamically adjusts link rest lengths so slack and tension behave realistically as distance changes.
         /// </summary>
         public void UpdateDynamicEndpoints(Vector2 startPos, Vector2 endPos, float restLengthBudget = -1f)
         {
+            _isInFlightMode = false;
+            _isTautMode = false;
+
             if (_cachedWaypoints.Count < 2)
             {
                 _cachedWaypoints.Clear();
@@ -199,21 +446,36 @@ namespace ThailandHorrorJam.Systems.Needle
                 _cachedWaypoints[_cachedWaypoints.Count - 1] = endPos;
             }
 
-            if (_nodes.Count >= 2 && _pinnedWaypointIndices.Count >= 2)
+            // หากยังไม่ได้สร้างโหนดเชือก ให้สร้างทันที
+            if (_nodes.Count < 2 || _pinnedWaypointIndices.Count < 2)
+            {
+                BuildVerletRope();
+            }
+            else
             {
                 int firstIdx = _pinnedWaypointIndices[0];
                 int lastIdx = _pinnedWaypointIndices[_pinnedWaypointIndices.Count - 1];
 
-                _nodes[firstIdx].Position = startPos;
-                _nodes[firstIdx].OldPosition = startPos;
+                VerletNode firstNode = _nodes[firstIdx];
+                firstNode.Position = startPos;
+                firstNode.OldPosition = startPos;
+                _nodes[firstIdx] = firstNode;
 
-                _nodes[lastIdx].Position = endPos;
-                _nodes[lastIdx].OldPosition = endPos;
+                VerletNode lastNode = _nodes[lastIdx];
+                lastNode.Position = endPos;
+                lastNode.OldPosition = endPos;
+                _nodes[lastIdx] = lastNode;
             }
 
-            if (restLengthBudget > 0f && _links.Count > 0)
+            UpdatePinMarkers(_cachedWaypoints);
+
+            float targetRestLength = restLengthBudget > 0f
+                ? restLengthBudget
+                : Vector2.Distance(startPos, endPos);
+
+            if (_links.Count > 0)
             {
-                float perLinkRest = (restLengthBudget / _links.Count) * Mathf.Max(1.0f, _slackFactor);
+                float perLinkRest = (targetRestLength / _links.Count) * Mathf.Max(1.0f, _slackFactor);
                 for (int i = 0; i < _links.Count; i++)
                 {
                     VerletLink link = _links[i];
@@ -223,6 +485,8 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             UpdatePinMarkers(_cachedWaypoints);
+            RebuildSplineData();
+            _isSplineDirty = true;
         }
 
         private void BuildVerletRope()
@@ -243,68 +507,58 @@ namespace ThailandHorrorJam.Systems.Needle
                 float segDistance = Vector2.Distance(pStart, pEnd);
 
                 Vector2 segDir = segDistance > 0.001f ? (pEnd - pStart) / segDistance : Vector2.right;
-                Vector2 segNormal = new Vector2(-segDir.y, segDir.x); // Transverse normal for guitar twang
+                Vector2 segNormal = new Vector2(-segDir.y, segDir.x);
 
                 int nodesThisSeg = Mathf.Max(3, _nodesPerSegment);
                 float linkRestLength = (segDistance / (nodesThisSeg - 1)) * Mathf.Max(1.0f, _slackFactor);
 
-                int startNodeIdx = _nodes.Count;
+                int startNodeIdx;
                 if (seg > 0)
                 {
-                    // Reuse previous end node as start node
                     startNodeIdx = _nodes.Count - 1;
                 }
                 else
                 {
-                    // First waypoint node
-                    var startNode = new VerletNode
+                    startNodeIdx = 0;
+                    _nodes.Add(new VerletNode
                     {
                         Position = pStart,
                         OldPosition = pStart,
                         IsPinned = true
-                    };
-                    _nodes.Add(startNode);
+                    });
                     _pinnedWaypointIndices.Add(0);
                 }
 
-                // Add interior nodes
                 for (int i = 1; i < nodesThisSeg - 1; i++)
                 {
                     float t = (float)i / (nodesThisSeg - 1);
                     Vector2 basePos = Vector2.Lerp(pStart, pEnd, t);
 
-                    // Transverse plucked wave
                     float envelope = Mathf.Sin(t * Mathf.PI);
                     Vector2 pluckOffset = (segNormal * (_twangImpulse * 0.12f * envelope)) + (Vector2.down * (0.05f * envelope));
                     Vector2 pos = basePos + pluckOffset;
 
-                    // Initial velocity via OldPosition offset
                     Vector2 initialVel = segNormal * (_twangImpulse * envelope);
                     Vector2 oldPos = pos - (initialVel * dt);
 
-                    var interiorNode = new VerletNode
+                    _nodes.Add(new VerletNode
                     {
                         Position = pos,
                         OldPosition = oldPos,
                         IsPinned = false
-                    };
-                    _nodes.Add(interiorNode);
+                    });
                 }
 
-                // End waypoint node
-                var endNode = new VerletNode
+                _nodes.Add(new VerletNode
                 {
                     Position = pEnd,
                     OldPosition = pEnd,
                     IsPinned = true
-                };
-                _nodes.Add(endNode);
+                });
                 _pinnedWaypointIndices.Add(_nodes.Count - 1);
 
-                // Build links for this segment
-                int segStart = (seg == 0) ? startNodeIdx : startNodeIdx;
                 int segEnd = _nodes.Count - 1;
-                for (int n = segStart; n < segEnd; n++)
+                for (int n = startNodeIdx; n < segEnd; n++)
                 {
                     _links.Add(new VerletLink
                     {
@@ -318,17 +572,19 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void SimulateVerlet(float dt)
         {
-            Vector2 gravityStep = Vector2.down * (_gravity * dt * dt);
-            float dragFactor = Mathf.Clamp01(1f - (_airDamping * dt));
+            Vector2 gravityStep = _isTautMode ? Vector2.zero : Vector2.down * (_gravity * dt * dt);
+            float currentDamping = _isTautMode ? _airDamping * 1.6f : _airDamping;
+            float dragFactor = Mathf.Clamp01(1f - (currentDamping * dt));
 
             for (int i = 0; i < _nodes.Count; i++)
             {
-                var node = _nodes[i];
+                VerletNode node = _nodes[i];
                 if (node.IsPinned) continue;
 
                 Vector2 velocity = (node.Position - node.OldPosition) * dragFactor;
                 node.OldPosition = node.Position;
                 node.Position += velocity + gravityStep;
+                _nodes[i] = node;
             }
         }
 
@@ -338,12 +594,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
             for (int iter = 0; iter < _constraintIterations; iter++)
             {
-                // Distance constraints between adjacent particles
                 for (int i = 0; i < linkCount; i++)
                 {
-                    var link = _links[i];
-                    var nodeA = _nodes[link.NodeA];
-                    var nodeB = _nodes[link.NodeB];
+                    VerletLink link = _links[i];
+                    VerletNode nodeA = _nodes[link.NodeA];
+                    VerletNode nodeB = _nodes[link.NodeB];
 
                     Vector2 delta = nodeB.Position - nodeA.Position;
                     float dist = delta.magnitude;
@@ -356,33 +611,97 @@ namespace ThailandHorrorJam.Systems.Needle
                     {
                         nodeA.Position += correction;
                         nodeB.Position -= correction;
+                        _nodes[link.NodeA] = nodeA;
+                        _nodes[link.NodeB] = nodeB;
                     }
                     else if (!nodeA.IsPinned)
                     {
                         nodeA.Position += correction * 2f;
+                        _nodes[link.NodeA] = nodeA;
                     }
                     else if (!nodeB.IsPinned)
                     {
                         nodeB.Position -= correction * 2f;
+                        _nodes[link.NodeB] = nodeB;
                     }
                 }
 
-                // Strict waypoint pinning
+                if (_enableGroundCollision)
+                {
+                    SolveCollisions();
+                }
+
                 for (int w = 0; w < _pinnedWaypointIndices.Count; w++)
                 {
                     int nodeIdx = _pinnedWaypointIndices[w];
                     Vector2 targetPos = _cachedWaypoints[w];
-                    _nodes[nodeIdx].Position = targetPos;
-                    _nodes[nodeIdx].OldPosition = targetPos;
+                    VerletNode pinnedNode = _nodes[nodeIdx];
+                    pinnedNode.Position = targetPos;
+                    pinnedNode.OldPosition = targetPos;
+                    _nodes[nodeIdx] = pinnedNode;
                 }
             }
         }
 
-        private void DrawCatmullRomSpline()
+        private void SolveCollisions()
+        {
+            EnsureCollisionFilter();
+
+            int nodeCount = _nodes.Count;
+            for (int i = 0; i < nodeCount; i++)
+            {
+                VerletNode node = _nodes[i];
+                if (node.IsPinned) continue;
+
+                int hitCount = Physics2D.OverlapPoint(node.Position, _collisionFilter, _pointHitBuffer);
+                if (hitCount > 0)
+                {
+                    Collider2D hit = _pointHitBuffer[0];
+                    if (hit == null) continue;
+
+                    // กรอง collider ของวัตถุเจ้าของด้ายออก ไม่ให้ด้ายติดตัวเอง
+                    if (_cachedOwner != null && _cachedOwner.ObjectTransform != null &&
+                        hit.transform.IsChildOf(_cachedOwner.ObjectTransform))
+                    {
+                        continue;
+                    }
+
+                    Vector2 surfacePoint = hit.ClosestPoint(node.OldPosition);
+                    Vector2 normal = (node.OldPosition - surfacePoint).normalized;
+
+                    // Fallback หาก OldPosition อยู่ข้างในตัว collider ด้วย
+                    if (normal.sqrMagnitude < 0.001f)
+                    {
+                        var rayHit = Physics2D.Raycast(node.Position + Vector2.up * 0.8f, Vector2.down, 1.6f, _collisionMask);
+                        if (rayHit.collider != null)
+                        {
+                            surfacePoint = rayHit.point;
+                            normal = rayHit.normal;
+                        }
+                        else
+                        {
+                            normal = Vector2.up;
+                        }
+                    }
+
+                    node.Position = surfacePoint + normal * _surfaceOffset;
+
+                    // ใส่แรงเสียดทาน (Friction) เมื่อสัมผัสพื้น เพื่อให้ด้ายกองนิ่งอยู่กับที่ ไม่ลื่นไหล
+                    Vector2 vel = node.Position - node.OldPosition;
+                    vel *= (1f - _groundFriction);
+                    node.OldPosition = node.Position - vel;
+
+                    _nodes[i] = node;
+                }
+            }
+        }
+
+        private void RebuildSplineData()
         {
             if (_nodes.Count < 2)
             {
-                _lineRenderer.positionCount = 0;
+                _renderBuffer.Clear();
+                _totalPathLength = 0f;
                 return;
             }
 
@@ -403,6 +722,18 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     float t = (float)step / subdivisions;
                     Vector2 pt = EvaluateCatmullRom(p0, p1, p2, p3, t);
+
+                    if (!_isTautMode && _enableGroundCollision && Physics2D.OverlapPoint(pt, _collisionFilter, _pointHitBuffer) > 0)
+                    {
+                        Collider2D groundHit = _pointHitBuffer[0];
+                        if (groundHit != null && (_cachedOwner == null || _cachedOwner.ObjectTransform == null ||
+                            !groundHit.transform.IsChildOf(_cachedOwner.ObjectTransform)))
+                        {
+                            Vector2 surfacePoint = groundHit.ClosestPoint(pt + Vector2.up * 0.15f);
+                            pt = surfacePoint + Vector2.up * _surfaceOffset;
+                        }
+                    }
+
                     _renderBuffer.Add(new Vector3(pt.x, pt.y, 0f));
                 }
             }
@@ -416,17 +747,32 @@ namespace ThailandHorrorJam.Systems.Needle
                 _cumulativeLengths.Add(runningDist);
             }
             _totalPathLength = runningDist;
-
-            _lineRenderer.positionCount = _renderBuffer.Count;
-            for (int i = 0; i < _renderBuffer.Count; i++)
-            {
-                _lineRenderer.SetPosition(i, _renderBuffer[i]);
-            }
         }
 
-        /// <summary>
-        /// Samples an exact world position and tangent along the physical sagging/curving thread at a specified distance.
-        /// </summary>
+        private void ApplySplineToLineRenderer()
+        {
+            EnsureComponents();
+            int count = _renderBuffer.Count;
+            if (count < 2)
+            {
+                _lineRenderer.positionCount = 0;
+                return;
+            }
+
+            if (_linePositionsArray == null || _linePositionsArray.Length < count)
+            {
+                _linePositionsArray = new Vector3[Mathf.NextPowerOfTwo(Mathf.Max(128, count))];
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                _linePositionsArray[i] = _renderBuffer[i];
+            }
+
+            _lineRenderer.positionCount = count;
+            _lineRenderer.SetPositions(_linePositionsArray);
+        }
+
         public Vector2 GetPointAtDistance(float distance, out Vector2 tangent)
         {
             if (_renderBuffer.Count == 0)
@@ -498,10 +844,6 @@ namespace ThailandHorrorJam.Systems.Needle
             );
         }
 
-        /// <summary>
-        /// Pluck the suture thread at a given world position to trigger organic vibration (Webbed style).
-        /// Applies smooth cosine falloff across the specified radius.
-        /// </summary>
         public void Pluck(Vector2 worldPosition, Vector2 impulse, float radius = 1.4f)
         {
             if (_nodes.Count == 0) return;
@@ -509,13 +851,16 @@ namespace ThailandHorrorJam.Systems.Needle
 
             for (int i = 0; i < _nodes.Count; i++)
             {
-                if (_nodes[i].IsPinned) continue;
-                float dist = Vector2.Distance(worldPosition, _nodes[i].Position);
+                VerletNode node = _nodes[i];
+                if (node.IsPinned) continue;
+
+                float dist = Vector2.Distance(worldPosition, node.Position);
                 if (dist < radius)
                 {
                     float t = dist / radius;
                     float falloff = 0.5f * (1f + Mathf.Cos(t * Mathf.PI));
-                    _nodes[i].OldPosition -= impulse * (falloff * dt);
+                    node.OldPosition -= impulse * (falloff * dt);
+                    _nodes[i] = node;
                 }
             }
         }
@@ -524,14 +869,49 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (!_enableAnimation || _threadMaterial == null || _renderBuffer.Count < 2) return;
 
-            float totalLength = 0f;
-            for (int i = 0; i < _renderBuffer.Count - 1; i++)
+            // ใช้ _totalPathLength ที่คำนวณไว้แล้วแทนการวนลูป Vector3.Distance ซ้ำ
+            _threadMaterial.SetFloat(s_TilingId, Mathf.Max(1f, _totalPathLength * _tilingFrequency));
+            _threadMaterial.SetFloat(s_ScrollSpeedId, _scrollSpeed);
+        }
+
+        private Vector2 SnapToNearestObjectEdge(Vector2 pt, Vector2 towardsDir, bool isOwner)
+        {
+            EnsureComponents();
+            EnsureCollisionFilter();
+
+            if (isOwner)
             {
-                totalLength += Vector3.Distance(_renderBuffer[i], _renderBuffer[i + 1]);
+                // Waypoint 0 (the initial object position where rail starts): Keep the fixed world coordinate
+                return pt;
             }
 
-            _threadMaterial.SetFloat(s_TilingId, Mathf.Max(1f, totalLength * _tilingFrequency));
-            _threadMaterial.SetFloat(s_ScrollSpeedId, _scrollSpeed);
+            // For external anchor (e.g. wall/floor): find the surface of the collider at or near this point
+            int hitCount = Physics2D.OverlapCircle(pt, 1.5f, _collisionFilter, _pointHitBuffer);
+            float closestDist = float.MaxValue;
+            Vector2 bestEdge = pt;
+            bool found = false;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider2D hit = _pointHitBuffer[i];
+                if (hit == null) continue;
+                if (_cachedOwner != null && _cachedOwner.ObjectTransform != null && hit.transform.IsChildOf(_cachedOwner.ObjectTransform))
+                {
+                    continue; // Skip owner
+                }
+
+                Vector2 fromPt = pt - towardsDir * 5f;
+                Vector2 edgePoint = hit.ClosestPoint(fromPt);
+                float dist = Vector2.Distance(pt, edgePoint);
+                if (dist < closestDist)
+                {
+                    closestDist = dist;
+                    bestEdge = edgePoint;
+                    found = true;
+                }
+            }
+
+            return found ? bestEdge : pt;
         }
 
         private void UpdatePinMarkers(IReadOnlyList<Vector2> waypoints)
@@ -546,8 +926,13 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (i < waypoints.Count)
                 {
+                    if (!_pinMarkers[i].activeSelf)
+                    {
+                        _pinMarkers[i].transform.localScale = Vector3.one * 0.38f;
+                        _pinMarkers[i].SetActive(true);
+                    }
+                    _pinMarkers[i].transform.SetParent(null);
                     _pinMarkers[i].transform.position = waypoints[i];
-                    _pinMarkers[i].SetActive(true);
                 }
                 else
                 {
@@ -560,7 +945,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             GameObject pin = new GameObject("NeedlePin_2D");
             pin.transform.SetParent(null);
-            pin.transform.localScale = Vector3.one * 0.38f; // Start with juicy pop scale
+            pin.transform.localScale = Vector3.one * 0.38f;
 
             SpriteRenderer sr = pin.AddComponent<SpriteRenderer>();
             if (s_PinSprite == null)
@@ -573,7 +958,6 @@ namespace ThailandHorrorJam.Systems.Needle
             sr.sortingOrder = 12;
 
             pin.AddComponent<PinMarkerPopAnimation>();
-
             return pin;
         }
 
@@ -583,11 +967,13 @@ namespace ThailandHorrorJam.Systems.Needle
 
             private void Update()
             {
-                transform.localScale = Vector3.MoveTowards(transform.localScale, Vector3.one * k_TargetScale, Time.deltaTime * 1.8f);
-                if (Mathf.Abs(transform.localScale.x - k_TargetScale) < 0.005f)
+                if (Mathf.Abs(transform.localScale.x - k_TargetScale) > 0.005f)
+                {
+                    transform.localScale = Vector3.MoveTowards(transform.localScale, Vector3.one * k_TargetScale, Time.deltaTime * 1.8f);
+                }
+                else
                 {
                     transform.localScale = Vector3.one * k_TargetScale;
-                    Destroy(this);
                 }
             }
         }
@@ -616,6 +1002,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void Clear()
         {
+            _isInFlightMode = false;
+            _isTautMode = false;
             _cachedWaypoints.Clear();
             _pinnedWaypointIndices.Clear();
             _nodes.Clear();
@@ -623,16 +1011,28 @@ namespace ThailandHorrorJam.Systems.Needle
             _renderBuffer.Clear();
             _cumulativeLengths.Clear();
             _totalPathLength = 0f;
+            _isSplineDirty = false;
 
             if (_lineRenderer != null)
             {
                 _lineRenderer.positionCount = 0;
             }
 
-            ClearPinMarkers();
+            HidePinMarkers();
         }
 
-        private void ClearPinMarkers()
+        private void HidePinMarkers()
+        {
+            for (int i = 0; i < _pinMarkers.Count; i++)
+            {
+                if (_pinMarkers[i] != null)
+                {
+                    _pinMarkers[i].SetActive(false);
+                }
+            }
+        }
+
+        private void DestroyPinMarkers()
         {
             for (int i = 0; i < _pinMarkers.Count; i++)
             {
@@ -655,28 +1055,30 @@ namespace ThailandHorrorJam.Systems.Needle
         private void OnDisable()
         {
             s_ActiveThreads.Remove(this);
-            ClearPinMarkers();
+            HidePinMarkers();
         }
 
-        /// <summary>
-        /// Check if a world point (e.g. mouse pointer or interaction zone) is close to any point on this suture thread line, and severs it.
-        /// </summary>
         public bool TrySeverAt(Vector2 point, float radius)
         {
             if (_renderBuffer.Count < 2) return false;
 
             float sqrRadius = radius * radius;
 
-            for (int i = 0; i < _renderBuffer.Count; i++)
+            for (int i = 0; i < _renderBuffer.Count - 1; i++)
             {
-                Vector2 threadPt = _renderBuffer[i];
-                float sqrDist = (threadPt - point).sqrMagnitude;
-                if (sqrDist <= sqrRadius)
+                Vector2 segA = _renderBuffer[i];
+                Vector2 segB = _renderBuffer[i + 1];
+
+                if (SqrDistanceToSegment(point, segA, segB) <= sqrRadius)
                 {
-                    IStitchable owner = GetComponentInParent<IStitchable>();
-                    if (owner != null)
+                    if (_cachedOwner == null)
                     {
-                        owner.CutThread();
+                        _cachedOwner = GetComponentInParent<IStitchable>();
+                    }
+
+                    if (_cachedOwner != null)
+                    {
+                        _cachedOwner.CutThread();
                     }
                     else
                     {
@@ -689,9 +1091,17 @@ namespace ThailandHorrorJam.Systems.Needle
             return false;
         }
 
-        /// <summary>
-        /// Checks all active threads in the world and severs any thread passing near the given point.
-        /// </summary>
+        private static float SqrDistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float lenSq = ab.sqrMagnitude;
+            if (lenSq < 0.00001f) return (p - a).sqrMagnitude;
+
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / lenSq);
+            Vector2 projection = a + t * ab;
+            return (p - projection).sqrMagnitude;
+        }
+
         public static bool TrySeverAnyThreadNear(Vector2 point, float radius)
         {
             bool anySevered = false;
@@ -707,7 +1117,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void OnDestroy()
         {
-            ClearPinMarkers();
+            DestroyPinMarkers();
             if (_threadMaterial != null)
             {
                 Destroy(_threadMaterial);

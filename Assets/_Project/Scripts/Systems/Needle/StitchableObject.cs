@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Needle
 {
@@ -15,6 +16,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("travelSpeed")]
         [SerializeField] private float _travelSpeed = 3.5f;
 
+        [Header("Ground Collision Settings")]
+        [Tooltip("Surfaces that the stitchable object must not penetrate through (e.g. Ground, Walls).")]
+        [SerializeField] private LayerMask _groundLayer;
+
         [Header("Thread Component")]
         [FormerlySerializedAs("sutureThread")]
         [SerializeField] private SutureThread _sutureThread;
@@ -26,6 +31,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Maximum tether leash distance budget.")]
         [SerializeField] private float _maxTetherDistance = 4.5f;
 
+        [Tooltip("Multiplier applied to Rigidbody2D mass while hauled by player (e.g. 0.1 = 10% of original mass). Makes dragging lighter and prevents the player from being pulled backward.")]
+        [Range(0.01f, 1f)]
+        [SerializeField] private float _tetheredMassMultiplier = 0.1f;
+
         [Header("Webbed Trampoline Settings")]
         [Tooltip("Multiplier for the bounce deflection impulse when the player lands.")]
         [SerializeField] private float _landingPluckMultiplier = 1.4f;
@@ -35,25 +44,34 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private Rigidbody2D _rb;
         private RigidbodyType2D _originalBodyType;
+        private float _originalMass = 1f;
         private bool _hasRb;
+        private Collider2D _col;
+        private float _halfHeight = 0.5f;
+        private Vector2 _boxCastSize = new Vector2(0.9f, 0.05f);
+        private ContactFilter2D _groundFilter;
+        private readonly RaycastHit2D[] _groundRaycastBuffer = new RaycastHit2D[4];
 
         private DistanceJoint2D _tetherJoint;
         private Transform _tetheredPlayerTransform;
         private Rigidbody2D _tetheredPlayerRb;
+        private PlayerController2D _tetheredPlayerController;
+        private NeedleController _tetheredNeedleController;
         private float _activeTetherLeashLength;
+        private bool _isReleasingTether;
 
         private StitchState _currentState = StitchState.Idle;
         private readonly List<Vector2> _waypoints = new List<Vector2>();
         private LoopPlaybackMode _activeLoopMode;
         private int _currentWaypointIndex;
-        private float _distanceAlongThread;
         private bool _isReversing;
         private Vector2 _previousPosition;
+        private Vector2 _targetFramePosition;
         private Vector2 _currentVelocity;
 
         public StitchState CurrentState => _currentState;
         public Transform ObjectTransform => transform;
-        public Vector2 CurrentPosition => transform.position;
+        public Vector2 CurrentPosition => _hasRb ? _rb.position : (Vector2)transform.position;
         public Vector2 CurrentVelocity => _currentVelocity;
         public bool IsTetheredToPlayer => _currentState == StitchState.PlayerHarness;
 
@@ -63,9 +81,19 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_hasRb)
             {
                 _originalBodyType = _rb.bodyType;
+                _originalMass = _rb.mass;
             }
 
+            EnsureGroundFilter();
+
+            _previousPosition = CurrentPosition;
+            _targetFramePosition = _previousPosition;
+
             _tetherJoint = GetComponent<DistanceJoint2D>();
+            if (_tetherJoint != null)
+            {
+                _tetherJoint.enabled = false;
+            }
 
             if (_sutureThread == null)
             {
@@ -74,13 +102,42 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     GameObject threadObj = new GameObject("SutureThread");
                     threadObj.transform.SetParent(transform);
+                    threadObj.transform.localPosition = Vector3.zero;
                     _sutureThread = threadObj.AddComponent<SutureThread>();
                 }
             }
         }
 
+        private void EnsureGroundFilter()
+        {
+            if (_col == null)
+            {
+                _col = GetComponent<Collider2D>();
+                if (_col != null)
+                {
+                    _halfHeight = _col.bounds.extents.y;
+                    _boxCastSize = new Vector2(_col.bounds.size.x * 0.9f, 0.05f);
+                }
+            }
+
+            if (_groundFilter.useLayerMask) return;
+
+            if (_groundLayer.value == 0)
+            {
+                int groundLayer = LayerMask.NameToLayer("Ground");
+                _groundLayer = groundLayer != -1 ? (1 << groundLayer) : LayerMask.GetMask("Ground", "Default");
+            }
+
+            _groundFilter = new ContactFilter2D();
+            _groundFilter.SetLayerMask(_groundLayer);
+            _groundFilter.useLayerMask = true;
+            _groundFilter.useTriggers = false;
+        }
+
         private void FixedUpdate()
         {
+            _targetFramePosition = CurrentPosition;
+
             if (_currentState == StitchState.Looping)
             {
                 TraverseWaypoints();
@@ -90,12 +147,12 @@ namespace ThailandHorrorJam.Systems.Needle
                 UpdatePlayerHarness();
             }
 
-            Vector2 curPos = transform.position;
             if (Time.fixedDeltaTime > 0f)
             {
-                _currentVelocity = (curPos - _previousPosition) / Time.fixedDeltaTime;
+                // ใช้ _targetFramePosition เพื่อให้ได้ความเร็วที่แม่นยำในเฟรมปัจจุบันทันที แม้จะขยับด้วย _rb.MovePosition
+                _currentVelocity = (_targetFramePosition - _previousPosition) / Time.fixedDeltaTime;
             }
-            _previousPosition = curPos;
+            _previousPosition = _targetFramePosition;
         }
 
         public void OnPlayerLanded(float impactSpeed, Vector2 contactPoint)
@@ -127,7 +184,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             _currentState = StitchState.Tethered;
             _waypoints.Clear();
-            _waypoints.Add(transform.position);
+            _waypoints.Add(CurrentPosition);
 
             if (_sutureThread != null)
             {
@@ -138,11 +195,37 @@ namespace ThailandHorrorJam.Systems.Needle
         public void UpdatePinnedWaypoints(IReadOnlyList<Vector2> waypoints)
         {
             _waypoints.Clear();
-            _waypoints.AddRange(waypoints);
+            for (int i = 0; i < waypoints.Count; i++)
+            {
+                _waypoints.Add(waypoints[i]);
+            }
 
             if (_sutureThread != null)
             {
                 _sutureThread.RenderPath(_waypoints);
+            }
+        }
+
+        public void UpdateInFlightNeedle(Vector2 needlePos)
+        {
+            if (_waypoints.Count == 0)
+            {
+                _waypoints.Add(CurrentPosition);
+                _waypoints.Add(needlePos);
+            }
+            else if (_waypoints.Count == 1)
+            {
+                _waypoints.Add(needlePos);
+            }
+            else
+            {
+                _waypoints[0] = CurrentPosition;
+                _waypoints[1] = needlePos;
+            }
+
+            if (_sutureThread != null)
+            {
+                _sutureThread.UpdateInFlightNeedle(_waypoints[0], needlePos);
             }
         }
 
@@ -156,33 +239,43 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_currentState == StitchState.PlayerHarness)
             {
-                if (_tetherJoint != null)
-                {
-                    _tetherJoint.enabled = false;
-                    _tetherJoint.connectedBody = null;
-                }
-                _tetheredPlayerTransform = null;
-                _tetheredPlayerRb = null;
+                DisableTetherJointAndClearPlayerRefs();
             }
 
             _waypoints.Clear();
-            _waypoints.AddRange(waypoints);
+            for (int i = 0; i < waypoints.Count; i++)
+            {
+                _waypoints.Add(waypoints[i]);
+            }
+
+            // ซิงค์จุดเริ่มต้นให้ตรงกับตำแหน่งปัจจุบันของวัตถุ ป้องกันการกระชากวาร์ปในเฟรมแรก
+            _waypoints[0] = CurrentPosition;
+
             _activeLoopMode = mode;
             _currentState = StitchState.Looping;
             _currentWaypointIndex = 0;
-            _distanceAlongThread = 0f;
             _isReversing = false;
 
             if (_hasRb)
             {
-                _rb.bodyType = RigidbodyType2D.Kinematic;
                 _rb.linearVelocity = Vector2.zero;
                 _rb.angularVelocity = 0f;
+                _rb.bodyType = RigidbodyType2D.Static;
             }
 
             if (_sutureThread != null)
             {
                 _sutureThread.RenderPath(_waypoints);
+                _sutureThread.SnapTaut(3.8f);
+
+                // ซิงค์พิกัด Waypoints ของกล่องให้ตรงกับหมุดและแนวเส้นด้ายที่ขึงตึง 100%
+                if (_sutureThread.CachedWaypoints != null && _sutureThread.CachedWaypoints.Count == _waypoints.Count)
+                {
+                    for (int i = 0; i < _waypoints.Count; i++)
+                    {
+                        _waypoints[i] = _sutureThread.CachedWaypoints[i];
+                    }
+                }
             }
         }
 
@@ -190,53 +283,6 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (_waypoints.Count < 2) return;
 
-            if (_sutureThread != null && _sutureThread.TotalPathLength > 0.05f)
-            {
-                TraverseAlongThread();
-            }
-            else
-            {
-                TraverseWaypointsLinearFallback();
-            }
-        }
-
-        private void TraverseAlongThread()
-        {
-            float totalLength = _sutureThread.TotalPathLength;
-            float step = _travelSpeed * Time.fixedDeltaTime;
-
-            if (!_isReversing)
-            {
-                _distanceAlongThread += step;
-                if (_distanceAlongThread >= totalLength)
-                {
-                    if (_activeLoopMode == LoopPlaybackMode.PingPong)
-                    {
-                        _distanceAlongThread = totalLength;
-                        _isReversing = true;
-                    }
-                    else
-                    {
-                        _distanceAlongThread = 0f;
-                    }
-                }
-            }
-            else
-            {
-                _distanceAlongThread -= step;
-                if (_distanceAlongThread <= 0f)
-                {
-                    _distanceAlongThread = 0f;
-                    _isReversing = false;
-                }
-            }
-
-            Vector2 targetPos = _sutureThread.GetPointAtDistance(_distanceAlongThread, out _);
-            MoveToPosition(targetPos);
-        }
-
-        private void TraverseWaypointsLinearFallback()
-        {
             int targetIndex = _isReversing ? _currentWaypointIndex - 1 : _currentWaypointIndex + 1;
 
             if (!_isReversing && targetIndex >= _waypoints.Count)
@@ -261,7 +307,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             Vector2 targetPos = _waypoints[targetIndex];
-            Vector2 currentPos = transform.position;
+            Vector2 currentPos = CurrentPosition;
             float step = _travelSpeed * Time.fixedDeltaTime;
 
             Vector2 newPos = Vector2.MoveTowards(currentPos, targetPos, step);
@@ -275,14 +321,57 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void MoveToPosition(Vector2 pos)
         {
+            // ในโหมดรางลูป (Looping) วัตถุจะแล่นไปตามแนวด้ายตรงเป๊ะโดยไม่ถูกกดลงพื้น
+            Vector2 validPos = (_currentState == StitchState.Looping) ? pos : ClampToGroundSurface(pos);
+            _targetFramePosition = validPos;
             if (_hasRb)
             {
-                _rb.MovePosition(pos);
+                _rb.position = validPos;
+                transform.position = validPos;
             }
             else
             {
-                transform.position = pos;
+                transform.position = validPos;
             }
+        }
+
+        /// <summary>
+        /// ป้องกันไม่ให้วัตถุทะลุผ่านพื้นดินหรือสิ่งกีดขวาง โดยล็อกระดับ Y ให้อยู่เสมอกับผิวดินพอดีเป๊ะ (Flush 0 cm)
+        /// </summary>
+        public Vector2 ClampToGroundSurface(Vector2 targetPos)
+        {
+            EnsureGroundFilter();
+            if (_col == null) return targetPos;
+
+            Vector2 currentPos = CurrentPosition;
+            float castTopY = Mathf.Max(currentPos.y, targetPos.y) + _halfHeight + 0.2f;
+            Vector2 origin = new Vector2(targetPos.x, castTopY);
+            float castDist = castTopY - (targetPos.y - _halfHeight) + 0.5f;
+
+            int count = Physics2D.BoxCast(origin, _boxCastSize, 0f, Vector2.down, _groundFilter, _groundRaycastBuffer, castDist);
+
+            float highestGroundY = float.MinValue;
+            for (int i = 0; i < count; i++)
+            {
+                Collider2D hitCol = _groundRaycastBuffer[i].collider;
+                if (hitCol == null || hitCol == _col || hitCol.transform.IsChildOf(transform)) continue;
+
+                if (_groundRaycastBuffer[i].point.y > highestGroundY)
+                {
+                    highestGroundY = _groundRaycastBuffer[i].point.y;
+                }
+            }
+
+            if (highestGroundY > float.MinValue)
+            {
+                float minY = highestGroundY + _halfHeight;
+                if (targetPos.y < minY)
+                {
+                    return new Vector2(targetPos.x, minY);
+                }
+            }
+
+            return targetPos;
         }
 
         public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb)
@@ -291,11 +380,14 @@ namespace ThailandHorrorJam.Systems.Needle
 
             _tetheredPlayerTransform = playerTransform;
             _tetheredPlayerRb = playerRb;
+            _tetheredPlayerController = playerTransform.GetComponent<PlayerController2D>();
+            _tetheredNeedleController = playerTransform.GetComponent<NeedleController>();
             _currentState = StitchState.PlayerHarness;
 
             if (_hasRb)
             {
                 _rb.bodyType = RigidbodyType2D.Dynamic;
+                _rb.mass = Mathf.Max(0.1f, _originalMass * _tetheredMassMultiplier);
             }
 
             if (_tetherJoint == null)
@@ -307,7 +399,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            float currentDist = Vector2.Distance(transform.position, playerTransform.position);
+            float currentDist = Vector2.Distance(CurrentPosition, playerTransform.position);
             _activeTetherLeashLength = Mathf.Clamp(currentDist, _minTetherDistance, _maxTetherDistance);
 
             _tetherJoint.enabled = true;
@@ -318,7 +410,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _tetherJoint.enableCollision = true;
 
             _waypoints.Clear();
-            _waypoints.Add(transform.position);
+            _waypoints.Add(CurrentPosition);
             _waypoints.Add(playerTransform.position);
 
             if (_sutureThread != null)
@@ -329,20 +421,59 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void ReleasePlayerTether()
         {
+            if (_isReleasingTether) return;
+            _isReleasingTether = true;
+
+            NeedleController needleCtrl = _tetheredNeedleController;
+            PlayerController2D playerCtrl = _tetheredPlayerController;
+
+            DisableTetherJointAndClearPlayerRefs();
+
+            _currentState = StitchState.Idle;
+            _waypoints.Clear();
+
+            if (_hasRb)
+            {
+                _rb.bodyType = _originalBodyType;
+                _rb.mass = _originalMass;
+            }
+
+            if (_sutureThread != null)
+            {
+                _sutureThread.Clear();
+            }
+
+            // ซิงค์สถานะกลับไปยัง PlayerController2D และ NeedleController กรณีด้ายขาดเองหรือถูกตัดจากภายนอก
+            if (playerCtrl != null)
+            {
+                playerCtrl.SetHauling(false);
+            }
+
+            if (needleCtrl != null && needleCtrl.IsTetheredToPlayer)
+            {
+                needleCtrl.ReleasePlayerTether();
+            }
+
+            _isReleasingTether = false;
+        }
+
+        private void DisableTetherJointAndClearPlayerRefs()
+        {
             if (_tetherJoint != null)
             {
                 _tetherJoint.enabled = false;
                 _tetherJoint.connectedBody = null;
             }
 
+            if (_hasRb)
+            {
+                _rb.mass = _originalMass;
+            }
+
             _tetheredPlayerTransform = null;
             _tetheredPlayerRb = null;
-            _currentState = StitchState.Idle;
-
-            if (_sutureThread != null)
-            {
-                _sutureThread.Clear();
-            }
+            _tetheredPlayerController = null;
+            _tetheredNeedleController = null;
         }
 
         private void UpdatePlayerHarness()
@@ -353,7 +484,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            Vector2 objPos = transform.position;
+            Vector2 objPos = CurrentPosition;
             Vector2 playerPos = _tetheredPlayerTransform.position;
             float dist = Vector2.Distance(objPos, playerPos);
 
@@ -380,17 +511,25 @@ namespace ThailandHorrorJam.Systems.Needle
 
             _currentState = StitchState.Idle;
             _waypoints.Clear();
-            _distanceAlongThread = 0f;
             _isReversing = false;
 
             if (_hasRb)
             {
                 _rb.bodyType = _originalBodyType;
+                _rb.mass = _originalMass;
             }
 
             if (_sutureThread != null)
             {
                 _sutureThread.Clear();
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (_currentState == StitchState.PlayerHarness)
+            {
+                ReleasePlayerTether();
             }
         }
     }
