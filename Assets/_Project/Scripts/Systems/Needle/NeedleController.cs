@@ -433,31 +433,13 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            // Calculate surface-inset offset for the stitchable box so it rests flush
-            Vector2 anchorPos = hitPoint;
-            Collider2D targetCol = _activeTarget.ObjectTransform.GetComponent<Collider2D>();
-            if (targetCol != null)
-            {
-                Vector2 normal = hitNormal.sqrMagnitude > 0.001f ? hitNormal : Vector2.up;
-                float halfHeight = targetCol.bounds.extents.y;
-                float halfWidth = targetCol.bounds.extents.x;
-
-                Vector2 offset = Vector2.zero;
-                if (Mathf.Abs(normal.y) > 0.5f)
-                {
-                    offset.y = Mathf.Sign(normal.y) * halfHeight;
-                }
-                else
-                {
-                    offset.x = Mathf.Sign(normal.x) * halfWidth;
-                }
-
-                anchorPos += offset;
-            }
+            // วางหมุด Pin แนบติดกับพื้นผิวจุดกระทบพอดีเป๊ะ พร้อมยกขอบขึ้นตามแนว Normal เล็กน้อย (2 cm) เพื่อไม่ให้จมเนื้อ collider
+            Vector2 normal = hitNormal.sqrMagnitude > 0.001f ? hitNormal.normalized : Vector2.up;
+            Vector2 anchorPos = hitPoint + normal * 0.02f;
 
             // Check thread length budget from Box (Waypoint 0)
             Vector2 boxPos = _pinnedWaypoints[0];
-            float segDist = Vector2.Distance(boxPos, anchorPos);
+            float segDist = Vector2.Distance(boxPos, hitPoint);
 
             if (segDist < k_MinWaypointDistance || segDist > _maxThreadLength)
             {
@@ -705,30 +687,12 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            // ชดเชยจุด Waypoint ให้อิงตามขนาดขอบเขต (Extents) ของวัตถุ เพื่อให้ขอบวัตถุแนบสนิทกับผิวพื้นพอดีเป๊ะ (Flush 0 cm)
-            if (foundValid && ignoredStitchable != null && ignoredStitchable.ObjectTransform != null)
+            // วางจุด Waypoint แนบติดกับพื้นผิวจุดกระทบ พร้อมยกขอบขึ้นตามแนว Normal เล็กน้อย (2 cm) เพื่อไม่ให้จมเนื้อ collider
+            if (foundValid)
             {
-                Collider2D targetCol = ignoredStitchable.ObjectTransform.GetComponent<Collider2D>();
-                if (targetCol != null)
-                {
-                    Vector2 normal = ((Vector2)worldAimPos - anchorPoint).normalized;
-                    if (normal.sqrMagnitude < 0.001f) normal = Vector2.up;
-
-                    float halfHeight = targetCol.bounds.extents.y;
-                    float halfWidth = targetCol.bounds.extents.x;
-
-                    Vector2 offset = Vector2.zero;
-                    if (Mathf.Abs(normal.y) > 0.5f)
-                    {
-                        offset.y = Mathf.Sign(normal.y) * halfHeight;
-                    }
-                    if (Mathf.Abs(normal.x) > 0.5f)
-                    {
-                        offset.x = Mathf.Sign(normal.x) * halfWidth;
-                    }
-
-                    anchorPoint += offset;
-                }
+                Vector2 normal = ((Vector2)worldAimPos - anchorPoint).normalized;
+                if (normal.sqrMagnitude < 0.001f) normal = Vector2.up;
+                anchorPoint += normal * 0.02f;
             }
 
             return foundValid;

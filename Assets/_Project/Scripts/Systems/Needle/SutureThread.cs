@@ -238,14 +238,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _cachedWaypoints.Clear();
             for (int i = 0; i < waypoints.Count; i++)
             {
-                Vector2 towardsDir = Vector2.right;
-                if (waypoints.Count > 1)
-                {
-                    if (i == 0) towardsDir = (waypoints[1] - waypoints[0]).normalized;
-                    else towardsDir = (waypoints[i] - waypoints[i - 1]).normalized;
-                }
-                Vector2 snapped = SnapToNearestObjectEdge(waypoints[i], towardsDir, i == 0);
-                _cachedWaypoints.Add(snapped);
+                _cachedWaypoints.Add(waypoints[i]);
             }
 
             BuildVerletRope();
@@ -872,46 +865,6 @@ namespace ThailandHorrorJam.Systems.Needle
             // ใช้ _totalPathLength ที่คำนวณไว้แล้วแทนการวนลูป Vector3.Distance ซ้ำ
             _threadMaterial.SetFloat(s_TilingId, Mathf.Max(1f, _totalPathLength * _tilingFrequency));
             _threadMaterial.SetFloat(s_ScrollSpeedId, _scrollSpeed);
-        }
-
-        private Vector2 SnapToNearestObjectEdge(Vector2 pt, Vector2 towardsDir, bool isOwner)
-        {
-            EnsureComponents();
-            EnsureCollisionFilter();
-
-            if (isOwner)
-            {
-                // Waypoint 0 (the initial object position where rail starts): Keep the fixed world coordinate
-                return pt;
-            }
-
-            // For external anchor (e.g. wall/floor): find the surface of the collider at or near this point
-            int hitCount = Physics2D.OverlapCircle(pt, 1.5f, _collisionFilter, _pointHitBuffer);
-            float closestDist = float.MaxValue;
-            Vector2 bestEdge = pt;
-            bool found = false;
-
-            for (int i = 0; i < hitCount; i++)
-            {
-                Collider2D hit = _pointHitBuffer[i];
-                if (hit == null) continue;
-                if (_cachedOwner != null && _cachedOwner.ObjectTransform != null && hit.transform.IsChildOf(_cachedOwner.ObjectTransform))
-                {
-                    continue; // Skip owner
-                }
-
-                Vector2 fromPt = pt - towardsDir * 5f;
-                Vector2 edgePoint = hit.ClosestPoint(fromPt);
-                float dist = Vector2.Distance(pt, edgePoint);
-                if (dist < closestDist)
-                {
-                    closestDist = dist;
-                    bestEdge = edgePoint;
-                    found = true;
-                }
-            }
-
-            return found ? bestEdge : pt;
         }
 
         private void UpdatePinMarkers(IReadOnlyList<Vector2> waypoints)

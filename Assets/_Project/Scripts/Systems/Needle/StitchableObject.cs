@@ -267,14 +267,26 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _sutureThread.RenderPath(_waypoints);
                 _sutureThread.SnapTaut(3.8f);
+            }
 
-                // ซิงค์พิกัด Waypoints ของกล่องให้ตรงกับหมุดและแนวเส้นด้ายที่ขึงตึง 100%
-                if (_sutureThread.CachedWaypoints != null && _sutureThread.CachedWaypoints.Count == _waypoints.Count)
+            // คำนวณจุดหยุดปลายทางของกล่อง เพื่อให้ขอบหน้าของกล่องแตะกับผนังพอดีเป๊ะ (Flush 0 cm)
+            // โดยที่หมุดเข็มและเส้นด้ายยังคงตรึงแน่นอยู่ที่จุด P1 (hitPoint บนพื้นผิวจริง)
+            if (_waypoints.Count >= 2)
+            {
+                Vector2 p0 = _waypoints[0];
+                Vector2 p1 = _waypoints[_waypoints.Count - 1];
+                Vector2 segDelta = p1 - p0;
+                float segDist = segDelta.magnitude;
+                if (segDist > 0.001f)
                 {
-                    for (int i = 0; i < _waypoints.Count; i++)
-                    {
-                        _waypoints[i] = _sutureThread.CachedWaypoints[i];
-                    }
+                    Vector2 dir = segDelta / segDist;
+                    EnsureGroundFilter();
+                    float halfW = _col != null ? _col.bounds.extents.x : 0.5f;
+                    float halfH = _col != null ? _col.bounds.extents.y : 0.5f;
+                    float frontExtent = Mathf.Abs(dir.x) * halfW + Mathf.Abs(dir.y) * halfH;
+
+                    float maxTravel = Mathf.Max(0.1f, segDist - frontExtent);
+                    _waypoints[_waypoints.Count - 1] = p0 + dir * maxTravel;
                 }
             }
         }
