@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 using ThailandHorrorJam.Systems.Needle;
 
 namespace ThailandHorrorJam.Core
@@ -80,6 +81,15 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private float _fallStretchThreshold = -3.5f;
         [SerializeField] private float _maxFallStretchY = 1.15f;
 
+        [Header("DOTween Settings (Juice)")]
+        [SerializeField] private bool _useDOTweenRecoil = true;
+        [SerializeField] private float _recoilDuration = 0.14f;
+        [SerializeField] private Ease _recoilEase = Ease.OutBack;
+
+        [Header("DOTween Impact FX")]
+        [SerializeField] private bool _enableSnapFx = true;
+        [SerializeField] private Color _snapFlashColor = new Color(1.5f, 1.5f, 1.5f, 1f);
+
         private VisualState _currentState = VisualState.Idle;
         private Sprite[] _currentClip;
         private int _currentFrame;
@@ -89,6 +99,7 @@ namespace ThailandHorrorJam.Core
         private Vector3 _baseScale = Vector3.one;
         private float _currentTiltAngle;
         private Vector3 _recoilOffset = Vector3.zero;
+        private Tween _recoilTween;
 
         public VisualState CurrentState => _currentState;
         public bool IsFacingRight => _isFacingRight;
@@ -150,6 +161,8 @@ namespace ThailandHorrorJam.Core
             if (_needleController != null)
             {
                 _needleController.OnNeedleLaunched += HandleNeedleLaunched;
+                _needleController.OnThreadSevered += HandleThreadSevered;
+                _needleController.OnPlayerTetherAttached += HandlePlayerTetherAttached;
             }
         }
 
@@ -164,7 +177,13 @@ namespace ThailandHorrorJam.Core
             if (_needleController != null)
             {
                 _needleController.OnNeedleLaunched -= HandleNeedleLaunched;
+                _needleController.OnThreadSevered -= HandleThreadSevered;
+                _needleController.OnPlayerTetherAttached -= HandlePlayerTetherAttached;
             }
+
+            _recoilTween?.Kill();
+            if (_spriteRenderer != null) _spriteRenderer.DOKill();
+            if (_visualHolder != null) _visualHolder.DOKill();
         }
 
         private void Start()
@@ -460,6 +479,13 @@ namespace ThailandHorrorJam.Core
                 aimDir.Normalize();
                 // Kick backward along opposite aim trajectory
                 _recoilOffset = -(Vector3)(aimDir * _throwRecoilDistance);
+
+                if (_useDOTweenRecoil)
+                {
+                    _recoilTween?.Kill();
+                    _recoilTween = DOTween.To(() => _recoilOffset, x => _recoilOffset = x, Vector3.zero, _recoilDuration)
+                                          .SetEase(_recoilEase);
+                }
             }
 
             if (_enableSquashAndStretch)
@@ -472,16 +498,48 @@ namespace ThailandHorrorJam.Core
         {
             if (_visualHolder == null) return;
 
-            if (_recoilOffset.sqrMagnitude > 0.00001f)
+            if (!_useDOTweenRecoil)
             {
-                _recoilOffset = Vector3.MoveTowards(_recoilOffset, Vector3.zero, _recoilRecoverySpeed * Time.deltaTime);
-            }
-            else
-            {
-                _recoilOffset = Vector3.zero;
+                if (_recoilOffset.sqrMagnitude > 0.00001f)
+                {
+                    _recoilOffset = Vector3.MoveTowards(_recoilOffset, Vector3.zero, _recoilRecoverySpeed * Time.deltaTime);
+                }
+                else
+                {
+                    _recoilOffset = Vector3.zero;
+                }
             }
 
             _visualHolder.localPosition = _recoilOffset;
+        }
+
+        private void HandleThreadSevered()
+        {
+            if (!_enableSnapFx || _spriteRenderer == null) return;
+
+            _spriteRenderer.DOKill();
+            _spriteRenderer.color = _snapFlashColor;
+            _spriteRenderer.DOColor(Color.white, 0.12f).SetEase(Ease.OutQuad);
+
+            if (_visualHolder != null)
+            {
+                _visualHolder.DOPunchScale(new Vector3(0.08f, -0.08f, 0f), 0.15f, 1, 0.5f);
+            }
+        }
+
+        private void HandlePlayerTetherAttached()
+        {
+            if (_spriteRenderer != null)
+            {
+                _spriteRenderer.DOKill();
+                _spriteRenderer.color = Color.white;
+                _spriteRenderer.DOColor(new Color(0.6f, 1f, 1f), 0.09f).SetLoops(2, LoopType.Yoyo);
+            }
+
+            if (_visualHolder != null)
+            {
+                _visualHolder.DOPunchScale(new Vector3(-0.06f, 0.06f, 0f), 0.18f, 2, 0.5f);
+            }
         }
 
         #endregion

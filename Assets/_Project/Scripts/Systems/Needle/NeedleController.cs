@@ -3,6 +3,7 @@ using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
+using DG.Tweening;
 using ThailandHorrorJam.Core;
 using Debug = UnityEngine.Debug;
 
@@ -98,6 +99,9 @@ namespace ThailandHorrorJam.Systems.Needle
         public float RemainingThreadLength => Mathf.Max(0f, _maxThreadLength - GetUsedThreadLength());
 
         public event System.Action<Vector2> OnNeedleLaunched;
+        public event System.Action OnActionDenied;
+        public event System.Action OnThreadSevered;
+        public event System.Action OnPlayerTetherAttached;
 
         private void Awake()
         {
@@ -332,6 +336,7 @@ namespace ThailandHorrorJam.Systems.Needle
                         else
                         {
                             LogWarning("[Needle] Cannot transfer tether: target wall is out of thread budget or too close.");
+                            NotifyActionDenied();
                         }
                         return;
                     }
@@ -349,6 +354,7 @@ namespace ThailandHorrorJam.Systems.Needle
                         float dist = Vector2.Distance(_playerTransform.position, stitchable.CurrentPosition);
                         LogWarning($"[Needle] Too far from {stitchable.ObjectTransform.name} to stitch! Distance: {dist:F1}m (Max: {_maxInteractionDistance:F1}m). Move closer.");
                         CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                        NotifyActionDenied();
                     }
                 }
             }
@@ -370,6 +376,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     else
                     {
                         LogWarning($"[Needle] Player is too far ({distToPlayer:F1}m > {maxAllowed:F1}m) to tether! Move closer.");
+                        NotifyActionDenied();
                     }
                     return;
                 }
@@ -492,16 +499,19 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_isPinning)
             {
                 CancelStitching();
+                OnThreadSevered?.Invoke();
             }
             else if (_tetheredStitchable != null)
             {
                 ReleasePlayerTether();
+                OnThreadSevered?.Invoke();
             }
             else
             {
                 if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
                 {
                     CameraController2D.Instance?.Shake(0.04f, 0.08f);
+                    OnThreadSevered?.Invoke();
                     Log("[Needle] Thread severed by pointer release.");
                 }
             }
@@ -517,6 +527,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 Log($"[Needle] Severed previous circuit on {_currentlyLoopingTarget.ObjectTransform.name} to tether new entity.");
                 _currentlyLoopingTarget.CutThread();
                 _currentlyLoopingTarget = null;
+                OnThreadSevered?.Invoke();
             }
 
             if (_tetheredStitchable != null && _tetheredStitchable != target)
@@ -533,6 +544,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             CameraController2D.Instance?.Punch((_playerTransform.position - (Vector3)target.CurrentPosition).normalized, 0.04f);
+            OnPlayerTetherAttached?.Invoke();
             Log($"[Needle] Tethered {target.ObjectTransform.name} to Player! Walk to haul it. Right-click to release, or click a wall to anchor.");
 
             ResetPinningState();
@@ -720,22 +732,19 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private IStitchable FindStitchableAt(Vector3 worldAimPos)
         {
-            // Zero-allocation search on Stitchable layer first
-            int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _stitchableFilter, _hitBuffer);
+            // Zero-allocation search on Stitchable layer first, fallback across all layers
+            return SearchStitchableWithFilter(worldAimPos, _stitchableFilter)
+                ?? SearchStitchableWithFilter(worldAimPos, ContactFilter2D.noFilter);
+        }
+
+        private IStitchable SearchStitchableWithFilter(Vector3 worldAimPos, ContactFilter2D filter)
+        {
+            int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, filter, _hitBuffer);
             for (int i = 0; i < hitCount; i++)
             {
                 IStitchable stitchable = _hitBuffer[i].GetComponentInParent<IStitchable>();
                 if (stitchable != null) return stitchable;
             }
-
-            // Fallback: Zero-allocation search across all layers
-            hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, ContactFilter2D.noFilter, _hitBuffer);
-            for (int i = 0; i < hitCount; i++)
-            {
-                IStitchable stitchable = _hitBuffer[i].GetComponentInParent<IStitchable>();
-                if (stitchable != null) return stitchable;
-            }
-
             return null;
         }
 
@@ -890,8 +899,32 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        private void NotifyActionDenied()
+        {
+            TriggerReticleDeniedFeedback();
+            OnActionDenied?.Invoke();
+        }
+
+        private void TriggerReticleDeniedFeedback()
+        {
+            if (_reticleTransform != null)
+            {
+                _reticleTransform.DOKill();
+                _reticleTransform.DOShakePosition(0.18f, strength: 0.12f, vibrato: 25);
+            }
+
+            if (_reticleSprite != null)
+            {
+                _reticleSprite.DOKill();
+                _reticleSprite.color = s_InvalidColor;
+                _reticleSprite.DOColor(s_ValidColor, 0.25f);
+            }
+        }
+
         private void OnDestroy()
         {
+            if (_reticleTransform != null) _reticleTransform.DOKill();
+            if (_reticleSprite != null) _reticleSprite.DOKill();
             if (_previewMaterial != null)
             {
                 Destroy(_previewMaterial);

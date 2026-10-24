@@ -132,47 +132,47 @@ MonoBehaviour:
   - {fileID: -6115249455897352381, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   - {fileID: -2571877843981159715, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _jumpSprites:
-  - {fileID: -8140836258235426341, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
-  - {fileID: 9022136335609554798, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
-  - {fileID: 6799996762400539643, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
-  - {fileID: 3395284724364805909, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
-  - {fileID: -3508840370931995621, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  - {fileID: 2026493307, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 425578883, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 1765520148, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -1938641322, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _fallSprites:
-  - {fileID: 6597567026599930772, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
-  - {fileID: 6945539784783510553, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
-  - {fileID: 3412609715734813502, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
-  - {fileID: 672202939057887284, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
+  - {fileID: 944952346, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _fallLoopSprites:
-  - {fileID: -6896762156783377253, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
-  - {fileID: 7711603859215870014, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
-  - {fileID: 3651719337381808633, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
+  - {fileID: 944952346, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -1879336553, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _idleFps: 6.6
   _walkFps: 6.4
   _haulWalkFps: 6.4
   _haulingWalkFpsMultiplier: 0.8
-  _jumpFps: 12
+  _jumpFps: 18
   _fallFps: 50
   _fallLoopFps: 10
   _fallThreshold: -2.2
   _faceAimWhenPinning: 1
   _startFacingRight: 1
   _enableSquashAndStretch: 1
-  _jumpStretch: {x: 0.86, y: 1.18, z: 1}
-  _landSquash: {x: 1.22, y: 0.8, z: 1}
+  _jumpStretch: {x: 0.82, y: 1.25, z: 1}
+  _landSquash: {x: 1.38, y: 0.68, z: 1}
   _squashRecoverySpeed: 10
   _enableHaulTilt: 1
-  _haulForwardTiltAngle: -13
-  _haulBraceTiltAngle: 6
-  _tiltSpeed: 12
+  _haulForwardTiltAngle: -22
+  _haulBraceTiltAngle: 10
+  _tiltSpeed: 90
   _enableThrowRecoil: 1
-  _throwRecoilDistance: 0.06
+  _throwRecoilDistance: 0.22
   _throwRecoilSquash: {x: 1.16, y: 0.88, z: 1}
   _recoilRecoverySpeed: 16
   _enableAimLean: 1
-  _maxAimTiltAngle: 7
+  _maxAimTiltAngle: 12
   _enableAirStretch: 1
-  _fallStretchThreshold: -3.5
-  _maxFallStretchY: 1.15
+  _fallStretchThreshold: -1.2
+  _maxFallStretchY: 1.3
+  _useDOTweenRecoil: 1
+  _recoilDuration: 0.18
+  _recoilEase: 27
+  _enableSnapFx: 1
+  _snapFlashColor: {r: 2, g: 2, b: 2, a: 1}
 --- !u!1 &5737250694710447164
 GameObject:
   m_ObjectHideFlags: 0
