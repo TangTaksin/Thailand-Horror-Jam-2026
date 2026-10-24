@@ -26,10 +26,10 @@ namespace ThailandHorrorJam.Systems.Needle
 
         [Header("Hauling / Tether Settings")]
         [Tooltip("Minimum tether leash distance.")]
-        [SerializeField] private float _minTetherDistance = 1.0f;
+        [SerializeField] private float _minTetherDistance = 0.8f;
 
         [Tooltip("Maximum tether leash distance budget.")]
-        [SerializeField] private float _maxTetherDistance = 4.5f;
+        [SerializeField] private float _maxTetherDistance = 2.2f;
 
         [Tooltip("Multiplier applied to Rigidbody2D mass while hauled by player (e.g. 0.1 = 10% of original mass). Makes dragging lighter and prevents the player from being pulled backward.")]
         [Range(0.01f, 1f)]
@@ -74,6 +74,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public Vector2 CurrentPosition => _hasRb ? _rb.position : (Vector2)transform.position;
         public Vector2 CurrentVelocity => _currentVelocity;
         public bool IsTetheredToPlayer => _currentState == StitchState.PlayerHarness;
+        public float MaxTetherDistance => _maxTetherDistance;
 
         private void Awake()
         {

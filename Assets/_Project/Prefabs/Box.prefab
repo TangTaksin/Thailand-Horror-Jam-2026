@@ -185,8 +185,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   _sutureThread: {fileID: 0}
-  _minTetherDistance: 1
-  _maxTetherDistance: 4.5
+  _minTetherDistance: 0.8
+  _maxTetherDistance: 2.2
   _tetheredMassMultiplier: 0.1
   _landingPluckMultiplier: 1.4
   _jumpKickImpulse: 0

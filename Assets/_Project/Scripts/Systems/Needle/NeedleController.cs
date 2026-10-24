@@ -355,17 +355,18 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
 
-                // 1. Check if clicking on Player to tether object to self (must be within thread budget!)
+                // 1. Check if clicking on Player to tether object to self (must be within tether distance budget!)
                 if (IsAimingAtPlayer(worldAimPos))
                 {
                     float distToPlayer = Vector2.Distance(lastPoint, _playerTransform.position);
-                    if (distToPlayer <= RemainingThreadLength)
+                    float maxAllowed = _activeTarget is StitchableObject so ? so.MaxTetherDistance : 2.2f;
+                    if (distToPlayer <= maxAllowed && distToPlayer <= RemainingThreadLength)
                     {
                         StartPlayerTether(_activeTarget);
                     }
                     else
                     {
-                        LogWarning("[Needle] Player is too far from the object to tether!");
+                        LogWarning($"[Needle] Player is too far ({distToPlayer:F1}m > {maxAllowed:F1}m) to tether! Move closer.");
                     }
                     return;
                 }
@@ -825,7 +826,8 @@ namespace ThailandHorrorJam.Systems.Needle
             if (isAimingPlayer)
             {
                 float distToPlayer = Vector2.Distance(launchOrigin, playerPos);
-                bool canTether = distToPlayer <= RemainingThreadLength;
+                float maxAllowed = _activeTarget is StitchableObject so ? so.MaxTetherDistance : 2.2f;
+                bool canTether = distToPlayer <= maxAllowed && distToPlayer <= RemainingThreadLength;
                 Color col = canTether ? s_PlayerTetherColor : s_InvalidColor;
 
                 DrawAimTrajectory(launchOrigin, playerPos, col);
