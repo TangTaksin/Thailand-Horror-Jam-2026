@@ -29,16 +29,17 @@ namespace ThailandHorrorJam.Core
 
         [Header("Ground Check")]
         [SerializeField] private Transform _groundCheckPoint;
-        [SerializeField] private Vector2 _groundCheckSize = new Vector2(0.6f, 0.1f);
+        [SerializeField] private Vector2 _groundCheckSize = new Vector2(0.6f, 0.14f);
         [SerializeField] private LayerMask _groundLayer;
 
         private Rigidbody2D _rb;
         private Collider2D _col;
-        private readonly Collider2D[] _groundHitBuffer = new Collider2D[2]; // เผื่อกรอง Collider ตัวเองออก
+        private readonly Collider2D[] _groundHitBuffer = new Collider2D[6]; // เผื่อกรอง Collider ตัวเองและรองรับวัตถุซ้อนทับกันหลายชิ้น
         private ContactFilter2D _groundFilter;
 
         private Collider2D _currentGroundCollider;
         private StitchableObject _currentStitchable;
+        private Vector2 _lastGroundPosition;
 
         private float _horizontalInput;
         private bool _isGrounded;
@@ -91,6 +92,7 @@ namespace ThailandHorrorJam.Core
 
         private void FixedUpdate()
         {
+            ApplyPlatformMovement();
             CheckGround();
 
             if (_jumpRequested)
@@ -104,6 +106,23 @@ namespace ThailandHorrorJam.Core
 
             // เก็บค่าความเร็วแกน Y ไว้ท้ายสุด เพื่อใช้วัดแรงกระแทกก่อนที่ Physics Step รอบถัดไปจะปรับเป็น 0
             _lastVerticalVelocity = _rb.linearVelocity.y;
+        }
+
+        private void ApplyPlatformMovement()
+        {
+            if (_currentStitchable != null)
+            {
+                Vector2 currentPos = _currentStitchable.transform.position;
+                Vector2 delta = currentPos - _lastGroundPosition;
+
+                // ตรวจสอบ delta ให้อยู่ในขอบเขตการเคลื่อนที่ปกติ (ป้องกันการถูกดีดกระเด็นจากการวาร์ป)
+                if (delta.sqrMagnitude > 0.0000001f && delta.sqrMagnitude < 4.0f)
+                {
+                    _rb.position += delta;
+                }
+
+                _lastGroundPosition = currentPos;
+            }
         }
 
         private void ReadMovementInput()
@@ -196,6 +215,8 @@ namespace ThailandHorrorJam.Core
 
             _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, _jumpForce + extraBounce);
             _isGrounded = false;
+            _currentStitchable = null;
+            _currentGroundCollider = null;
             // ถ้าระหว่างติด Jump Buffer ผู้เล่นปล่อยปุ่มกระโดดไปแล้ว ให้ตัดความสูงกระโดดทันที (Short Hop)
             _isJumpCut = !_isJumpButtonHeld;
             OnJumped?.Invoke();
@@ -238,12 +259,21 @@ namespace ThailandHorrorJam.Core
             int hitCount = Physics2D.OverlapBox(checkPos, _groundCheckSize, 0f, _groundFilter, _groundHitBuffer);
 
             Collider2D detectedGround = null;
+            // ให้ความสำคัญกับ StitchableObject (แท่นเคลื่อนที่) ก่อนพื้นธรรมดา เพื่อรักษาการ Snap ติดแท่นเคลื่อนที่
             for (int i = 0; i < hitCount; i++)
             {
-                if (_groundHitBuffer[i] != _col) // ป้องกันการตรวจจับ Collider ของตัวเอง
+                Collider2D groundCol = _groundHitBuffer[i];
+                if (groundCol == null || groundCol == _col) continue;
+
+                if (groundCol.GetComponentInParent<StitchableObject>() != null)
                 {
-                    detectedGround = _groundHitBuffer[i];
+                    detectedGround = groundCol;
                     break;
+                }
+
+                if (detectedGround == null)
+                {
+                    detectedGround = groundCol;
                 }
             }
 
@@ -269,6 +299,11 @@ namespace ThailandHorrorJam.Core
 
             _currentGroundCollider = newGround;
             _currentStitchable = newGround != null ? newGround.GetComponentInParent<StitchableObject>() : null;
+
+            if (_currentStitchable != null)
+            {
+                _lastGroundPosition = _currentStitchable.transform.position;
+            }
         }
 
         private void HandleLandingImpact()
