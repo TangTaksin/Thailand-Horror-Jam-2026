@@ -111,27 +111,19 @@ MonoBehaviour:
   _visualHolder: {fileID: 2208266038891259765}
   _spriteRenderer: {fileID: 1820032509223617933}
   _idleSprites:
-  - {fileID: 7551218612100083373, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 6227021133205805896, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: -769768725478162228, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: -3147337510902319380, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: -4955897243321007787, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 1189084013230730913, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 8013369839060306655, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 1840860440156844617, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 9222543000981068822, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
-  - {fileID: 8563984892298253582, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 6417973203142015010, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 5922334090371449419, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 6842706038706646227, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -7865898532622437186, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -3410672223334927688, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 2061893793, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _walkSprites:
-  - {fileID: -8647587273327956491, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: -3374454604379380723, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: 7558764494380699398, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: 6926016915007694203, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: -3951488770114854535, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: 7610011056556642618, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: -5831632846312306573, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: -4626934465059276383, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: 2087082048469294650, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
-  - {fileID: 148732629217313217, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 6920706530876565666, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -6363570057842233811, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 6178380841081427924, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4326421184106424717, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -6115249455897352381, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -2571877843981159715, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
   _jumpSprites:
   - {fileID: -8140836258235426341, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
   - {fileID: 9022136335609554798, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
@@ -147,8 +139,8 @@ MonoBehaviour:
   - {fileID: -6896762156783377253, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
   - {fileID: 7711603859215870014, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
   - {fileID: 3651719337381808633, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
-  _idleFps: 12
-  _walkFps: 12
+  _idleFps: 6.6
+  _walkFps: 6.4
   _haulingWalkFpsMultiplier: 0.8
   _jumpFps: 12
   _fallFps: 50
@@ -256,10 +248,10 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 0
-  m_Constraints: 0
+  m_Constraints: 4
 --- !u!114 &3054172141830632971
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -286,7 +278,7 @@ MonoBehaviour:
   _groundCheckSize: {x: 0.46, y: 0.08}
   _groundLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 192
 --- !u!114 &6038937062244345014
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -300,7 +292,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
   _maxThreadLength: 9.5
-  _maxInteractionDistance: 3.5
+  _maxInteractionDistance: 1.5
   _maxWaypoints: 2
   _requireSurfaceToPin: 1
   _singleCircuitLimit: 1
@@ -310,8 +302,8 @@ MonoBehaviour:
   _anchorSurfaceLayer:
     serializedVersion: 2
     m_Bits: 0
-  _projectileSpeed: 16
   _needleProjectile: {fileID: 0}
+  _projectileSpeed: 16
   _previewLine: {fileID: 0}
   _mainCamera: {fileID: 0}
   _reticleTransform: {fileID: 0}
