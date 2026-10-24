@@ -1,0 +1,345 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1014675813354102945
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2208266038891259765}
+  - component: {fileID: 1820032509223617933}
+  - component: {fileID: 2579593358176125694}
+  m_Layer: 0
+  m_Name: Visual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2208266038891259765
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6088152015723954691}
+  m_Father: {fileID: 6699114349496988853}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &1820032509223617933
+SpriteRenderer:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 7551218612100083373, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 2}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
+--- !u!114 &2579593358176125694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 786c2abae52edd64c9147af341cc764c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Core.PlayerVisuals
+  _controller: {fileID: 3054172141830632971}
+  _needleController: {fileID: 6038937062244345014}
+  _visualHolder: {fileID: 2208266038891259765}
+  _spriteRenderer: {fileID: 1820032509223617933}
+  _idleSprites:
+  - {fileID: 7551218612100083373, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 6227021133205805896, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: -769768725478162228, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: -3147337510902319380, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: -4955897243321007787, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 1189084013230730913, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 8013369839060306655, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 1840860440156844617, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 9222543000981068822, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  - {fileID: 8563984892298253582, guid: cfa79c3e37f3b1345a592f62368b9f96, type: 3}
+  _walkSprites:
+  - {fileID: -8647587273327956491, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: -3374454604379380723, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 7558764494380699398, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 6926016915007694203, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: -3951488770114854535, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 7610011056556642618, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: -5831632846312306573, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: -4626934465059276383, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 2087082048469294650, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  - {fileID: 148732629217313217, guid: 14f140a799ffa9f4f90024a4fa02c777, type: 3}
+  _jumpSprites:
+  - {fileID: -8140836258235426341, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  - {fileID: 9022136335609554798, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  - {fileID: 6799996762400539643, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  - {fileID: 3395284724364805909, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  - {fileID: -3508840370931995621, guid: 9b29cb21b2f87b74cace3e6de6ff1f1c, type: 3}
+  _fallSprites:
+  - {fileID: 6597567026599930772, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
+  - {fileID: 6945539784783510553, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
+  - {fileID: 3412609715734813502, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
+  - {fileID: 672202939057887284, guid: 41dd01202c3cf764d96d3148a693f190, type: 3}
+  _fallLoopSprites:
+  - {fileID: -6896762156783377253, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
+  - {fileID: 7711603859215870014, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
+  - {fileID: 3651719337381808633, guid: 5ad136d76b453f444b82a35f81fecf5c, type: 3}
+  _idleFps: 12
+  _walkFps: 12
+  _haulingWalkFpsMultiplier: 0.8
+  _jumpFps: 12
+  _fallFps: 50
+  _fallLoopFps: 10
+  _fallThreshold: -2.2
+  _faceAimWhenPinning: 1
+  _startFacingRight: 1
+  _enableSquashAndStretch: 1
+  _jumpStretch: {x: 0.86, y: 1.18, z: 1}
+  _landSquash: {x: 1.22, y: 0.8, z: 1}
+  _squashRecoverySpeed: 10
+--- !u!1 &5737250694710447164
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6699114349496988853}
+  - component: {fileID: 6783161465168261949}
+  - component: {fileID: 7914051681350862273}
+  - component: {fileID: 3054172141830632971}
+  - component: {fileID: 6038937062244345014}
+  m_Layer: 0
+  m_Name: Player
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6699114349496988853
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2208266038891259765}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!70 &6783161465168261949
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 6200000, guid: 653f24cf6312e2643bbca28d5c1d4921, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Size: {x: 0.5, y: 1}
+  m_Direction: 0
+--- !u!50 &7914051681350862273
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
+--- !u!114 &3054172141830632971
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36b53b4ad33012f429f1a80de1d6fdb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Core.PlayerController2D
+  _moveSpeed: 3.5
+  _acceleration: 50
+  _deceleration: 60
+  _haulingSpeedMultiplier: 0.58
+  _jumpForce: 6
+  _coyoteTime: 0.15
+  _jumpBufferTime: 0.15
+  _fallMultiplier: 2.5
+  _lowJumpMultiplier: 2
+  _maxFallSpeed: 20
+  _groundCheckPoint: {fileID: 6088152015723954691}
+  _groundCheckSize: {x: 0.46, y: 0.08}
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+--- !u!114 &6038937062244345014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b257c415c43319c458f6f1b40c749edd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
+  _maxThreadLength: 9.5
+  _maxWaypoints: 3
+  _requireSurfaceToPin: 1
+  _singleCircuitLimit: 1
+  _stitchableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _anchorSurfaceLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _previewLine: {fileID: 0}
+  _mainCamera: {fileID: 0}
+  _reticleTransform: {fileID: 0}
+--- !u!1 &8804497818258877819
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6088152015723954691}
+  m_Layer: 0
+  m_Name: GroundCheck
+  m_TagString: Untagged
+  m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6088152015723954691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8804497818258877819}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2208266038891259765}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
