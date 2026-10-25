@@ -32,6 +32,26 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private Vector2 _groundCheckSize = new Vector2(0.6f, 0.14f);
         [SerializeField] private LayerMask _groundLayer;
 
+        [Header("Ledge & Corner Assistance (Limbo Style)")]
+        [Tooltip("เปิดใช้งานระบบช่วยดูด/ดันตัวผู้เล่นขึ้นแพลตฟอร์มเมื่อกระโดดเฉียดมุม 90 องศา")]
+        [SerializeField] private bool _enableCornerCorrection = true;
+        [Tooltip("ระยะยิง Raycast เหนือศีรษะสำหรับเช็กมุมเพดาน")]
+        [SerializeField] private float _headRayDistance = 0.28f;
+        [Tooltip("ระยะเยื้องซ้าย-ขวาจากกึ่งกลางตัวสำหรับตรวจจับมุม")]
+        [SerializeField] private float _cornerRaySideOffset = 0.28f;
+        [Tooltip("ระยะขยับตัวผู้เล่นหลบมุมเพดานในแต่ละฟิสิกส์เฟรม")]
+        [SerializeField] private float _headNudgeStep = 0.06f;
+        [Tooltip("ระยะเช็กเพื่อดึงตัวขึ้นบนขอบแท่น (Ledge Step-up)")]
+        [SerializeField] private float _ledgeRayForwardDistance = 0.42f;
+        [Tooltip("ระยะยกตัวขึ้นยืนบนขอบแท่น/กล่องเมื่อเท้าหรือเข่าเฉียดขอบมุม (รองรับ Box สูง ~0.5m)")]
+        [SerializeField] private float _ledgeStepUpDistance = 0.45f;
+
+        [Header("Ground Snapping")]
+        [Tooltip("เปิดใช้งานระบบดูดเท้าติดพื้นเวลาก้าวลงทางลาดหรือขอบเตี้ย (ป้องกันตัวลอยสะดุด)")]
+        [SerializeField] private bool _enableGroundSnapping = true;
+        [Tooltip("ระยะดูดเท้าติดพื้นสูงสุด (0.15m เหมาะสำหรับทางลาดชันและขอบเตี้ย)")]
+        [SerializeField] private float _groundSnapDistance = 0.16f;
+
         private Rigidbody2D _rb;
         private Collider2D _col;
         private readonly Collider2D[] _groundHitBuffer = new Collider2D[6]; // เผื่อกรอง Collider ตัวเองและรองรับวัตถุซ้อนทับกันหลายชิ้น
@@ -103,6 +123,11 @@ namespace ThailandHorrorJam.Core
 
             ApplyHorizontalMovement();
             ApplyJumpPhysics();
+
+            if (_enableCornerCorrection && !_isGrounded)
+            {
+                ApplyCornerCorrection();
+            }
 
             // เก็บค่าความเร็วแกน Y ไว้ท้ายสุด เพื่อใช้วัดแรงกระแทกก่อนที่ Physics Step รอบถัดไปจะปรับเป็น 0
             _lastVerticalVelocity = _rb.linearVelocity.y;
@@ -277,6 +302,22 @@ namespace ThailandHorrorJam.Core
                 }
             }
 
+            // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (velocity Y <= 0 และเฟรมก่อนอยู่บนพื้น)
+            // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก
+            if (_enableGroundSnapping && detectedGround == null && wasGrounded && _rb.linearVelocity.y <= 0.05f)
+            {
+                RaycastHit2D snapHit = Physics2D.Raycast(checkPos, Vector2.down, _groundSnapDistance, _groundLayer);
+                if (snapHit.collider != null && snapHit.collider != _col)
+                {
+                    float snapDeltaY = snapHit.point.y - checkPos.y;
+                    if (snapDeltaY < 0f && Mathf.Abs(snapDeltaY) <= _groundSnapDistance)
+                    {
+                        _rb.position = new Vector2(_rb.position.x, _rb.position.y + snapDeltaY);
+                        detectedGround = snapHit.collider;
+                    }
+                }
+            }
+
             UpdateCachedGround(detectedGround);
 
             // นับว่าอยู่บนพื้นเฉพาะเมื่อไม่ได้กำลังพุ่งตัวขึ้นจากการกระโดด
@@ -338,6 +379,101 @@ namespace ThailandHorrorJam.Core
             }
         }
 
+        private void ApplyCornerCorrection()
+        {
+            ApplyHeadCornerCorrection();
+            ApplyLedgeStepUpCorrection();
+        }
+
+        /// <summary>
+        /// เมื่อกระโดดขึ้นแล้วศีรษะเฉียดมุม 90 องศาของเพดาน/กล่อง
+        /// จะช่วยเบี่ยงตำแหน่งตัวละครหลบมุมออกด้านข้าง ป้องกันหัวโหม่งมุมแล้วร่วงดิ่ง
+        /// </summary>
+        private void ApplyHeadCornerCorrection()
+        {
+            if (_rb.linearVelocity.y <= 0f) return;
+
+            Vector2 center = (Vector2)transform.position + Vector2.up * _col.bounds.extents.y;
+            Vector2 leftOrigin = center + Vector2.left * _cornerRaySideOffset;
+            Vector2 rightOrigin = center + Vector2.right * _cornerRaySideOffset;
+
+            RaycastHit2D hitLeft = Physics2D.Raycast(leftOrigin, Vector2.up, _headRayDistance, _groundLayer);
+            RaycastHit2D hitRight = Physics2D.Raycast(rightOrigin, Vector2.up, _headRayDistance, _groundLayer);
+
+            // ขวาชน แต่ซ้ายโล่ง -> ดันหลบไปทางซ้าย
+            if (hitRight.collider != null && hitRight.collider != _col && (hitLeft.collider == null || hitLeft.collider == _col))
+            {
+                _rb.position = new Vector2(_rb.position.x - _headNudgeStep, _rb.position.y);
+            }
+            // ซ้ายชน แต่ขวาโล่ง -> ดันหลบไปทางขวา
+            else if (hitLeft.collider != null && hitLeft.collider != _col && (hitRight.collider == null || hitRight.collider == _col))
+            {
+                _rb.position = new Vector2(_rb.position.x + _headNudgeStep, _rb.position.y);
+            }
+        }
+
+        /// <summary>
+        /// เมื่อกระโดดเข้าหามุม 90 องศาของแท่นแพลตฟอร์มหรือกล่อง (Box) แล้วเท้า/เข่าเฉียดขอบบน
+        /// ระบบจะช่วยยกและสไลด์ตัวละครขึ้นไปยืนบนขอบแท่นทันที (สไตล์ Limbo Ledge Assistance)
+        /// </summary>
+        private void ApplyLedgeStepUpCorrection()
+        {
+            // ทำงานเฉพาะเมื่อผู้เล่นกำลังลอยอยู่ และมีทิศทางการเคลื่อนที่หรือป้อน Input เข้าหากำแพง/กล่อง
+            float moveDir = Mathf.Abs(_horizontalInput) > 0.05f ? Mathf.Sign(_horizontalInput) : Mathf.Sign(_rb.linearVelocity.x);
+            if (Mathf.Abs(moveDir) < 0.05f && Mathf.Abs(_rb.linearVelocity.x) < 0.05f) return;
+
+            Vector2 forward = Vector2.right * moveDir;
+            float extentsY = _col.bounds.extents.y;
+            Vector2 feetPos = (Vector2)transform.position + Vector2.down * (extentsY * 0.75f); // ระดับเท้า/ข้อเท้า
+            Vector2 kneePos = (Vector2)transform.position + Vector2.down * (extentsY * 0.25f); // ระดับเข่า
+            Vector2 waistPos = transform.position; // กึ่งกลางลำตัว/ระดับเอว
+            Vector2 headPos = (Vector2)transform.position + Vector2.up * (extentsY * 0.85f); // ระดับเหนืออก/หัว
+
+            // ตรวจสอบว่าศีรษะด้านหน้าโล่ง (ถ้ามีกำแพงสูงขวางอยู่ข้างหน้าจะไม่ทำ Step-up)
+            RaycastHit2D hitHead = Physics2D.Raycast(headPos, forward, _ledgeRayForwardDistance, _groundLayer);
+            if (hitHead.collider != null && hitHead.collider != _col) return;
+
+            // ตรวจสอบว่าระดับเท้า, เข่า หรือเอว ชนขอบมุมของวัตถุ (เช่น Box.prefab หรือมุมแพลตฟอร์ม)
+            RaycastHit2D hitLower = Physics2D.Raycast(feetPos, forward, _ledgeRayForwardDistance, _groundLayer);
+            if (hitLower.collider == null || hitLower.collider == _col)
+            {
+                hitLower = Physics2D.Raycast(kneePos, forward, _ledgeRayForwardDistance, _groundLayer);
+            }
+            if (hitLower.collider == null || hitLower.collider == _col)
+            {
+                hitLower = Physics2D.Raycast(waistPos, forward, _ledgeRayForwardDistance, _groundLayer);
+            }
+
+            if (hitLower.collider != null && hitLower.collider != _col)
+            {
+                // คำนวณจุด probe ด้านบนของวัตถุโดยตรงจาก Bounds ของ Collider หรือตำแหน่งที่ชน
+                float topBoundY = hitLower.collider.bounds.max.y;
+                float currentFeetY = transform.position.y - extentsY;
+                float heightDifference = topBoundY - currentFeetY;
+
+                // ยิง probe จากเหนือขอบแท่นลงมาเพื่อหาผิวด้านบนที่แม่นยำ
+                Vector2 probeTop = new Vector2(hitLower.point.x + (moveDir * 0.12f), topBoundY + 0.15f);
+                RaycastHit2D hitLedgeTop = Physics2D.Raycast(probeTop, Vector2.down, Mathf.Max(0.6f, heightDifference + 0.3f), _groundLayer);
+
+                float surfaceY = hitLedgeTop.collider != null && hitLedgeTop.collider != _col ? hitLedgeTop.point.y : topBoundY;
+                heightDifference = surfaceY - currentFeetY;
+
+                // ถ้าระดับขอบบนของกล่อง/แท่นอยู่สูงกว่าเท้าไม่เกิน _ledgeStepUpDistance
+                if (heightDifference > -0.05f && heightDifference <= _ledgeStepUpDistance)
+                {
+                    // ยกตัวผู้เล่นขึ้นไปยืนบนขอบแท่น และเลื่อนเข้าหาแท่นเล็กน้อย ป้องกันการสะดุดขอบซ้ำ
+                    _rb.position = new Vector2(
+                        _rb.position.x + (moveDir * 0.08f),
+                        surfaceY + extentsY + 0.02f
+                    );
+
+                    // ปรับความเร็วในแนวดิ่งให้อยู่นิ่งบนแท่นทันที และช่วยส่งแรงเดินหน้าต่อ
+                    _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, Mathf.Max(0f, _rb.linearVelocity.y));
+                    _isGrounded = true;
+                }
+            }
+        }
+
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = _isGrounded ? Color.green : Color.red;
@@ -348,6 +484,21 @@ namespace ThailandHorrorJam.Core
                 ? (Vector2)_groundCheckPoint.position
                 : (Vector2)transform.position + Vector2.down * fallbackOffset;
             Gizmos.DrawWireCube(checkPos, _groundCheckSize);
+
+            if (_enableCornerCorrection)
+            {
+                // วาด Gizmos สำหรับ Head Corner Correction (สีเหลือง)
+                Gizmos.color = Color.yellow;
+                Vector2 headCenter = (Vector2)transform.position + Vector2.up * fallbackOffset;
+                Gizmos.DrawLine(headCenter + Vector2.left * _cornerRaySideOffset, headCenter + Vector2.left * _cornerRaySideOffset + Vector2.up * _headRayDistance);
+                Gizmos.DrawLine(headCenter + Vector2.right * _cornerRaySideOffset, headCenter + Vector2.right * _cornerRaySideOffset + Vector2.up * _headRayDistance);
+
+                // วาด Gizmos สำหรับ Ledge Step-up Correction (สีฟ้า)
+                Gizmos.color = Color.cyan;
+                Vector2 feetPos = (Vector2)transform.position + Vector2.down * (fallbackOffset * 0.75f);
+                Gizmos.DrawLine(feetPos, feetPos + Vector2.right * _ledgeRayForwardDistance);
+                Gizmos.DrawLine(feetPos, feetPos + Vector2.left * _ledgeRayForwardDistance);
+            }
         }
     }
 }

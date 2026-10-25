@@ -296,10 +296,18 @@ MonoBehaviour:
   _lowJumpMultiplier: 2
   _maxFallSpeed: 20
   _groundCheckPoint: {fileID: 6088152015723954691}
-  _groundCheckSize: {x: 0.46, y: 0.08}
+  _groundCheckSize: {x: 0.3, y: 0.2}
   _groundLayer:
     serializedVersion: 2
     m_Bits: 192
+  _enableCornerCorrection: 1
+  _headRayDistance: 0.11
+  _cornerRaySideOffset: 0.26
+  _headNudgeStep: 0.06
+  _ledgeRayForwardDistance: 0.252
+  _ledgeStepUpDistance: 0.5
+  _enableGroundSnapping: 1
+  _groundSnapDistance: 0.16
 --- !u!114 &6038937062244345014
 MonoBehaviour:
   m_ObjectHideFlags: 0
