@@ -165,7 +165,17 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
 
-                // Hit a solid surface!
+                // Trigger colliders are ignored unless they are an enabled NeedleAnchorPoint
+                if (hitCol.isTrigger)
+                {
+                    NeedleAnchorPoint triggerAnchor = hitCol.GetComponentInParent<NeedleAnchorPoint>();
+                    if (triggerAnchor == null || !triggerAnchor.IsAnchorEnabled)
+                    {
+                        continue;
+                    }
+                }
+
+                // Hit a solid surface or valid anchor trigger!
                 transform.position = hit.point;
                 _state = ProjectileState.Embedded;
                 _onHitCallback?.Invoke(hit.point, hit.normal, hitCol);

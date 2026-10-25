@@ -47,6 +47,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Whether pins must snap to a physical surface (prevents stitching in mid-air).")]
         [SerializeField] private bool _requireSurfaceToPin = true;
 
+        [Tooltip("When true, needles can ONLY anchor onto objects with an active NeedleAnchorPoint component. Normal walls will deflect/rewind the needle.")]
+        [SerializeField] private bool _requireAnchorComponent = true;
+
         [Tooltip("When true, completing a new circuit severs the previous circuit (Faustian sacrifice).")]
         [SerializeField] private bool _singleCircuitLimit = true;
 
@@ -85,6 +88,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private IStitchable _activeTarget;
         private IStitchable _currentlyLoopingTarget;
         private IStitchable _tetheredStitchable;
+        private NeedleAnchorPoint _currentPinnedAnchor;
 
         private readonly List<Vector2> _pinnedWaypoints = new List<Vector2>(8);
         private readonly Collider2D[] _hitBuffer = new Collider2D[8];
@@ -153,7 +157,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _anchorFilter = new ContactFilter2D();
             _anchorFilter.SetLayerMask(_anchorSurfaceLayer);
             _anchorFilter.useLayerMask = true;
-            _anchorFilter.useTriggers = false;
+            _anchorFilter.useTriggers = true;
 
             if (_previewLine == null)
             {
@@ -246,13 +250,26 @@ namespace ThailandHorrorJam.Systems.Needle
             UpdateInFlightThread();
             UpdateAimLeashThread();
 
-            if (_needleProjectile != null && _needleProjectile.IsEmbedded)
+            if (_currentPinnedAnchor != null || (_needleProjectile != null && _needleProjectile.IsEmbedded))
             {
                 if (_currentlyLoopingTarget == null || _currentlyLoopingTarget.CurrentState != StitchState.Looping)
                 {
-                    _needleProjectile.Cancel();
+                    if (_needleProjectile != null && _needleProjectile.IsEmbedded)
+                    {
+                        _needleProjectile.Cancel();
+                    }
                     _currentlyLoopingTarget = null;
+                    ClearCurrentPinnedAnchor();
                 }
+            }
+        }
+
+        private void ClearCurrentPinnedAnchor()
+        {
+            if (_currentPinnedAnchor != null)
+            {
+                _currentPinnedAnchor.NotifyUnpinned();
+                _currentPinnedAnchor = null;
             }
         }
 
@@ -382,12 +399,12 @@ namespace ThailandHorrorJam.Systems.Needle
                         return;
                     }
 
-                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos))
+                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint foundAnchor))
                     {
                         float tetherTransferDist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
                         if (tetherTransferDist >= k_MinWaypointDistance && tetherTransferDist <= _maxThreadLength)
                         {
-                            TransferTetherToAnchor(anchorPos);
+                            TransferTetherToAnchor(anchorPos, foundAnchor);
                         }
                         else
                         {
@@ -501,18 +518,38 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            // วางหมุด Pin แนบติดกับพื้นผิวจุดกระทบพอดีเป๊ะ พร้อมยกขอบขึ้นตามแนว Normal เล็กน้อย (2 cm) เพื่อไม่ให้จมเนื้อ collider
-            Vector2 normal = hitNormal.sqrMagnitude > 0.001f ? hitNormal.normalized : Vector2.up;
-            Vector2 anchorPos = hitPoint + normal * 0.02f;
+            NeedleAnchorPoint anchor = hitCol != null ? hitCol.GetComponentInParent<NeedleAnchorPoint>() : null;
+            bool hasValidAnchorComp = anchor != null && anchor.IsAnchorEnabled;
+
+            if (_requireAnchorComponent && !hasValidAnchorComp)
+            {
+                LogWarning($"[Needle] Surface '{(hitCol != null ? hitCol.name : "null")}' has no active NeedleAnchorPoint. Rewinding!");
+                _needleProjectile.StartRewind();
+                NotifyActionDenied();
+                return;
+            }
+
+            Vector2 anchorPos;
+            if (hasValidAnchorComp)
+            {
+                anchorPos = anchor.GetAnchorPosition(hitPoint, hitNormal);
+            }
+            else
+            {
+                // วางหมุด Pin แนบติดกับพื้นผิวจุดกระทบพอดีเป๊ะ พร้อมยกขอบขึ้นตามแนว Normal เล็กน้อย (2 cm) เพื่อไม่ให้จมเนื้อ collider
+                Vector2 normal = hitNormal.sqrMagnitude > 0.001f ? hitNormal.normalized : Vector2.up;
+                anchorPos = hitPoint + normal * 0.02f;
+            }
 
             // Check thread length budget from Box (Waypoint 0)
             Vector2 boxPos = _pinnedWaypoints[0];
-            float segDist = Vector2.Distance(boxPos, hitPoint);
+            float segDist = Vector2.Distance(boxPos, anchorPos);
 
             if (segDist < k_MinWaypointDistance || segDist > _maxThreadLength)
             {
                 LogWarning($"[Needle] Hit point is out of thread budget ({segDist:F1}m > {_maxThreadLength:F1}m). Rewinding!");
                 _needleProjectile.StartRewind();
+                NotifyActionDenied();
                 return;
             }
 
@@ -524,6 +561,13 @@ namespace ThailandHorrorJam.Systems.Needle
             else
             {
                 _pinnedWaypoints[1] = anchorPos;
+            }
+
+            ClearCurrentPinnedAnchor();
+            if (hasValidAnchorComp)
+            {
+                _currentPinnedAnchor = anchor;
+                _currentPinnedAnchor.NotifyPinned();
             }
 
             Vector2 hitDir = (_pinnedWaypoints[1] - _pinnedWaypoints[0]).normalized;
@@ -575,6 +619,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     {
                         _needleProjectile.Cancel();
                     }
+                    ClearCurrentPinnedAnchor();
                     CameraController2D.Instance?.Shake(0.04f, 0.08f);
                     OnThreadSevered?.Invoke();
                     Log("[Needle] Thread severed by pointer release.");
@@ -592,6 +637,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 Log($"[Needle] Severed previous circuit on {_currentlyLoopingTarget.ObjectTransform.name} to tether new entity.");
                 _currentlyLoopingTarget.CutThread();
                 _currentlyLoopingTarget = null;
+                ClearCurrentPinnedAnchor();
                 OnThreadSevered?.Invoke();
             }
 
@@ -630,7 +676,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private void TransferTetherToAnchor(Vector2 anchorPos)
+        private void TransferTetherToAnchor(Vector2 anchorPos, NeedleAnchorPoint anchorPointComp = null)
         {
             if (_tetheredStitchable == null) return;
 
@@ -640,6 +686,13 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_singleCircuitLimit && _currentlyLoopingTarget != null && _currentlyLoopingTarget != target)
             {
                 _currentlyLoopingTarget.CutThread();
+            }
+
+            ClearCurrentPinnedAnchor();
+            if (anchorPointComp != null)
+            {
+                _currentPinnedAnchor = anchorPointComp;
+                _currentPinnedAnchor.NotifyPinned();
             }
 
             _pinnedWaypoints.Clear();
@@ -679,6 +732,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     if (_currentlyLoopingTarget == _activeTarget)
                     {
                         _currentlyLoopingTarget = null;
+                        ClearCurrentPinnedAnchor();
                     }
                     _activeTarget.CutThread();
                 }
@@ -686,9 +740,14 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private bool TryGetValidAnchorPoint(Vector3 worldAimPos, IStitchable ignoredStitchable, out Vector2 anchorPoint)
+        private bool TryGetValidAnchorPoint(
+            Vector3 worldAimPos,
+            IStitchable ignoredStitchable,
+            out Vector2 anchorPoint,
+            out NeedleAnchorPoint foundAnchor)
         {
             anchorPoint = worldAimPos;
+            foundAnchor = null;
 
             if (IsAimingAtPlayer(worldAimPos))
             {
@@ -699,14 +758,17 @@ namespace ThailandHorrorJam.Systems.Needle
             if (!_requireSurfaceToPin) return true;
 
             // 1. Check if clicking on another valid IStitchable object
-            IStitchable stitchable = FindStitchableAt(worldAimPos);
-            if (stitchable != null && stitchable != ignoredStitchable)
+            if (!_requireAnchorComponent)
             {
-                anchorPoint = stitchable.CurrentPosition;
-                return true;
+                IStitchable stitchable = FindStitchableAt(worldAimPos);
+                if (stitchable != null && stitchable != ignoredStitchable)
+                {
+                    anchorPoint = stitchable.CurrentPosition;
+                    return true;
+                }
             }
 
-            // 2. Zero-alloc check with physical surfaces (excluding player and ignoredStitchable)
+            // 2. Zero-alloc check with physical surfaces / anchor points (excluding player and ignoredStitchable)
             int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, _anchorFilter, _hitBuffer);
             float closestDistSq = float.MaxValue;
             bool foundValid = false;
@@ -722,22 +784,43 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
 
+                NeedleAnchorPoint anchor = hit.GetComponentInParent<NeedleAnchorPoint>();
+                bool isValidAnchor = anchor != null && anchor.IsAnchorEnabled;
+
+                if (hit.isTrigger && !isValidAnchor)
+                {
+                    continue;
+                }
+
+                if (_requireAnchorComponent && !isValidAnchor)
+                {
+                    continue;
+                }
+
                 Vector2 candidatePoint = hit.ClosestPoint(worldAimPos);
                 float distSq = ((Vector2)worldAimPos - candidatePoint).sqrMagnitude;
                 if (distSq < closestDistSq)
                 {
                     closestDistSq = distSq;
                     anchorPoint = candidatePoint;
+                    foundAnchor = isValidAnchor ? anchor : null;
                     foundValid = true;
                 }
             }
 
-            // วางจุด Waypoint แนบติดกับพื้นผิวจุดกระทบ พร้อมยกขอบขึ้นตามแนว Normal เล็กน้อย (2 cm) เพื่อไม่ให้จมเนื้อ collider
             if (foundValid)
             {
                 Vector2 normal = ((Vector2)worldAimPos - anchorPoint).normalized;
                 if (normal.sqrMagnitude < 0.001f) normal = Vector2.up;
-                anchorPoint += normal * 0.02f;
+
+                if (foundAnchor != null)
+                {
+                    anchorPoint = foundAnchor.GetAnchorPosition(anchorPoint, normal);
+                }
+                else
+                {
+                    anchorPoint += normal * 0.02f;
+                }
             }
 
             return foundValid;
@@ -880,6 +963,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _reticleSprite.color = s_ValidColor;
             }
+            UpdateAnchorPointsFeedback(false, Vector2.zero, null);
         }
 
         private float GetUsedThreadLength()
@@ -892,7 +976,12 @@ namespace ThailandHorrorJam.Systems.Needle
             return length;
         }
 
-        private bool TryCastNeedleTrajectory(Vector2 origin, Vector2 direction, float maxDistance, out RaycastHit2D validHit)
+        private bool TryCastNeedleTrajectory(
+            Vector2 origin,
+            Vector2 direction,
+            float maxDistance,
+            out RaycastHit2D validHit,
+            out NeedleAnchorPoint hitAnchor)
         {
             float sweepRadius = _needleProjectile != null ? _needleProjectile.SweepRadius : 0.08f;
             int hitCount = Physics2D.CircleCast(origin, sweepRadius, direction, _anchorFilter, _rayHitBuffer, maxDistance);
@@ -914,11 +1003,21 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
 
+                NeedleAnchorPoint anchor = col.GetComponentInParent<NeedleAnchorPoint>();
+                bool isValidAnchor = anchor != null && anchor.IsAnchorEnabled;
+
+                if (col.isTrigger && !isValidAnchor)
+                {
+                    continue;
+                }
+
                 validHit = hit;
+                hitAnchor = isValidAnchor ? anchor : null;
                 return true;
             }
 
             validHit = default;
+            hitAnchor = null;
             return false;
         }
 
@@ -930,6 +1029,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     _previewLine.positionCount = 0;
                 }
+                UpdateAnchorPointsFeedback(false, Vector2.zero, null);
                 return;
             }
 
@@ -937,6 +1037,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_isNeedleInFlight)
             {
                 _previewLine.positionCount = 0;
+                UpdateAnchorPointsFeedback(false, Vector2.zero, null);
                 return;
             }
 
@@ -957,6 +1058,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 DrawAimTrajectory(launchOrigin, playerPos, col);
                 if (_reticleSprite != null) _reticleSprite.color = col;
+                UpdateAnchorPointsFeedback(true, launchOrigin, null);
                 return;
             }
 
@@ -968,21 +1070,31 @@ namespace ThailandHorrorJam.Systems.Needle
                 rayOrigin = (Vector2)targetCol.bounds.center + aimDir * (Mathf.Max(targetCol.bounds.extents.x, targetCol.bounds.extents.y) + 0.05f);
             }
 
-            bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, _maxThreadLength, out RaycastHit2D hit);
+            bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, _maxThreadLength, out RaycastHit2D hit, out NeedleAnchorPoint hitAnchor);
             Vector2 endPoint;
             bool canPlace = false;
 
             if (hasValidHit)
             {
-                endPoint = hit.point;
-                float totalDist = Vector2.Distance(launchOrigin, endPoint);
-                canPlace = totalDist >= k_MinWaypointDistance && totalDist <= _maxThreadLength;
+                if (_requireAnchorComponent && hitAnchor == null)
+                {
+                    endPoint = hit.point;
+                    canPlace = false;
+                }
+                else
+                {
+                    endPoint = hitAnchor != null ? hitAnchor.GetAnchorPosition(hit.point, hit.normal) : hit.point;
+                    float totalDist = Vector2.Distance(launchOrigin, endPoint);
+                    canPlace = totalDist >= k_MinWaypointDistance && totalDist <= _maxThreadLength;
+                }
             }
             else
             {
                 endPoint = launchOrigin + aimDir * Mathf.Min(aimDist, _maxThreadLength);
                 canPlace = false;
             }
+
+            UpdateAnchorPointsFeedback(true, launchOrigin, canPlace ? hitAnchor : null);
 
             Color activeColor = canPlace ? s_ValidColor : s_InvalidColor;
             if (_reticleSprite != null)
@@ -991,6 +1103,24 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             DrawAimTrajectory(launchOrigin, endPoint, activeColor);
+        }
+
+        private void UpdateAnchorPointsFeedback(bool isAiming, Vector2 launchOrigin, NeedleAnchorPoint hoveredAnchor)
+        {
+            IReadOnlyList<NeedleAnchorPoint> anchors = NeedleAnchorPoint.ActiveAnchors;
+            int count = anchors.Count;
+            for (int i = 0; i < count; i++)
+            {
+                NeedleAnchorPoint anchor = anchors[i];
+                if (anchor == null) continue;
+
+                anchor.UpdateAimFeedback(
+                    isAiming,
+                    launchOrigin,
+                    k_MinWaypointDistance,
+                    _maxThreadLength,
+                    isAiming && anchor == hoveredAnchor);
+            }
         }
 
         private void DrawAimTrajectory(Vector2 start, Vector2 end, Color color)
