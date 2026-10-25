@@ -1,12 +1,5 @@
 {
   "dependencies": {
-    "com.masyo-lab.favorites-asset": {
-      "version": "https://github.com/MasyoLab/UnityTools-FavoritesAsset.git?path=Assets/MasyoLab/FavoritesAsset",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "a035a3aec268b9ee41649eb793f738f34998b9ae"
-    },
     "com.mibdev.fullscreen-editor": {
       "version": "file:com.mibdev.fullscreen-editor",
       "depth": 0,
@@ -69,6 +62,15 @@
         "com.unity.burst": "1.8.30",
         "com.unity.collections": "2.6.8"
       }
+    },
+    "com.unity.bindings.openimageio": {
+      "version": "1.0.2",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.collections": "1.2.4"
+      },
+      "url": "https://packages.unity.com"
     },
     "com.unity.burst": {
       "version": "2.0.0",
@@ -155,6 +157,17 @@
       "source": "builtin",
       "dependencies": {}
     },
+    "com.unity.recorder": {
+      "version": "5.1.7",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.timeline": "1.8.7",
+        "com.unity.collections": "1.2.4",
+        "com.unity.bindings.openimageio": "1.0.2"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.render-pipelines.core": {
       "version": "17.7.0",
       "depth": 1,
@@ -220,6 +233,17 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       }
     },
+    "com.unity.timeline": {
+      "version": "6.7.0",
+      "depth": 1,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.modules.director": "1.0.0",
+        "com.unity.modules.animation": "1.0.0",
+        "com.unity.modules.audio": "1.0.0",
+        "com.unity.modules.particlesystem": "1.0.0"
+      }
+    },
     "com.unity.ugui": {
       "version": "2.7.0",
       "depth": 0,
@@ -252,6 +276,15 @@
       "depth": 0,
       "source": "builtin",
       "dependencies": {}
+    },
+    "com.unity.modules.director": {
+      "version": "1.0.0",
+      "depth": 2,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.modules.audio": "1.0.0",
+        "com.unity.modules.animation": "1.0.0"
+      }
     },
     "com.unity.modules.hierarchycore": {
       "version": "1.0.0",

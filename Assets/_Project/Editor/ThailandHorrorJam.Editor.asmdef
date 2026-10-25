@@ -2,7 +2,10 @@
     "name": "ThailandHorrorJam.Editor",
     "rootNamespace": "ThailandHorrorJam.Editor",
     "references": [
-        "ThailandHorrorJam.Runtime"
+        "ThailandHorrorJam.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Universal.Editor",
+        "Unity.RenderPipelines.Universal.2D.Runtime"
     ],
     "includePlatforms": [
         "Editor"

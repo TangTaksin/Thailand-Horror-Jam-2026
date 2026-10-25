@@ -1,0 +1,371 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1014675813354102945
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2208266038891259765}
+  - component: {fileID: 1820032509223617933}
+  - component: {fileID: 2579593358176125694}
+  m_Layer: 0
+  m_Name: Visual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2208266038891259765
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6699114349496988853}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &1820032509223617933
+SpriteRenderer:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 6417973203142015010, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 2}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
+--- !u!114 &2579593358176125694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014675813354102945}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 786c2abae52edd64c9147af341cc764c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Core.PlayerVisuals
+  _controller: {fileID: 3054172141830632971}
+  _needleController: {fileID: 6038937062244345014}
+  _visualHolder: {fileID: 2208266038891259765}
+  _spriteRenderer: {fileID: 1820032509223617933}
+  _idleSprites:
+  - {fileID: 6417973203142015010, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 5922334090371449419, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 6842706038706646227, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -7865898532622437186, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -3410672223334927688, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 2061893793, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _walkSprites:
+  - {fileID: 313080370057419823, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -8086626681894203737, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -8050462381099678961, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4374256872242248994, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4795871217518782806, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -4640297688425572588, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _haulWalkSprites:
+  - {fileID: 6920706530876565666, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -6363570057842233811, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 6178380841081427924, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 4326421184106424717, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -6115249455897352381, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -2571877843981159715, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _jumpSprites:
+  - {fileID: 2026493307, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 425578883, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: 1765520148, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -1938641322, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _fallSprites:
+  - {fileID: 944952346, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _fallLoopSprites:
+  - {fileID: 944952346, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  - {fileID: -1879336553, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
+  _idleFps: 6.6
+  _walkFps: 6.4
+  _haulWalkFps: 6.4
+  _haulingWalkFpsMultiplier: 0.8
+  _jumpFps: 18
+  _fallFps: 50
+  _fallLoopFps: 10
+  _fallThreshold: -2.2
+  _faceAimWhenPinning: 1
+  _startFacingRight: 1
+  _enableSquashAndStretch: 1
+  _jumpStretch: {x: 0.82, y: 1.25, z: 1}
+  _landSquash: {x: 1.38, y: 0.68, z: 1}
+  _squashRecoverySpeed: 10
+  _enableHaulTilt: 1
+  _haulForwardTiltAngle: -6
+  _haulBraceTiltAngle: 0
+  _tiltSpeed: 90
+  _enableThrowRecoil: 1
+  _throwRecoilDistance: 0.22
+  _throwRecoilSquash: {x: 1.16, y: 0.88, z: 1}
+  _recoilRecoverySpeed: 16
+  _enableAimLean: 1
+  _maxAimTiltAngle: 4
+  _enableAirStretch: 1
+  _fallStretchThreshold: -1.2
+  _maxFallStretchY: 1.3
+  _enableSnapFx: 1
+  _snapFlashColor: {r: 2, g: 2, b: 2, a: 1}
+--- !u!1 &5737250694710447164
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6699114349496988853}
+  - component: {fileID: 6783161465168261949}
+  - component: {fileID: 7914051681350862273}
+  - component: {fileID: 3054172141830632971}
+  - component: {fileID: 6038937062244345014}
+  m_Layer: 0
+  m_Name: Player
+  m_TagString: Player
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6699114349496988853
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2208266038891259765}
+  - {fileID: 6088152015723954691}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!70 &6783161465168261949
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 6200000, guid: 653f24cf6312e2643bbca28d5c1d4921, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Size: {x: 0.5, y: 1}
+  m_Direction: 0
+--- !u!50 &7914051681350862273
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 1
+  m_SleepingMode: 1
+  m_CollisionDetection: 1
+  m_Constraints: 4
+--- !u!114 &3054172141830632971
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36b53b4ad33012f429f1a80de1d6fdb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Core.PlayerController2D
+  _moveSpeed: 3.5
+  _acceleration: 50
+  _deceleration: 60
+  _haulingSpeedMultiplier: 0.58
+  _aimingSpeedMultiplier: 0.38
+  _jumpForce: 6
+  _coyoteTime: 0.15
+  _jumpBufferTime: 0.15
+  _fallMultiplier: 2.5
+  _lowJumpMultiplier: 2
+  _maxFallSpeed: 20
+  _groundCheckPoint: {fileID: 6088152015723954691}
+  _groundCheckSize: {x: 0.3, y: 0.2}
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 192
+  _enableCornerCorrection: 1
+  _headRayDistance: 0.11
+  _cornerRaySideOffset: 0.26
+  _headNudgeStep: 0.06
+  _ledgeRayForwardDistance: 0.252
+  _ledgeStepUpDistance: 0.5
+  _enableGroundSnapping: 1
+  _groundSnapDistance: 0.16
+--- !u!114 &6038937062244345014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5737250694710447164}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b257c415c43319c458f6f1b40c749edd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
+  _minWaypointDistance: 0.9
+  _maxThreadLength: 6.2
+  _maxInteractionDistance: 0.9
+  _maxAimLeashDistance: 2
+  _maxWaypoints: 2
+  _requireSurfaceToPin: 1
+  _requireAnchorComponent: 1
+  _singleCircuitLimit: 1
+  _stitchableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _anchorSurfaceLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _needleProjectile: {fileID: 5992268549182240167, guid: e2b5161ba87cc4d40bb5becb4f13f29e, type: 3}
+  _projectileSpeed: 16
+  _previewLine: {fileID: 0}
+  _lineMaterial: {fileID: 2100000, guid: b1d8f39a04a64ef88e7e17cb581f1b21, type: 2}
+  _mainCamera: {fileID: 0}
+  _reticleTransform: {fileID: 0}
+--- !u!1 &8804497818258877819
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6088152015723954691}
+  m_Layer: 0
+  m_Name: GroundCheck
+  m_TagString: Untagged
+  m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6088152015723954691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8804497818258877819}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6699114349496988853}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}

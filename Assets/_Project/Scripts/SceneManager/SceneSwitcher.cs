@@ -66,9 +66,11 @@ public class SceneSwitcher : MonoBehaviour
             yield return new WaitForSeconds(customWaitTime);
         }
 
-#if UNITY_EDITOR
-        UnityEditor.Selection.activeObject = null;
-#endif
+        if (eventChannel != null)
+        {
+            eventChannel.isTransitioning = false;
+        }
+
         SceneManager.LoadScene(targetBuildIndex);
     }
 }
