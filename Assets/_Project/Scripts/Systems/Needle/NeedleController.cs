@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 using DG.Tweening;
@@ -18,10 +19,8 @@ namespace ThailandHorrorJam.Systems.Needle
     public sealed class NeedleController : MonoBehaviour
     {
         private const float k_MinWaypointDistance = 0.4f;
-        private const float k_AutoPinDistance = 0.5f;
         private const float k_HitSearchRadius = 0.45f;
         private const float k_PlayerAimRadius = 1.25f;
-        private const int k_PreviewCurveSteps = 20;
 
         private static readonly Color s_ValidColor = new Color(0.95f, 0.95f, 1f, 0.95f);
         private static readonly Color s_PlayerTetherColor = new Color(0.4f, 0.95f, 1f, 0.95f);
@@ -69,6 +68,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("previewLine")]
         [SerializeField] private LineRenderer _previewLine;
 
+        [Tooltip("Material used for rendering the dashed suture line. If unassigned, defaults to Universal Render Pipeline/2D/AnimatedSutureLine.")]
+        [SerializeField] private Material _lineMaterial;
+
         [FormerlySerializedAs("mainCamera")]
         [SerializeField] private Camera _mainCamera;
 
@@ -85,8 +87,8 @@ namespace ThailandHorrorJam.Systems.Needle
         private IStitchable _tetheredStitchable;
 
         private readonly List<Vector2> _pinnedWaypoints = new List<Vector2>(8);
-        private readonly Vector3[] _previewPointsBuffer = new Vector3[k_PreviewCurveSteps + 1];
         private readonly Collider2D[] _hitBuffer = new Collider2D[8];
+        private readonly RaycastHit2D[] _rayHitBuffer = new RaycastHit2D[8];
 
         private ContactFilter2D _stitchableFilter;
         private ContactFilter2D _anchorFilter;
@@ -168,10 +170,20 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void EnsureNeedleProjectile()
         {
-            if (_needleProjectile == null)
+            if (_needleProjectile == null || !_needleProjectile.gameObject.scene.IsValid())
             {
-                _needleProjectile = GetComponentInChildren<NeedleProjectile>(true);
-                if (_needleProjectile == null)
+                NeedleProjectile sceneChild = GetComponentInChildren<NeedleProjectile>(true);
+                if (sceneChild != null && sceneChild.gameObject.scene.IsValid())
+                {
+                    _needleProjectile = sceneChild;
+                }
+                else if (_needleProjectile != null)
+                {
+                    NeedleProjectile prefabAsset = _needleProjectile;
+                    _needleProjectile = Instantiate(prefabAsset, transform);
+                    _needleProjectile.name = "NeedleProjectile";
+                }
+                else
                 {
                     GameObject projObj = new GameObject("NeedleProjectile");
                     projObj.transform.SetParent(transform);
@@ -201,11 +213,22 @@ namespace ThailandHorrorJam.Systems.Needle
             _previewLine.sortingOrder = 15;
             _previewLine.textureMode = LineTextureMode.Tile;
 
-            Shader shader = Shader.Find("Universal Render Pipeline/2D/AnimatedSutureLine");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            if (shader != null)
+            if (_lineMaterial != null)
             {
-                _previewMaterial = new Material(shader);
+                _previewMaterial = new Material(_lineMaterial);
+            }
+            else
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/2D/AnimatedSutureLine");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+                if (shader != null)
+                {
+                    _previewMaterial = new Material(shader);
+                }
+            }
+
+            if (_previewMaterial != null)
+            {
                 _previewMaterial.SetColor(s_BaseColorId, s_ValidColor);
                 _previewMaterial.SetFloat(s_ScrollSpeedId, 3.2f);
                 _previewLine.material = _previewMaterial;
@@ -222,6 +245,15 @@ namespace ThailandHorrorJam.Systems.Needle
             UpdatePreviewVisual(worldAimPos);
             UpdateInFlightThread();
             UpdateAimLeashThread();
+
+            if (_needleProjectile != null && _needleProjectile.IsEmbedded)
+            {
+                if (_currentlyLoopingTarget == null || _currentlyLoopingTarget.CurrentState != StitchState.Looping)
+                {
+                    _needleProjectile.Cancel();
+                    _currentlyLoopingTarget = null;
+                }
+            }
         }
 
         private void UpdateAimLeashThread()
@@ -312,25 +344,24 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (Mouse.current != null)
             {
-                if (Mouse.current.leftButton.wasPressedThisFrame)
-                {
-                    OnPrimaryClick(worldAimPos);
-                }
+                bool isOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
-                if (Mouse.current.rightButton.wasPressedThisFrame)
+                if (!isOverUI)
                 {
-                    OnSecondaryClick(worldAimPos);
+                    if (Mouse.current.leftButton.wasPressedThisFrame)
+                    {
+                        OnPrimaryClick(worldAimPos);
+                    }
+
+                    if (Mouse.current.rightButton.wasPressedThisFrame)
+                    {
+                        OnSecondaryClick(worldAimPos);
+                    }
                 }
             }
 
             if (Keyboard.current != null)
             {
-                if (Keyboard.current.eKey.wasPressedThisFrame ||
-                    Keyboard.current.enterKey.wasPressedThisFrame)
-                {
-                    OnCompleteKeyPressed(worldAimPos);
-                }
-
                 if (Keyboard.current.escapeKey.wasPressedThisFrame ||
                     Keyboard.current.qKey.wasPressedThisFrame)
                 {
@@ -433,7 +464,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
             float maxFlightDist = _maxThreadLength + 1.5f;
 
-            // Offset start slightly outside the box collider so swept cast doesn't start overlapping with it
+            // Offset start slightly outside the box collider so swept cast doesn't start overlapping with it or adjacent ground
             Vector2 startPos = launchOrigin;
             Collider2D targetCol = _activeTarget.ObjectTransform != null ? _activeTarget.ObjectTransform.GetComponent<Collider2D>() : null;
             if (targetCol != null)
@@ -495,7 +526,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 _pinnedWaypoints[1] = anchorPos;
             }
 
-            _needleProjectile.Cancel();
+            Vector2 hitDir = (_pinnedWaypoints[1] - _pinnedWaypoints[0]).normalized;
+            _needleProjectile.Embed(anchorPos, hitDir);
             _isNeedleInFlight = false;
 
             CameraController2D.Instance?.Shake(0.04f, 0.1f);
@@ -535,6 +567,14 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
                 {
+                    if (_currentlyLoopingTarget != null && _currentlyLoopingTarget.CurrentState != StitchState.Looping)
+                    {
+                        _currentlyLoopingTarget = null;
+                    }
+                    if (_needleProjectile != null)
+                    {
+                        _needleProjectile.Cancel();
+                    }
                     CameraController2D.Instance?.Shake(0.04f, 0.08f);
                     OnThreadSevered?.Invoke();
                     Log("[Needle] Thread severed by pointer release.");
@@ -643,43 +683,6 @@ namespace ThailandHorrorJam.Systems.Needle
                     _activeTarget.CutThread();
                 }
                 ResetPinningState();
-            }
-        }
-
-        private void OnCompleteKeyPressed(Vector3 worldAimPos)
-        {
-            if (!_isPinning)
-            {
-                Log("[Needle] Pressing E ignored: not currently stitching an object. First click on an object to tether.");
-                return;
-            }
-
-            if (_pinnedWaypoints.Count > 0 && _pinnedWaypoints.Count < _maxWaypoints)
-            {
-                if (TryGetValidAnchorPoint(worldAimPos, _activeTarget, out Vector2 anchorPos) && !IsAimingAtPlayer(worldAimPos))
-                {
-                    Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
-                    float dist = Vector2.Distance(lastPoint, anchorPos);
-
-                    if (dist > k_AutoPinDistance && dist <= RemainingThreadLength)
-                    {
-                        _pinnedWaypoints.Add(anchorPos);
-                        Log($"[Needle] Auto-added destination waypoint at {anchorPos} from E key");
-                        if (_activeTarget != null)
-                        {
-                            _activeTarget.UpdatePinnedWaypoints(_pinnedWaypoints);
-                        }
-                    }
-                }
-            }
-
-            if (_pinnedWaypoints.Count >= 2)
-            {
-                CompleteStitchingRail();
-            }
-            else
-            {
-                LogWarning("[Needle] Need at least 2 points on valid surfaces to create a rail.");
             }
         }
 
@@ -806,6 +809,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void StartStitching(IStitchable target)
         {
+            if (_needleProjectile != null)
+            {
+                _needleProjectile.Cancel();
+            }
+
             _activeTarget = target;
             _activeTarget.AttachThread();
 
@@ -859,7 +867,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _playerController.SetAiming(false);
             }
 
-            if (_needleProjectile != null)
+            if (_needleProjectile != null && !_needleProjectile.IsEmbedded)
             {
                 _needleProjectile.Cancel();
             }
@@ -882,6 +890,36 @@ namespace ThailandHorrorJam.Systems.Needle
                 length += Vector2.Distance(_pinnedWaypoints[i], _pinnedWaypoints[i + 1]);
             }
             return length;
+        }
+
+        private bool TryCastNeedleTrajectory(Vector2 origin, Vector2 direction, float maxDistance, out RaycastHit2D validHit)
+        {
+            float sweepRadius = _needleProjectile != null ? _needleProjectile.SweepRadius : 0.08f;
+            int hitCount = Physics2D.CircleCast(origin, sweepRadius, direction, _anchorFilter, _rayHitBuffer, maxDistance);
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit2D hit = _rayHitBuffer[i];
+                Collider2D col = hit.collider;
+                if (col == null || col == _playerCol) continue;
+
+                if (_playerTransform != null && (col.transform == _playerTransform || col.transform.IsChildOf(_playerTransform)))
+                {
+                    continue;
+                }
+
+                if (_activeTarget?.ObjectTransform != null &&
+                    (col.transform == _activeTarget.ObjectTransform || col.transform.IsChildOf(_activeTarget.ObjectTransform)))
+                {
+                    continue;
+                }
+
+                validHit = hit;
+                return true;
+            }
+
+            validHit = default;
+            return false;
         }
 
         private void UpdatePreviewVisual(Vector3 worldAimPos)
@@ -930,11 +968,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 rayOrigin = (Vector2)targetCol.bounds.center + aimDir * (Mathf.Max(targetCol.bounds.extents.x, targetCol.bounds.extents.y) + 0.05f);
             }
 
-            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, aimDir, _maxThreadLength, _anchorSurfaceLayer);
+            bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, _maxThreadLength, out RaycastHit2D hit);
             Vector2 endPoint;
             bool canPlace = false;
 
-            if (hit.collider != null && hit.collider != _playerCol && (targetCol == null || hit.collider != targetCol))
+            if (hasValidHit)
             {
                 endPoint = hit.point;
                 float totalDist = Vector2.Distance(launchOrigin, endPoint);
@@ -960,10 +998,8 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_previewLine == null) return;
 
             _previewLine.positionCount = 2;
-            _previewPointsBuffer[0] = new Vector3(start.x, start.y, 0f);
-            _previewPointsBuffer[1] = new Vector3(end.x, end.y, 0f);
-            _previewLine.SetPosition(0, _previewPointsBuffer[0]);
-            _previewLine.SetPosition(1, _previewPointsBuffer[1]);
+            _previewLine.SetPosition(0, new Vector3(start.x, start.y, 0f));
+            _previewLine.SetPosition(1, new Vector3(end.x, end.y, 0f));
 
             if (_previewMaterial != null)
             {
@@ -1002,6 +1038,10 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_previewMaterial != null)
             {
                 Destroy(_previewMaterial);
+            }
+            if (_needleProjectile != null && _needleProjectile.gameObject != null && _needleProjectile.gameObject.scene.IsValid())
+            {
+                Destroy(_needleProjectile.gameObject);
             }
         }
 

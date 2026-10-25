@@ -72,6 +72,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _scrollSpeed = 2.5f;
         [SerializeField] private float _tilingFrequency = 2.5f;
 
+        [Header("Pin Visuals")]
+        [Tooltip("If true, the destination waypoint pin (white dot) is hidden because the embedded NeedleProjectile sprite is shown there.")]
+        [SerializeField] private bool _hideDestinationPinDot = true;
+
         // เปลี่ยนเป็น struct เพื่อป้องกัน Heap Allocation ทุกครั้งที่สร้างเส้นด้ายใหม่
         private struct VerletNode
         {
@@ -104,7 +108,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private readonly List<VerletLink> _links = new List<VerletLink>(48);
         private readonly List<Vector3> _renderBuffer = new List<Vector3>(128);
         private Vector3[] _linePositionsArray = new Vector3[128];
-        private readonly List<float> _cumulativeLengths = new List<float>(128);
         private float _totalPathLength;
         private bool _isSplineDirty;
         private bool _isTautMode;
@@ -623,7 +626,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
 
-                if (_enableGroundCollision)
+                if (_enableGroundCollision && !_isTautMode)
                 {
                     SolveCollisions();
                 }
@@ -735,13 +738,10 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            _cumulativeLengths.Clear();
-            _cumulativeLengths.Add(0f);
             float runningDist = 0f;
             for (int i = 0; i < _renderBuffer.Count - 1; i++)
             {
                 runningDist += Vector3.Distance(_renderBuffer[i], _renderBuffer[i + 1]);
-                _cumulativeLengths.Add(runningDist);
             }
             _totalPathLength = runningDist;
         }
@@ -768,64 +768,6 @@ namespace ThailandHorrorJam.Systems.Needle
 
             _lineRenderer.positionCount = count;
             _lineRenderer.SetPositions(_linePositionsArray);
-        }
-
-        public Vector2 GetPointAtDistance(float distance, out Vector2 tangent)
-        {
-            if (_renderBuffer.Count == 0)
-            {
-                tangent = Vector2.right;
-                return transform.position;
-            }
-
-            if (_renderBuffer.Count == 1 || _totalPathLength <= 0.0001f)
-            {
-                tangent = Vector2.right;
-                return _renderBuffer[0];
-            }
-
-            if (distance <= 0f)
-            {
-                Vector2 p0 = _renderBuffer[0];
-                Vector2 p1 = _renderBuffer[1];
-                tangent = (p1 - p0).normalized;
-                return p0;
-            }
-
-            if (distance >= _totalPathLength)
-            {
-                int last = _renderBuffer.Count - 1;
-                Vector2 pLast = _renderBuffer[last];
-                Vector2 pPrev = _renderBuffer[last - 1];
-                tangent = (pLast - pPrev).normalized;
-                return pLast;
-            }
-
-            int search = _cumulativeLengths.BinarySearch(distance);
-            if (search >= 0)
-            {
-                int tIdx = Mathf.Min(search + 1, _renderBuffer.Count - 1);
-                Vector2 pA = _renderBuffer[search];
-                Vector2 pB = _renderBuffer[tIdx];
-                tangent = (pB - pA).normalized;
-                return pA;
-            }
-
-            int nextIdx = ~search;
-            int prevIdx = nextIdx - 1;
-
-            float segDistA = _cumulativeLengths[prevIdx];
-            float segDistB = _cumulativeLengths[nextIdx];
-            float segSpan = segDistB - segDistA;
-
-            float t = segSpan > 0.00001f ? (distance - segDistA) / segSpan : 0f;
-
-            Vector2 ptA = _renderBuffer[prevIdx];
-            Vector2 ptB = _renderBuffer[nextIdx];
-            Vector2 diff = ptB - ptA;
-            tangent = diff.sqrMagnitude > 0.0001f ? diff.normalized : Vector2.right;
-
-            return Vector2.Lerp(ptA, ptB, t);
         }
 
         private static Vector2 EvaluateCatmullRom(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
@@ -883,6 +825,12 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (i < waypoints.Count)
                 {
+                    if (i == 1 && _hideDestinationPinDot)
+                    {
+                        _pinMarkers[i].SetActive(false);
+                        continue;
+                    }
+
                     if (!_pinMarkers[i].activeSelf)
                     {
                         _pinMarkers[i].transform.localScale = Vector3.one * 0.38f;
@@ -966,7 +914,6 @@ namespace ThailandHorrorJam.Systems.Needle
             _nodes.Clear();
             _links.Clear();
             _renderBuffer.Clear();
-            _cumulativeLengths.Clear();
             _totalPathLength = 0f;
             _isSplineDirty = false;
 

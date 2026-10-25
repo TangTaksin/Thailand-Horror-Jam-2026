@@ -30,6 +30,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Radius of the collision sweep.")]
         [SerializeField] private float _sweepRadius = 0.08f;
 
+        [Header("Visual Orientation")]
+        [Tooltip("Angular offset in degrees to align the needle tip with flight direction. Set to 0 if the sprite points right (--> like Needle_Sheet_0), or -90 if the sprite points up (^).")]
+        [SerializeField] private float _spriteRotationOffset = 0f;
+
         private ProjectileState _state = ProjectileState.Idle;
         private Vector2 _velocity;
         private float _maxDistance;
@@ -37,7 +41,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private Transform _returnTransform;
         private Transform _playerTransform;
         private ContactFilter2D _collisionFilter;
-        private readonly RaycastHit2D[] _hitBuffer = new RaycastHit2D[4];
+        private readonly RaycastHit2D[] _hitBuffer = new RaycastHit2D[8];
 
         private Action<Vector2, Vector2, Collider2D> _onHitCallback;
         private Action _onRewindCompleteCallback;
@@ -49,6 +53,8 @@ namespace ThailandHorrorJam.Systems.Needle
         public bool IsInFlight => _state == ProjectileState.Flying || _state == ProjectileState.Rewinding;
         public bool IsFlying => _state == ProjectileState.Flying;
         public bool IsRewinding => _state == ProjectileState.Rewinding;
+        public bool IsEmbedded => _state == ProjectileState.Embedded;
+        public float SweepRadius => _sweepRadius;
         public Vector2 CurrentPosition => transform.position;
 
         private void Awake()
@@ -71,6 +77,10 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _spriteRenderer.sprite = GenerateNeedleSprite();
                 _spriteRenderer.color = new Color(0.9f, 0.95f, 1f, 1f);
+            }
+
+            if (_spriteRenderer.sortingOrder < 10)
+            {
                 _spriteRenderer.sortingOrder = 10;
             }
         }
@@ -91,6 +101,11 @@ namespace ThailandHorrorJam.Systems.Needle
             Transform playerTransform = null)
         {
             EnsureSpriteRenderer();
+
+            if (playerTransform != null)
+            {
+                transform.SetParent(null);
+            }
 
             transform.position = origin;
             _velocity = direction.normalized * (speed > 0f ? speed : _defaultSpeed);
@@ -202,9 +217,23 @@ namespace ThailandHorrorJam.Systems.Needle
             _state = ProjectileState.Rewinding;
         }
 
+        public void Embed(Vector2 position, Vector2 direction)
+        {
+            EnsureSpriteRenderer();
+            _state = ProjectileState.Embedded;
+            transform.position = position;
+            UpdateRotation(direction);
+            gameObject.SetActive(true);
+        }
+
         public void Cancel()
         {
             _state = ProjectileState.Idle;
+            if (_playerTransform != null)
+            {
+                transform.SetParent(_playerTransform);
+                transform.localPosition = Vector3.zero;
+            }
             gameObject.SetActive(false);
         }
 
@@ -213,7 +242,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (direction.sqrMagnitude > 0.0001f)
             {
                 float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-                transform.rotation = Quaternion.Euler(0f, 0f, angle - 90f); // Needle sprite points upwards by default
+                transform.rotation = Quaternion.Euler(0f, 0f, angle + _spriteRotationOffset);
             }
         }
 
@@ -221,8 +250,8 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (s_SharedNeedleSprite != null) return s_SharedNeedleSprite;
 
-            const int width = 8;
-            const int height = 32;
+            const int width = 32;
+            const int height = 8;
             Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Bilinear,
@@ -235,32 +264,32 @@ namespace ThailandHorrorJam.Systems.Needle
             Color eyeHole = new Color(0.15f, 0.15f, 0.22f, 0.9f);
             Color clear = Color.clear;
 
-            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
             {
-                float ny = (float)y / height;
-                // Tapered shape: sharp tip at top (y=31), eye at bottom (y=2..6)
-                float halfW = Mathf.Lerp(3.2f, 0.5f, Mathf.Pow(ny, 1.4f));
+                float nx = (float)x / width;
+                // Tapered shape: sharp tip at right (x=31), eye at left (x=2..6)
+                float halfH = Mathf.Lerp(3.2f, 0.5f, Mathf.Pow(nx, 1.4f));
 
-                for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
-                    float cx = Mathf.Abs((x + 0.5f) - (width * 0.5f));
+                    float cy = Mathf.Abs((y + 0.5f) - (height * 0.5f));
                     int idx = y * width + x;
 
-                    if (cx > halfW)
+                    if (cy > halfH)
                     {
                         pixels[idx] = clear;
                         continue;
                     }
 
-                    // Needle eye hole at base
-                    if (y >= 3 && y <= 7 && cx <= 0.8f)
+                    // Needle eye hole at base (left)
+                    if (x >= 3 && x <= 7 && cy <= 0.8f)
                     {
                         pixels[idx] = eyeHole;
                     }
                     else
                     {
-                        // Slight horizontal shading for metallic 3D cylinder feel
-                        float shade = Mathf.Clamp01(1f - (cx / halfW) * 0.4f);
+                        // Slight vertical shading for metallic 3D cylinder feel
+                        float shade = Mathf.Clamp01(1f - (cy / halfH) * 0.4f);
                         pixels[idx] = Color.Lerp(needleShade, needleBody, shade);
                     }
                 }
@@ -269,7 +298,7 @@ namespace ThailandHorrorJam.Systems.Needle
             tex.SetPixels(pixels);
             tex.Apply(false, true);
 
-            s_SharedNeedleSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.2f), 32);
+            s_SharedNeedleSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.2f, 0.5f), 32);
             return s_SharedNeedleSprite;
         }
     }
