@@ -61,7 +61,6 @@ namespace ThailandHorrorJam.Core
 
         private Collider2D _currentGroundCollider;
         private StitchableObject _currentStitchable;
-        private Vector2 _lastGroundPosition;
 
         private float _horizontalInput;
         private bool _isGrounded;
@@ -172,16 +171,13 @@ namespace ThailandHorrorJam.Core
         {
             if (_currentStitchable != null)
             {
-                Vector2 currentPos = _currentStitchable.transform.position;
-                Vector2 delta = currentPos - _lastGroundPosition;
+                Vector2 delta = _currentStitchable.FrameDelta;
 
                 // ตรวจสอบ delta ให้อยู่ในขอบเขตการเคลื่อนที่ปกติ (ป้องกันการถูกดีดกระเด็นจากการวาร์ป)
                 if (delta.sqrMagnitude > 0.0000001f && delta.sqrMagnitude < 4.0f)
                 {
                     _rb.position += delta;
                 }
-
-                _lastGroundPosition = currentPos;
             }
         }
 
@@ -361,8 +357,8 @@ namespace ThailandHorrorJam.Core
         private void CheckGround()
         {
             Vector2 checkPos = _groundCheckPoint != null
-                ? (Vector2)_groundCheckPoint.position
-                : (Vector2)transform.position + Vector2.down * _col.bounds.extents.y;
+                ? _rb.position + (Vector2)_groundCheckPoint.localPosition
+                : _rb.position + Vector2.down * _col.bounds.extents.y;
 
             bool wasGrounded = _isGrounded;
             int hitCount = Physics2D.OverlapBox(checkPos, _groundCheckSize, 0f, _groundFilter, _groundHitBuffer);
@@ -424,11 +420,6 @@ namespace ThailandHorrorJam.Core
 
             _currentGroundCollider = newGround;
             _currentStitchable = newGround != null ? newGround.GetComponentInParent<StitchableObject>() : null;
-
-            if (_currentStitchable != null)
-            {
-                _lastGroundPosition = _currentStitchable.transform.position;
-            }
         }
 
         private void HandleLandingImpact()
@@ -545,11 +536,27 @@ namespace ThailandHorrorJam.Core
                 // ถ้าระดับขอบบนของกล่อง/แท่นอยู่สูงกว่าเท้าไม่เกิน _ledgeStepUpDistance
                 if (heightDifference > -0.05f && heightDifference <= _ledgeStepUpDistance)
                 {
-                    // ยกตัวผู้เล่นขึ้นไปยืนบนขอบแท่น และเลื่อนเข้าหาแท่นเล็กน้อย ป้องกันการสะดุดขอบซ้ำ
-                    _rb.position = new Vector2(
+                    Vector2 steppedPos = new Vector2(
                         _rb.position.x + (moveDir * 0.08f),
                         surfaceY + extentsY + 0.02f
                     );
+
+                    Vector2 clearanceSize = new Vector2(
+                        _col.bounds.size.x * 0.9f,
+                        Mathf.Max(0.1f, _col.bounds.size.y - 0.04f)
+                    );
+                    int overlapCount = Physics2D.OverlapBox(steppedPos, clearanceSize, 0f, _groundFilter, _groundHitBuffer);
+                    for (int i = 0; i < overlapCount; i++)
+                    {
+                        Collider2D hit = _groundHitBuffer[i];
+                        if (hit != null && hit != _col)
+                        {
+                            return; // มีเพดานหรือสิ่งกีดขวางทับตำแหน่งปลายทาง ยกเลิกการยกตัวขึ้นขอบ
+                        }
+                    }
+
+                    // ยกตัวผู้เล่นขึ้นไปยืนบนขอบแท่น และเลื่อนเข้าหาแท่นเล็กน้อย ป้องกันการสะดุดขอบซ้ำ
+                    _rb.position = steppedPos;
 
                     // ปรับความเร็วในแนวดิ่งให้อยู่นิ่งบนแท่นทันที และช่วยส่งแรงเดินหน้าต่อ
                     _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, Mathf.Max(0f, _rb.linearVelocity.y));

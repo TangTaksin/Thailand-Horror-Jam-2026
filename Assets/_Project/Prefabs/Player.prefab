@@ -30,8 +30,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 6088152015723954691}
+  m_Children: []
   m_Father: {fileID: 6699114349496988853}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1820032509223617933
@@ -188,7 +187,7 @@ GameObject:
   - component: {fileID: 6038937062244345014}
   m_Layer: 0
   m_Name: Player
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -207,6 +206,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2208266038891259765}
+  - {fileID: 6088152015723954691}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!70 &6783161465168261949
@@ -333,9 +333,10 @@ MonoBehaviour:
   _anchorSurfaceLayer:
     serializedVersion: 2
     m_Bits: 0
-  _needleProjectile: {fileID: 0}
+  _needleProjectile: {fileID: 5992268549182240167, guid: e2b5161ba87cc4d40bb5becb4f13f29e, type: 3}
   _projectileSpeed: 16
   _previewLine: {fileID: 0}
+  _lineMaterial: {fileID: 2100000, guid: b1d8f39a04a64ef88e7e17cb581f1b21, type: 2}
   _mainCamera: {fileID: 0}
   _reticleTransform: {fileID: 0}
 --- !u!1 &8804497818258877819
@@ -367,5 +368,5 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2208266038891259765}
+  m_Father: {fileID: 6699114349496988853}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
