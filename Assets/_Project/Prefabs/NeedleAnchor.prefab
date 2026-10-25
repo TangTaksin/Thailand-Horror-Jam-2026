@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 8156857775501950023}
   - component: {fileID: 833292156695324613}
   - component: {fileID: 6337354810882531106}
-  m_Layer: 6
+  m_Layer: 0
   m_Name: NeedleAnchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -83,7 +83,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: -1
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
+  m_Sprite: {fileID: -4101820379533499163, guid: ad77c0e2ba3c95d459593d0a783ef10c, type: 3}
   m_Color: {r: 0.29803923, g: 0.34901962, b: 0.3026663, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -104,7 +104,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 653f24cf6312e2643bbca28d5c1d4921, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -128,17 +128,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.00438416, y: -0.0049651265}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0.5, y: 0.5}
+    pivot: {x: 0.17896117, y: 0.5019695}
     oldSize: {x: 1, y: 1}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.349154, y: 0.39042622}
   m_EdgeRadius: 0
 --- !u!114 &6337354810882531106
 MonoBehaviour:
