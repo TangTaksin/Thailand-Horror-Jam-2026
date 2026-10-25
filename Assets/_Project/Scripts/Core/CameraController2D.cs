@@ -129,5 +129,21 @@ namespace ThailandHorrorJam.Core
             _target = target;
             _targetRb = target != null ? target.GetComponent<Rigidbody2D>() : null;
         }
+
+        /// <summary>
+        /// Snaps the camera immediately to the target position, zeroing damp velocity and shake offsets.
+        /// Useful during checkpoint respawns and room transitions.
+        /// </summary>
+        public void SnapToTarget()
+        {
+            if (_target == null) return;
+            Vector3 targetPos = _target.position + _offset;
+            targetPos.z = _offset.z;
+            transform.position = targetPos;
+            _currentVelocity = Vector3.zero;
+            _currentLookAheadX = 0f;
+            _shakeTimer = 0f;
+            _punchOffset = Vector3.zero;
+        }
     }
 }
