@@ -161,6 +161,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void TriggerPlayerDeath(KillZone killZone)
         {
             if (_isRespawning) return;
+            _isRespawning = true;
 
             float shakeIntensity = killZone != null ? killZone.CameraShakeIntensity : 0.15f;
             float shakeDuration = killZone != null ? killZone.CameraShakeDuration : 0.3f;
@@ -178,6 +179,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void TriggerPlayerDeath(float shakeIntensity = 0.15f, float shakeDuration = 0.3f)
         {
             if (_isRespawning) return;
+            _isRespawning = true;
 
             if (_activeRespawnRoutine != null)
             {

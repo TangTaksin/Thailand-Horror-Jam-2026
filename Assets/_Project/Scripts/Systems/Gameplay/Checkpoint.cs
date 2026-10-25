@@ -47,7 +47,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             if (_isOneShot && _isActivated) return;
 
-            if (other.CompareTag("Player") || other.TryGetComponent(out PlayerController2D _) || other.GetComponentInParent<PlayerController2D>() != null)
+            if (PlayerController2D.IsPlayer(other))
             {
                 _isActivated = true;
                 if (CheckpointManager.Instance != null)

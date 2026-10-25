@@ -276,8 +276,8 @@ namespace ThailandHorrorJam.Core
             }
             else
             {
-                // เช็คจากความเร็วจริงเพื่อป้องกันอาการซอยเท้าอยู่กับที่เวลาเดินชนกำแพง
-                bool isMoving = Mathf.Abs(_controller.Velocity.x) > 0.05f;
+                // เช็คจากความเร็วสัมพัทธ์กับพื้นผิว เพื่อป้องกันอาการเดินเองเวลาแพลตฟอร์มเคลื่อนที่ และป้องกันซอยเท้าเวลาชนกำแพง
+                bool isMoving = Mathf.Abs(_controller.RelativeVelocity.x) > 0.05f;
                 if (isMoving)
                 {
                     bool shouldUseHaulWalk = _controller.IsHauling && _haulWalkSprites != null && _haulWalkSprites.Length > 0;

@@ -63,6 +63,7 @@ namespace ThailandHorrorJam.Core
         private PlayerVisuals _playerVisuals;
         private NeedleController _needleController;
         private readonly Collider2D[] _groundHitBuffer = new Collider2D[6]; // เผื่อกรอง Collider ตัวเองและรองรับวัตถุซ้อนทับกันหลายชิ้น
+        private readonly RaycastHit2D[] _snapHitBuffer = new RaycastHit2D[4];
         private ContactFilter2D _groundFilter;
 
         private Collider2D _currentGroundCollider;
@@ -90,40 +91,23 @@ namespace ThailandHorrorJam.Core
         public bool IsInputLocked => _isInputLocked;
         public float HorizontalInput => _horizontalInput;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
+        public Vector2 PlatformVelocity => _currentStitchable != null ? _currentStitchable.CurrentVelocity : Vector2.zero;
+        public Vector2 RelativeVelocity => Velocity - PlatformVelocity;
         public StitchableObject CurrentStitchable => _currentStitchable;
+
+        /// <summary>
+        /// Checks whether the given collider belongs to the player (via tag or root/parent component).
+        /// </summary>
+        public static bool IsPlayer(Collider2D col) =>
+            col != null && (col.CompareTag("Player") || col.GetComponentInParent<PlayerController2D>() != null);
 
         public bool IsStandingOn(Component target)
         {
             if (target == null || !_isGrounded) return false;
 
-            Collider2D targetCol = target.GetComponentInChildren<Collider2D>();
-            if (targetCol == null) return false;
-
-            // ตรวจสอบระดับความสูง: เท้าของผู้เล่นต้องอยู่ระดับเดียวกับหรือสูงกว่าขอบบนของวัตถุ (-0.15m เผื่อการยุบตัวเล็กน้อย)
-            // ถ้าเท้าอยู่ต่ำกว่าขอบบนของวัตถุ แสดงว่ายืนอยู่ข้างๆ วัตถุ ไม่ได้ยืนอยู่บนหลังวัตถุ
-            float playerFeetY = _col != null ? _col.bounds.min.y : transform.position.y;
-            float targetTopY = targetCol.bounds.max.y;
-            if (playerFeetY < targetTopY - 0.15f)
-            {
-                return false;
-            }
-
-            // ตรวจสอบตำแหน่งแนวนอน: กึ่งกลางตัวผู้เล่นต้องอยู่ในช่วงความกว้างของวัตถุ
-            float playerCenterX = _col != null ? _col.bounds.center.x : transform.position.x;
-            if (playerCenterX < targetCol.bounds.min.x - 0.1f || playerCenterX > targetCol.bounds.max.x + 0.1f)
-            {
-                return false;
-            }
-
-            if (_currentStitchable != null && (_currentStitchable == target || _currentStitchable.transform == target.transform || _currentStitchable.transform.IsChildOf(target.transform)))
-            {
-                return true;
-            }
-            if (_currentGroundCollider != null && (_currentGroundCollider.transform == target.transform || _currentGroundCollider.transform.IsChildOf(target.transform)))
-            {
-                return true;
-            }
-            return false;
+            Transform targetTransform = target.transform;
+            return (_currentStitchable != null && (_currentStitchable.transform == targetTransform || _currentStitchable.transform.IsChildOf(targetTransform)))
+                || (_currentGroundCollider != null && (_currentGroundCollider.transform == targetTransform || _currentGroundCollider.transform.IsChildOf(targetTransform)));
         }
 
         public event System.Action<float> OnLanded;
@@ -294,10 +278,10 @@ namespace ThailandHorrorJam.Core
             {
                 Vector2 delta = _currentStitchable.FrameDelta;
 
-                // ตรวจสอบ delta ให้อยู่ในขอบเขตการเคลื่อนที่ปกติ (ป้องกันการถูกดีดกระเด็นจากการวาร์ป)
-                if (delta.sqrMagnitude > 0.0000001f && delta.sqrMagnitude < 4.0f)
+                // สำหรับการเคลื่อนที่ในแนวดิ่งลง ช่วยดึงตำแหน่ง Y ตามลงไปด้วยเพื่อไม่ให้เท้าลอยกระตุก
+                if (delta.y < -0.0001f && delta.sqrMagnitude < 4.0f)
                 {
-                    _rb.position += delta;
+                    _rb.position = new Vector2(_rb.position.x, _rb.position.y + delta.y);
                 }
             }
         }
@@ -438,7 +422,8 @@ namespace ThailandHorrorJam.Core
                 }
             }
 
-            float targetSpeed = _horizontalInput * speed;
+            Vector2 platVel = PlatformVelocity;
+            float targetRelSpeed = _horizontalInput * speed;
 
             // หน่วงความเร็วแนวนอนไม่ให้เร่งหนีออกจากระยะด้ายเมื่อด้ายถูกขึงตึงถึงระยะจำกัด
             if (_isAiming && _aimLeashAnchor.HasValue && _aimLeashDistance > 0f)
@@ -449,17 +434,18 @@ namespace ThailandHorrorJam.Core
 
                 if (currentDist >= _aimLeashDistance - 0.05f)
                 {
-                    if ((dx > 0.01f && targetSpeed > 0f) || (dx < -0.01f && targetSpeed < 0f))
+                    if ((dx > 0.01f && targetRelSpeed > 0f) || (dx < -0.01f && targetRelSpeed < 0f))
                     {
-                        targetSpeed = 0f;
+                        targetRelSpeed = 0f;
                     }
                 }
             }
 
-            float accelRate = Mathf.Abs(targetSpeed) > 0.01f ? _acceleration : _deceleration;
-            float newVelX = Mathf.MoveTowards(_rb.linearVelocity.x, targetSpeed, accelRate * Time.fixedDeltaTime);
+            float accelRate = Mathf.Abs(targetRelSpeed) > 0.01f ? _acceleration : _deceleration;
+            float currentRelVelX = _rb.linearVelocity.x - platVel.x;
+            float newRelVelX = Mathf.MoveTowards(currentRelVelX, targetRelSpeed, accelRate * Time.fixedDeltaTime);
 
-            _rb.linearVelocity = new Vector2(newVelX, _rb.linearVelocity.y);
+            _rb.linearVelocity = new Vector2(platVel.x + newRelVelX, _rb.linearVelocity.y);
         }
 
         private void ApplyJumpPhysics()
@@ -541,17 +527,22 @@ namespace ThailandHorrorJam.Core
             }
 
             // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (velocity Y <= 0 และเฟรมก่อนอยู่บนพื้น)
-            // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก
+            // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก และไม่ดูดติด Trigger colliders
             if (_enableGroundSnapping && detectedGround == null && wasGrounded && _rb.linearVelocity.y <= 0.05f)
             {
-                RaycastHit2D snapHit = Physics2D.Raycast(checkPos, Vector2.down, _groundSnapDistance, _groundLayer);
-                if (snapHit.collider != null && snapHit.collider != _col)
+                int snapCount = Physics2D.Raycast(checkPos, Vector2.down, _groundFilter, _snapHitBuffer, _groundSnapDistance);
+                for (int s = 0; s < snapCount; s++)
                 {
-                    float snapDeltaY = snapHit.point.y - checkPos.y;
-                    if (snapDeltaY < 0f && Mathf.Abs(snapDeltaY) <= _groundSnapDistance)
+                    RaycastHit2D snapHit = _snapHitBuffer[s];
+                    if (snapHit.collider != null && snapHit.collider != _col && !snapHit.collider.isTrigger)
                     {
-                        _rb.position = new Vector2(_rb.position.x, _rb.position.y + snapDeltaY);
-                        detectedGround = snapHit.collider;
+                        float snapDeltaY = snapHit.point.y - checkPos.y;
+                        if (snapDeltaY < 0f && Mathf.Abs(snapDeltaY) <= _groundSnapDistance)
+                        {
+                            _rb.position = new Vector2(_rb.position.x, _rb.position.y + snapDeltaY);
+                            detectedGround = snapHit.collider;
+                            break;
+                        }
                     }
                 }
             }
@@ -640,13 +631,16 @@ namespace ThailandHorrorJam.Core
             RaycastHit2D hitLeft = Physics2D.Raycast(leftOrigin, Vector2.up, _headRayDistance, _groundLayer);
             RaycastHit2D hitRight = Physics2D.Raycast(rightOrigin, Vector2.up, _headRayDistance, _groundLayer);
 
+            bool isRightSolid = hitRight.collider != null && hitRight.collider != _col && !hitRight.collider.isTrigger;
+            bool isLeftSolid = hitLeft.collider != null && hitLeft.collider != _col && !hitLeft.collider.isTrigger;
+
             // ขวาชน แต่ซ้ายโล่ง -> ดันหลบไปทางซ้าย
-            if (hitRight.collider != null && hitRight.collider != _col && (hitLeft.collider == null || hitLeft.collider == _col))
+            if (isRightSolid && !isLeftSolid)
             {
                 _rb.position = new Vector2(_rb.position.x - _headNudgeStep, _rb.position.y);
             }
             // ซ้ายชน แต่ขวาโล่ง -> ดันหลบไปทางขวา
-            else if (hitLeft.collider != null && hitLeft.collider != _col && (hitRight.collider == null || hitRight.collider == _col))
+            else if (isLeftSolid && !isRightSolid)
             {
                 _rb.position = new Vector2(_rb.position.x + _headNudgeStep, _rb.position.y);
             }
@@ -671,20 +665,20 @@ namespace ThailandHorrorJam.Core
 
             // ตรวจสอบว่าศีรษะด้านหน้าโล่ง (ถ้ามีกำแพงสูงขวางอยู่ข้างหน้าจะไม่ทำ Step-up)
             RaycastHit2D hitHead = Physics2D.Raycast(headPos, forward, _ledgeRayForwardDistance, _groundLayer);
-            if (hitHead.collider != null && hitHead.collider != _col) return;
+            if (hitHead.collider != null && hitHead.collider != _col && !hitHead.collider.isTrigger) return;
 
             // ตรวจสอบว่าระดับเท้า, เข่า หรือเอว ชนขอบมุมของวัตถุ (เช่น Box.prefab หรือมุมแพลตฟอร์ม)
             RaycastHit2D hitLower = Physics2D.Raycast(feetPos, forward, _ledgeRayForwardDistance, _groundLayer);
-            if (hitLower.collider == null || hitLower.collider == _col)
+            if (hitLower.collider == null || hitLower.collider == _col || hitLower.collider.isTrigger)
             {
                 hitLower = Physics2D.Raycast(kneePos, forward, _ledgeRayForwardDistance, _groundLayer);
             }
-            if (hitLower.collider == null || hitLower.collider == _col)
+            if (hitLower.collider == null || hitLower.collider == _col || hitLower.collider.isTrigger)
             {
                 hitLower = Physics2D.Raycast(waistPos, forward, _ledgeRayForwardDistance, _groundLayer);
             }
 
-            if (hitLower.collider != null && hitLower.collider != _col)
+            if (hitLower.collider != null && hitLower.collider != _col && !hitLower.collider.isTrigger)
             {
                 // คำนวณจุด probe ด้านบนของวัตถุโดยตรงจาก Bounds ของ Collider หรือตำแหน่งที่ชน
                 float topBoundY = hitLower.collider.bounds.max.y;
@@ -695,7 +689,7 @@ namespace ThailandHorrorJam.Core
                 Vector2 probeTop = new Vector2(hitLower.point.x + (moveDir * 0.12f), topBoundY + 0.15f);
                 RaycastHit2D hitLedgeTop = Physics2D.Raycast(probeTop, Vector2.down, Mathf.Max(0.6f, heightDifference + 0.3f), _groundLayer);
 
-                float surfaceY = hitLedgeTop.collider != null && hitLedgeTop.collider != _col ? hitLedgeTop.point.y : topBoundY;
+                float surfaceY = hitLedgeTop.collider != null && hitLedgeTop.collider != _col && !hitLedgeTop.collider.isTrigger ? hitLedgeTop.point.y : topBoundY;
                 heightDifference = surfaceY - currentFeetY;
 
                 // ถ้าระดับขอบบนของกล่อง/แท่นอยู่สูงกว่าเท้าไม่เกิน _ledgeStepUpDistance
