@@ -167,9 +167,6 @@ MonoBehaviour:
   _enableAirStretch: 1
   _fallStretchThreshold: -1.2
   _maxFallStretchY: 1.3
-  _useDOTweenRecoil: 1
-  _recoilDuration: 0.18
-  _recoilEase: 27
   _enableSnapFx: 1
   _snapFlashColor: {r: 2, g: 2, b: 2, a: 1}
 --- !u!1 &5737250694710447164
@@ -321,11 +318,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b257c415c43319c458f6f1b40c749edd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
-  _maxThreadLength: 9.5
-  _maxInteractionDistance: 2
+  _minWaypointDistance: 0.9
+  _maxThreadLength: 6.2
+  _maxInteractionDistance: 0.9
   _maxAimLeashDistance: 2
   _maxWaypoints: 2
   _requireSurfaceToPin: 1
+  _requireAnchorComponent: 1
   _singleCircuitLimit: 1
   _stitchableLayer:
     serializedVersion: 2

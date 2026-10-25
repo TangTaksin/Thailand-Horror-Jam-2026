@@ -51,11 +51,17 @@ namespace ThailandHorrorJam.Core
         [Header("Ground Snapping")]
         [Tooltip("เปิดใช้งานระบบดูดเท้าติดพื้นเวลาก้าวลงทางลาดหรือขอบเตี้ย (ป้องกันตัวลอยสะดุด)")]
         [SerializeField] private bool _enableGroundSnapping = true;
-        [Tooltip("ระยะดูดเท้าติดพื้นสูงสุด (0.15m เหมาะสำหรับทางลาดชันและขอบเตี้ย)")]
-        [SerializeField] private float _groundSnapDistance = 0.16f;
+        [Tooltip("ระยะดูดเท้าติดพื้นสูงสุด (0.35m เหมาะสำหรับทางลาดชันและขอบเตี้ย)")]
+        [SerializeField] private float _groundSnapDistance = 0.35f;
+
+        [Header("Haul Airborne Settings")]
+        [Tooltip("ระยะเวลาลอยตัวกลางอากาศสูงสุดขณะลากของ ก่อนที่สายด้ายจะขาด/หลุดออกอัตโนมัติ (เช่น ตกขอบแท่นสูงหรือตกเหว)")]
+        [SerializeField] private float _maxHaulAirborneDuration = 0.25f;
 
         private Rigidbody2D _rb;
         private Collider2D _col;
+        private PlayerVisuals _playerVisuals;
+        private NeedleController _needleController;
         private readonly Collider2D[] _groundHitBuffer = new Collider2D[6]; // เผื่อกรอง Collider ตัวเองและรองรับวัตถุซ้อนทับกันหลายชิ้น
         private ContactFilter2D _groundFilter;
 
@@ -72,22 +78,116 @@ namespace ThailandHorrorJam.Core
         private float _lastVerticalVelocity;
         private float _footstepTimer;
         private bool _isHauling;
+        private float _haulingAirborneTimer;
         private bool _isAiming;
+        private bool _isInputLocked;
         private Vector2? _aimLeashAnchor;
         private float _aimLeashDistance;
 
         public bool IsGrounded => _isGrounded;
         public bool IsHauling => _isHauling;
         public bool IsAiming => _isAiming;
+        public bool IsInputLocked => _isInputLocked;
         public float HorizontalInput => _horizontalInput;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
+        public StitchableObject CurrentStitchable => _currentStitchable;
+
+        public bool IsStandingOn(Component target)
+        {
+            if (target == null || !_isGrounded) return false;
+
+            Collider2D targetCol = target.GetComponentInChildren<Collider2D>();
+            if (targetCol == null) return false;
+
+            // ตรวจสอบระดับความสูง: เท้าของผู้เล่นต้องอยู่ระดับเดียวกับหรือสูงกว่าขอบบนของวัตถุ (-0.15m เผื่อการยุบตัวเล็กน้อย)
+            // ถ้าเท้าอยู่ต่ำกว่าขอบบนของวัตถุ แสดงว่ายืนอยู่ข้างๆ วัตถุ ไม่ได้ยืนอยู่บนหลังวัตถุ
+            float playerFeetY = _col != null ? _col.bounds.min.y : transform.position.y;
+            float targetTopY = targetCol.bounds.max.y;
+            if (playerFeetY < targetTopY - 0.15f)
+            {
+                return false;
+            }
+
+            // ตรวจสอบตำแหน่งแนวนอน: กึ่งกลางตัวผู้เล่นต้องอยู่ในช่วงความกว้างของวัตถุ
+            float playerCenterX = _col != null ? _col.bounds.center.x : transform.position.x;
+            if (playerCenterX < targetCol.bounds.min.x - 0.1f || playerCenterX > targetCol.bounds.max.x + 0.1f)
+            {
+                return false;
+            }
+
+            if (_currentStitchable != null && (_currentStitchable == target || _currentStitchable.transform == target.transform || _currentStitchable.transform.IsChildOf(target.transform)))
+            {
+                return true;
+            }
+            if (_currentGroundCollider != null && (_currentGroundCollider.transform == target.transform || _currentGroundCollider.transform.IsChildOf(target.transform)))
+            {
+                return true;
+            }
+            return false;
+        }
 
         public event System.Action<float> OnLanded;
         public event System.Action OnJumped;
 
+        public void SetInputLocked(bool locked)
+        {
+            _isInputLocked = locked;
+            _horizontalInput = 0f;
+            _isJumpButtonHeld = false;
+            _jumpBufferCounter = 0f;
+            _jumpRequested = false;
+
+            if (locked && _rb != null)
+            {
+                _rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        public void TeleportTo(Vector2 position, bool faceRight)
+        {
+            if (_rb != null)
+            {
+                _rb.position = position;
+                _rb.linearVelocity = Vector2.zero;
+            }
+            transform.position = new Vector3(position.x, position.y, transform.position.z);
+            _lastVerticalVelocity = 0f;
+
+            if (_playerVisuals == null)
+            {
+                _playerVisuals = GetComponentInChildren<PlayerVisuals>();
+            }
+
+            if (_playerVisuals != null)
+            {
+                _playerVisuals.SetFacing(faceRight);
+            }
+        }
+
         public void SetHauling(bool isHauling)
         {
             _isHauling = isHauling;
+            if (!isHauling)
+            {
+                _haulingAirborneTimer = 0f;
+            }
+        }
+
+        public void ReleaseHaulingTether()
+        {
+            _haulingAirborneTimer = 0f;
+            if (_needleController != null && _needleController.IsTetheredToPlayer)
+            {
+                _needleController.ReleasePlayerTether();
+            }
+            else if (_currentStitchable != null)
+            {
+                _currentStitchable.ReleasePlayerTether();
+            }
+            else
+            {
+                SetHauling(false);
+            }
         }
 
         public void SetAiming(bool isAiming, Vector2? leashAnchor = null, float leashDistance = 0f)
@@ -121,6 +221,11 @@ namespace ThailandHorrorJam.Core
         {
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<Collider2D>();
+            _playerVisuals = GetComponentInChildren<PlayerVisuals>();
+            if (_needleController == null)
+            {
+                _needleController = GetComponent<NeedleController>();
+            }
 
             _rb.freezeRotation = true;
             _rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
@@ -146,6 +251,22 @@ namespace ThailandHorrorJam.Core
         {
             ApplyPlatformMovement();
             CheckGround();
+
+            // ตรวจสอบกรณีผูกลากของแล้วตัวลอยอยู่ในอากาศ (เช่น เดินตกขอบแท่นสูงหรือตกเหว)
+            // ถ้าลอยค้างกลางอากาศเกินกำหนด ให้ปลดสายด้ายหลุดอัตโนมัติ เพื่อให้ตัวละครตกลงสู่พื้นอย่างเป็นธรรมชาติ
+            if (_isHauling && !_isGrounded)
+            {
+                _haulingAirborneTimer += Time.fixedDeltaTime;
+                if (_haulingAirborneTimer >= _maxHaulAirborneDuration)
+                {
+                    _haulingAirborneTimer = 0f;
+                    ReleaseHaulingTether();
+                }
+            }
+            else
+            {
+                _haulingAirborneTimer = 0f;
+            }
 
             if (_jumpRequested)
             {
@@ -184,6 +305,12 @@ namespace ThailandHorrorJam.Core
         private void ReadMovementInput()
         {
             _horizontalInput = 0f;
+            if (_isInputLocked)
+            {
+                _isJumpButtonHeld = false;
+                return;
+            }
+
             bool jumpPressed = false;
             bool jumpReleased = false;
             bool jumpHeld = false;
@@ -236,6 +363,13 @@ namespace ThailandHorrorJam.Core
 
         private void HandleJumpTimers()
         {
+            if (_isInputLocked)
+            {
+                _jumpBufferCounter = 0f;
+                _jumpRequested = false;
+                return;
+            }
+
             if (_isGrounded)
             {
                 _coyoteTimeCounter = _coyoteTime;
@@ -247,8 +381,14 @@ namespace ThailandHorrorJam.Core
 
             _jumpBufferCounter -= Time.deltaTime;
 
-            if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isHauling && !_isAiming)
+            if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isAiming)
             {
+                // ขณะกำลังลากวัตถุ (Hauling) หากผู้เล่นกดกระโดด จะปลดเชือกหลุดอัตโนมัติแล้วกระโดดได้อย่างคล่องตัว
+                if (_isHauling)
+                {
+                    ReleaseHaulingTether();
+                }
+
                 _jumpRequested = true;
                 _jumpBufferCounter = 0f;
                 _coyoteTimeCounter = 0f;
@@ -287,7 +427,15 @@ namespace ThailandHorrorJam.Core
             }
             else if (_isHauling)
             {
-                speed *= _haulingSpeedMultiplier;
+                // ขณะลากของ หากตัวลอยอยู่ในอากาศ (ตกขอบแท่น) จะไม่สามารถออกแรงดึงของกลางอากาศได้
+                if (!_isGrounded)
+                {
+                    speed = 0f;
+                }
+                else
+                {
+                    speed *= _haulingSpeedMultiplier;
+                }
             }
 
             float targetSpeed = _horizontalInput * speed;
@@ -360,23 +508,33 @@ namespace ThailandHorrorJam.Core
                 ? _rb.position + (Vector2)_groundCheckPoint.localPosition
                 : _rb.position + Vector2.down * _col.bounds.extents.y;
 
+            // จำกัดความกว้างของกล่องเช็กพื้นไม่ให้ล้นเกินความกว้างลำตัวผู้เล่น เพื่อป้องกันการชนด้านข้างของกำแพงหรือกล่อง
+            float colWidth = _col != null ? _col.bounds.size.x : 0.5f;
+            float checkWidth = Mathf.Min(_groundCheckSize.x, colWidth * 0.85f);
+            Vector2 effectiveCheckSize = new Vector2(checkWidth, _groundCheckSize.y);
+
             bool wasGrounded = _isGrounded;
-            int hitCount = Physics2D.OverlapBox(checkPos, _groundCheckSize, 0f, _groundFilter, _groundHitBuffer);
+            int hitCount = Physics2D.OverlapBox(checkPos, effectiveCheckSize, 0f, _groundFilter, _groundHitBuffer);
 
             Collider2D detectedGround = null;
-            // ให้ความสำคัญกับ StitchableObject (แท่นเคลื่อนที่) ก่อนพื้นธรรมดา เพื่อรักษาการ Snap ติดแท่นเคลื่อนที่
+            float playerFeetY = _col != null ? _col.bounds.min.y : transform.position.y;
+
+            // ให้ความสำคัญกับ StitchableObject เฉพาะเมื่อผู้เล่นยืนอยู่บนหลังของมันจริงๆ
             for (int i = 0; i < hitCount; i++)
             {
                 Collider2D groundCol = _groundHitBuffer[i];
                 if (groundCol == null || groundCol == _col) continue;
 
-                if (groundCol.GetComponentInParent<StitchableObject>() != null)
+                StitchableObject so = groundCol.GetComponentInParent<StitchableObject>();
+                if (so != null)
                 {
-                    detectedGround = groundCol;
-                    break;
+                    if (playerFeetY >= groundCol.bounds.max.y - 0.2f)
+                    {
+                        detectedGround = groundCol;
+                        break;
+                    }
                 }
-
-                if (detectedGround == null)
+                else if (detectedGround == null)
                 {
                     detectedGround = groundCol;
                 }
@@ -420,6 +578,13 @@ namespace ThailandHorrorJam.Core
 
             _currentGroundCollider = newGround;
             _currentStitchable = newGround != null ? newGround.GetComponentInParent<StitchableObject>() : null;
+
+            // ปลดการลาก (Tether/Harness) ทันทีหากผู้เล่นก้าวขึ้นมายืนบนวัตถุที่ตัวเองกำลังผูกเชือกอยู่จริงๆ
+            // เพื่อป้องกันแรงฟิสิกส์ดึงวัตถุใต้เท้าจนเกิดบั๊กเลื่อนไหลตามตัว (Self-propulsion hoverboard exploit)
+            if (_isHauling && _currentStitchable != null && _currentStitchable.IsTetheredToPlayer && IsStandingOn(_currentStitchable))
+            {
+                _currentStitchable.ReleasePlayerTether();
+            }
         }
 
         private void HandleLandingImpact()
@@ -567,28 +732,63 @@ namespace ThailandHorrorJam.Core
 
         private void OnDrawGizmosSelected()
         {
-            Gizmos.color = _isGrounded ? Color.green : Color.red;
             Collider2D col = _col != null ? _col : GetComponent<Collider2D>();
             float fallbackOffset = col != null ? col.bounds.extents.y : 0.5f;
 
+            // 1. Ground Check Box (เขียวเมื่ออยู่บนพื้น / แดงเมื่อลอย)
+            Gizmos.color = _isGrounded ? Color.green : Color.red;
             Vector2 checkPos = _groundCheckPoint != null
                 ? (Vector2)_groundCheckPoint.position
                 : (Vector2)transform.position + Vector2.down * fallbackOffset;
-            Gizmos.DrawWireCube(checkPos, _groundCheckSize);
+
+            float colWidth = col != null ? col.bounds.size.x : 0.5f;
+            float checkWidth = Mathf.Min(_groundCheckSize.x, colWidth * 0.85f);
+            Gizmos.DrawWireCube(checkPos, new Vector2(checkWidth, _groundCheckSize.y));
+
+            // 2. Ground Snapping (สีม่วง Magenta ใต้ฝ่าเท้า)
+            if (_enableGroundSnapping && _groundSnapDistance > 0f)
+            {
+                Gizmos.color = new Color(0.85f, 0.35f, 1f, 0.85f);
+                Vector2 snapStart = checkPos;
+                Vector2 snapEnd = checkPos + Vector2.down * _groundSnapDistance;
+                Gizmos.DrawLine(snapStart, snapEnd);
+                Gizmos.DrawLine(snapEnd + Vector2.left * 0.12f, snapEnd + Vector2.right * 0.12f);
+            }
 
             if (_enableCornerCorrection)
             {
-                // วาด Gizmos สำหรับ Head Corner Correction (สีเหลือง)
+                // 3. Head Corner Correction (สีเหลือง เหนือศีรษะ)
                 Gizmos.color = Color.yellow;
                 Vector2 headCenter = (Vector2)transform.position + Vector2.up * fallbackOffset;
                 Gizmos.DrawLine(headCenter + Vector2.left * _cornerRaySideOffset, headCenter + Vector2.left * _cornerRaySideOffset + Vector2.up * _headRayDistance);
                 Gizmos.DrawLine(headCenter + Vector2.right * _cornerRaySideOffset, headCenter + Vector2.right * _cornerRaySideOffset + Vector2.up * _headRayDistance);
 
-                // วาด Gizmos สำหรับ Ledge Step-up Correction (สีฟ้า)
+                // 4. Ledge Step-up Correction (สีฟ้า Cyan แสดงทั้งระยะยื่นแนวนอน และความสูง _ledgeStepUpDistance แนวตั้ง)
+                float feetY = transform.position.y - fallbackOffset;
+
+                // ด้านขวา: แสดงเส้นขอบความสูง Step-up และกล่องโซนช่วยยกตัว
                 Gizmos.color = Color.cyan;
-                Vector2 feetPos = (Vector2)transform.position + Vector2.down * (fallbackOffset * 0.75f);
-                Gizmos.DrawLine(feetPos, feetPos + Vector2.right * _ledgeRayForwardDistance);
-                Gizmos.DrawLine(feetPos, feetPos + Vector2.left * _ledgeRayForwardDistance);
+                Vector2 rightEdgeBottom = new Vector2(transform.position.x + _ledgeRayForwardDistance, feetY);
+                Vector2 rightEdgeTop = new Vector2(transform.position.x + _ledgeRayForwardDistance, feetY + _ledgeStepUpDistance);
+                Gizmos.DrawLine(new Vector2(transform.position.x, feetY), rightEdgeBottom);
+                Gizmos.DrawLine(rightEdgeBottom, rightEdgeTop);
+                Gizmos.DrawLine(rightEdgeTop, rightEdgeTop + Vector2.left * 0.1f);
+
+                Vector2 rightBoxCenter = new Vector2(transform.position.x + (_ledgeRayForwardDistance * 0.5f), feetY + (_ledgeStepUpDistance * 0.5f));
+                Gizmos.color = new Color(0.2f, 0.85f, 1f, 0.2f);
+                Gizmos.DrawCube(rightBoxCenter, new Vector3(_ledgeRayForwardDistance, _ledgeStepUpDistance, 0.05f));
+
+                // ด้านซ้าย: แสดงเส้นขอบความสูง Step-up และกล่องโซนช่วยยกตัว
+                Gizmos.color = Color.cyan;
+                Vector2 leftEdgeBottom = new Vector2(transform.position.x - _ledgeRayForwardDistance, feetY);
+                Vector2 leftEdgeTop = new Vector2(transform.position.x - _ledgeRayForwardDistance, feetY + _ledgeStepUpDistance);
+                Gizmos.DrawLine(new Vector2(transform.position.x, feetY), leftEdgeBottom);
+                Gizmos.DrawLine(leftEdgeBottom, leftEdgeTop);
+                Gizmos.DrawLine(leftEdgeTop, leftEdgeTop + Vector2.right * 0.1f);
+
+                Vector2 leftBoxCenter = new Vector2(transform.position.x - (_ledgeRayForwardDistance * 0.5f), feetY + (_ledgeStepUpDistance * 0.5f));
+                Gizmos.color = new Color(0.2f, 0.85f, 1f, 0.2f);
+                Gizmos.DrawCube(leftBoxCenter, new Vector3(_ledgeRayForwardDistance, _ledgeStepUpDistance, 0.05f));
             }
         }
     }

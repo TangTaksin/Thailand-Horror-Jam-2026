@@ -61,6 +61,8 @@ namespace ThailandHorrorJam.Systems.Needle
         private Vector2 _previousPosition;
         private Vector2 _targetFramePosition;
         private Vector2 _currentVelocity;
+        private Vector2 _initialPosition;
+        private Quaternion _initialRotation;
 
         public StitchState CurrentState => _currentState;
         public Transform ObjectTransform => transform;
@@ -68,7 +70,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public Vector2 CurrentVelocity => _currentVelocity;
         public Vector2 FrameDelta { get; private set; }
         public bool IsTetheredToPlayer => _currentState == StitchState.PlayerHarness;
-        public float MaxTetherDistance => _maxTetherDistance;
+        public float MaxTetherDistance => Mathf.Max(_maxTetherDistance, 3.2f);
 
         private void Awake()
         {
@@ -83,6 +85,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
             _previousPosition = CurrentPosition;
             _targetFramePosition = _previousPosition;
+            _initialPosition = CurrentPosition;
+            _initialRotation = transform.rotation;
 
             _tetherJoint = GetComponent<DistanceJoint2D>();
             if (_tetherJoint != null)
@@ -363,7 +367,8 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             float currentDist = Vector2.Distance(CurrentPosition, playerTransform.position);
-            _activeTetherLeashLength = Mathf.Clamp(currentDist, _minTetherDistance, _maxTetherDistance);
+            // ให้ระยะสายจูงเริ่มต้นมีความยืดหยุ่นเพียงพอ (อย่างน้อย 1.8m) เพื่อไม่ให้รั้งตัวลอยเมื่อก้าวลงพื้นต่างระดับ
+            _activeTetherLeashLength = Mathf.Clamp(Mathf.Max(currentDist, 1.8f), _minTetherDistance, MaxTetherDistance);
 
             _tetherJoint.enabled = true;
             _tetherJoint.connectedBody = playerRb;
@@ -447,12 +452,30 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
+            // ปลดสายจูงทันทีหากผู้เล่นก้าวขึ้นมายืนอยู่บนวัตถุชิ้นนี้ ป้องกันแรงดึง Joint ฟิสิกส์ลากวัตถุใต้เท้า
+            if (_tetheredPlayerController != null && _tetheredPlayerController.IsStandingOn(this))
+            {
+                ReleasePlayerTether();
+                return;
+            }
+
             Vector2 objPos = CurrentPosition;
             Vector2 playerPos = _tetheredPlayerTransform.position;
             float dist = Vector2.Distance(objPos, playerPos);
 
+            // คลายระยะสายจูงออกได้อย่างยืดหยุ่นตามระยะเดินของผู้เล่นจนถึงขีดจำกัดสูงสุด MaxTetherDistance
+            // ป้องกันแรงดึง Joint รั้งตัวผู้เล่นลอยกลางอากาศเมื่อเดินลงพื้นต่างระดับหรือทางลาด
+            if (dist > _activeTetherLeashLength && dist <= MaxTetherDistance)
+            {
+                _activeTetherLeashLength = dist;
+                if (_tetherJoint != null)
+                {
+                    _tetherJoint.distance = _activeTetherLeashLength;
+                }
+            }
+
             // Snap if pulled beyond extreme distance (e.g. falling into pit)
-            if (dist > _maxTetherDistance * 1.8f)
+            if (dist > MaxTetherDistance * 1.8f)
             {
                 ReleasePlayerTether();
                 return;
@@ -486,6 +509,27 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _sutureThread.Clear();
             }
+        }
+
+        public void ResetToInitialState()
+        {
+            CutThread();
+
+            if (_hasRb)
+            {
+                _rb.position = _initialPosition;
+                _rb.rotation = _initialRotation.eulerAngles.z;
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
+            }
+
+            transform.position = _initialPosition;
+            transform.rotation = _initialRotation;
+
+            _previousPosition = _initialPosition;
+            _targetFramePosition = _initialPosition;
+            FrameDelta = Vector2.zero;
+            _currentVelocity = Vector2.zero;
         }
 
         private void OnDisable()

@@ -18,7 +18,6 @@ namespace ThailandHorrorJam.Systems.Needle
     /// </summary>
     public sealed class NeedleController : MonoBehaviour
     {
-        private const float k_MinWaypointDistance = 0.4f;
         private const float k_HitSearchRadius = 0.45f;
         private const float k_PlayerAimRadius = 1.25f;
 
@@ -31,6 +30,9 @@ namespace ThailandHorrorJam.Systems.Needle
         private static readonly int s_TilingId = Shader.PropertyToID("_Tiling");
 
         [Header("Constraints & Budget")]
+        [Tooltip("Minimum distance required between waypoints to place a valid pin.")]
+        [SerializeField] private float _minWaypointDistance = 0.5f;
+
         [Tooltip("Maximum allowed total thread length across all segments.")]
         [SerializeField] private float _maxThreadLength = 9.5f;
 
@@ -285,11 +287,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     _playerController.UpdateAimLeash(objPos, leashLimit);
                 }
-
-                if (_playerTransform != null)
-                {
-                    _activeTarget.UpdateAimLeash(_playerTransform.position, leashLimit);
-                }
             }
         }
 
@@ -345,14 +342,32 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (!_isPinning && _reticleSprite != null)
             {
-                IStitchable hovered = FindStitchableAt(worldAimPos);
-                if (hovered != null)
+                if (_tetheredStitchable != null)
                 {
-                    _reticleSprite.color = IsPlayerNearObject(hovered) ? s_ValidColor : s_InvalidColor;
+                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint anchor))
+                    {
+                        float dist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
+                        bool canTransfer = dist >= _minWaypointDistance && dist <= _maxThreadLength;
+                        _reticleSprite.color = canTransfer ? s_ValidColor : s_InvalidColor;
+                    }
+                    else
+                    {
+                        _reticleSprite.color = s_PlayerTetherColor;
+                    }
                 }
                 else
                 {
-                    _reticleSprite.color = s_ValidColor;
+                    IStitchable hovered = FindStitchableAt(worldAimPos);
+                    if (hovered != null)
+                    {
+                        bool isStandingOnHovered = _playerController != null && _playerController.IsStandingOn(hovered.ObjectTransform);
+                        bool isValid = IsPlayerNearObject(hovered) && !isStandingOnHovered;
+                        _reticleSprite.color = isValid ? s_PlayerTetherColor : s_InvalidColor;
+                    }
+                    else
+                    {
+                        _reticleSprite.color = s_ValidColor;
+                    }
                 }
             }
         }
@@ -402,7 +417,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint foundAnchor))
                     {
                         float tetherTransferDist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
-                        if (tetherTransferDist >= k_MinWaypointDistance && tetherTransferDist <= _maxThreadLength)
+                        if (tetherTransferDist >= _minWaypointDistance && tetherTransferDist <= _maxThreadLength)
                         {
                             TransferTetherToAnchor(anchorPos, foundAnchor);
                         }
@@ -435,13 +450,18 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_isNeedleInFlight) return;
 
-                Vector2 lastPoint = _pinnedWaypoints[_pinnedWaypoints.Count - 1];
-
-                // 1. Check if clicking on Player to tether object to self (must be within tether distance budget!)
-                if (IsAimingAtPlayer(worldAimPos))
+                // ตรวจสอบว่าคลิกที่ตัวผู้เล่นหรือกล่องเดิมซ้ำเพื่อผูกลากหรือไม่ (Fallback 2-Step Tether สำหรับคนถนัดคลิกซ้าย)
+                if (IsAimingAtPlayer(worldAimPos) || (FindStitchableAt(worldAimPos) == _activeTarget))
                 {
-                    float distToPlayer = Vector2.Distance(lastPoint, _playerTransform.position);
-                    float maxAllowed = _activeTarget is StitchableObject so ? so.MaxTetherDistance : 2.2f;
+                    if (_playerController != null && _activeTarget != null && _playerController.IsStandingOn(_activeTarget.ObjectTransform))
+                    {
+                        LogWarning($"[Needle] Cannot tether {_activeTarget.ObjectTransform.name} while standing on it!");
+                        NotifyActionDenied();
+                        return;
+                    }
+
+                    float distToPlayer = Vector2.Distance(_pinnedWaypoints[0], _playerTransform.position);
+                    float maxAllowed = _activeTarget is StitchableObject so ? so.MaxTetherDistance : _maxInteractionDistance;
                     if (distToPlayer <= maxAllowed && distToPlayer <= RemainingThreadLength)
                     {
                         StartPlayerTether(_activeTarget);
@@ -454,7 +474,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     return;
                 }
 
-                // 2. Launch Needle Projectile towards cursor
+                // ยิงเข็ม (Needle Projectile) พุ่งไปยังตำแหน่งเป้าหมาย
                 LaunchNeedleProjectile(worldAimPos);
             }
         }
@@ -545,7 +565,7 @@ namespace ThailandHorrorJam.Systems.Needle
             Vector2 boxPos = _pinnedWaypoints[0];
             float segDist = Vector2.Distance(boxPos, anchorPos);
 
-            if (segDist < k_MinWaypointDistance || segDist > _maxThreadLength)
+            if (segDist < _minWaypointDistance || segDist > _maxThreadLength)
             {
                 LogWarning($"[Needle] Hit point is out of thread budget ({segDist:F1}m > {_maxThreadLength:F1}m). Rewinding!");
                 _needleProjectile.StartRewind();
@@ -597,33 +617,66 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void OnSecondaryClick(Vector3 worldAimPos)
         {
+            if (_tetheredStitchable != null)
+            {
+                ReleasePlayerTether();
+                OnThreadSevered?.Invoke();
+                return;
+            }
+
+            // คลิกขวาที่ StitchableObject เพื่อผูกลากทันที (Instant Haul Tether) 1-Click
+            IStitchable stitchable = FindStitchableAt(worldAimPos);
+            if (stitchable != null)
+            {
+                if (_isPinning)
+                {
+                    CancelStitching();
+                }
+
+                if (_playerController != null && _playerController.IsStandingOn(stitchable.ObjectTransform))
+                {
+                    LogWarning($"[Needle] Cannot tether {stitchable.ObjectTransform.name} while standing on it!");
+                    CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                    NotifyActionDenied();
+                    return;
+                }
+
+                if (IsPlayerNearObject(stitchable))
+                {
+                    StartPlayerTether(stitchable);
+                }
+                else
+                {
+                    float dist = Vector2.Distance(_playerTransform.position, stitchable.CurrentPosition);
+                    LogWarning($"[Needle] Too far from {stitchable.ObjectTransform.name} to tether! Distance: {dist:F1}m (Max: {_maxInteractionDistance:F1}m). Move closer.");
+                    CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                    NotifyActionDenied();
+                }
+                return;
+            }
+
             if (_isPinning)
             {
                 CancelStitching();
                 OnThreadSevered?.Invoke();
+                return;
             }
-            else if (_tetheredStitchable != null)
+
+            // ตัดด้ายที่อยู่ใกล้จุดชี้เคอร์เซอร์ (Scissor fallback)
+            if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
             {
-                ReleasePlayerTether();
-                OnThreadSevered?.Invoke();
-            }
-            else
-            {
-                if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
+                if (_currentlyLoopingTarget != null && _currentlyLoopingTarget.CurrentState != StitchState.Looping)
                 {
-                    if (_currentlyLoopingTarget != null && _currentlyLoopingTarget.CurrentState != StitchState.Looping)
-                    {
-                        _currentlyLoopingTarget = null;
-                    }
-                    if (_needleProjectile != null)
-                    {
-                        _needleProjectile.Cancel();
-                    }
-                    ClearCurrentPinnedAnchor();
-                    CameraController2D.Instance?.Shake(0.04f, 0.08f);
-                    OnThreadSevered?.Invoke();
-                    Log("[Needle] Thread severed by pointer release.");
+                    _currentlyLoopingTarget = null;
                 }
+                if (_needleProjectile != null)
+                {
+                    _needleProjectile.Cancel();
+                }
+                ClearCurrentPinnedAnchor();
+                CameraController2D.Instance?.Shake(0.04f, 0.08f);
+                OnThreadSevered?.Invoke();
+                Log("[Needle] Thread severed by pointer release.");
             }
         }
 
@@ -717,6 +770,34 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        public void ResetAllNeedleStates()
+        {
+            if (_needleProjectile != null)
+            {
+                _needleProjectile.Cancel();
+            }
+            _isNeedleInFlight = false;
+
+            if (_isPinning)
+            {
+                CancelStitching();
+            }
+
+            if (_tetheredStitchable != null)
+            {
+                ReleasePlayerTether();
+            }
+
+            if (_currentlyLoopingTarget != null)
+            {
+                _currentlyLoopingTarget.CutThread();
+                _currentlyLoopingTarget = null;
+            }
+
+            ClearCurrentPinnedAnchor();
+            ResetPinningState();
+        }
+
         public void CancelStitching()
         {
             if (_isPinning)
@@ -748,12 +829,6 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             anchorPoint = worldAimPos;
             foundAnchor = null;
-
-            if (IsAimingAtPlayer(worldAimPos))
-            {
-                if (_playerTransform != null) anchorPoint = _playerTransform.position;
-                return true;
-            }
 
             if (!_requireSurfaceToPin) return true;
 
@@ -911,12 +986,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _playerController.SetAiming(true, _activeTarget.CurrentPosition, MaxAimLeashDistance);
             }
 
-            if (_playerTransform != null)
-            {
-                _activeTarget.UpdateAimLeash(_playerTransform.position, MaxAimLeashDistance);
-            }
-
-            Log($"[Needle] Tethered to {target.ObjectTransform.name}. Aim leash: {MaxAimLeashDistance:F1}m. Click a wall/surface to pin (Max points: {_maxWaypoints}).");
+            Log($"[Needle] Aiming needle from {target.ObjectTransform.name}. Aim leash: {MaxAimLeashDistance:F1}m. Click a wall/surface to pin (Max points: {_maxWaypoints}).");
         }
 
         private void CompleteStitchingRail()
@@ -1042,27 +1112,11 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             Vector2 launchOrigin = _pinnedWaypoints[0];
-            Vector2 playerPos = _playerTransform.position;
             Vector2 aimVector = (Vector2)worldAimPos - launchOrigin;
             float aimDist = aimVector.magnitude;
             Vector2 aimDir = aimDist > 0.001f ? aimVector / aimDist : Vector2.right;
 
-            // 1. Check if aiming at player (to tether)
-            bool isAimingPlayer = IsAimingAtPlayer(worldAimPos);
-            if (isAimingPlayer)
-            {
-                float distToPlayer = Vector2.Distance(launchOrigin, playerPos);
-                float maxAllowed = _activeTarget is StitchableObject so ? so.MaxTetherDistance : 2.2f;
-                bool canTether = distToPlayer <= maxAllowed && distToPlayer <= RemainingThreadLength;
-                Color col = canTether ? s_PlayerTetherColor : s_InvalidColor;
-
-                DrawAimTrajectory(launchOrigin, playerPos, col);
-                if (_reticleSprite != null) _reticleSprite.color = col;
-                UpdateAnchorPointsFeedback(true, launchOrigin, null);
-                return;
-            }
-
-            // 2. Aim guide from Waypoint 1 (Box) to predicted impact point
+            // Aim guide from Waypoint 1 (Box) to predicted impact point on physical surfaces/anchors
             Vector2 rayOrigin = launchOrigin;
             Collider2D targetCol = _activeTarget?.ObjectTransform != null ? _activeTarget.ObjectTransform.GetComponent<Collider2D>() : null;
             if (targetCol != null)
@@ -1085,7 +1139,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     endPoint = hitAnchor != null ? hitAnchor.GetAnchorPosition(hit.point, hit.normal) : hit.point;
                     float totalDist = Vector2.Distance(launchOrigin, endPoint);
-                    canPlace = totalDist >= k_MinWaypointDistance && totalDist <= _maxThreadLength;
+                    canPlace = totalDist >= _minWaypointDistance && totalDist <= _maxThreadLength;
                 }
             }
             else
@@ -1117,7 +1171,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 anchor.UpdateAimFeedback(
                     isAiming,
                     launchOrigin,
-                    k_MinWaypointDistance,
+                    _minWaypointDistance,
                     _maxThreadLength,
                     isAiming && anchor == hoveredAnchor);
             }
@@ -1185,6 +1239,50 @@ namespace ThailandHorrorJam.Systems.Needle
         private static void LogWarning(string message)
         {
             Debug.LogWarning(message);
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Vector3 center = transform.position;
+
+            // 1. วงระยะ Interaction สูงสุดที่ผู้เล่นจะคลิกเลือกกล่องได้ (สีฟ้าอมเขียว)
+            if (_maxInteractionDistance > 0f)
+            {
+                Gizmos.color = new Color(0.2f, 0.9f, 1f, 0.45f);
+                Gizmos.DrawWireSphere(center, _maxInteractionDistance);
+            }
+
+            // 2. ถ้ากำลังเย็บ (Pinning) หรือลากวัตถุอยู่ ให้วาดวงระยะยิงเข็มรอบตัววัตถุ (Box)
+            Vector3 originPos = center;
+            if (_isPinning && _pinnedWaypoints.Count > 0)
+            {
+                originPos = _pinnedWaypoints[0];
+            }
+            else if (_activeTarget != null)
+            {
+                originPos = _activeTarget.CurrentPosition;
+            }
+
+            // วงระยะใกล้สุดที่อนุญาตให้ปัก (สีแดง/ส้ม)
+            if (_minWaypointDistance > 0f)
+            {
+                Gizmos.color = new Color(1f, 0.4f, 0.2f, 0.6f);
+                Gizmos.DrawWireSphere(originPos, _minWaypointDistance);
+            }
+
+            // วงระยะยิงเข็มไกลสุด (สีเหลืองทอง / Max Thread Range)
+            if (_maxThreadLength > 0f)
+            {
+                Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.75f);
+                Gizmos.DrawWireSphere(originPos, _maxThreadLength);
+            }
+
+            // วงระยะ Aim Leash ที่เด็กหญิงเดินห่างจากกล่องได้ขณะเล็ง (สีม่วง)
+            if (_isPinning && _maxAimLeashDistance > 0f)
+            {
+                Gizmos.color = new Color(0.85f, 0.4f, 1f, 0.5f);
+                Gizmos.DrawWireSphere(originPos, _maxAimLeashDistance);
+            }
         }
     }
 }

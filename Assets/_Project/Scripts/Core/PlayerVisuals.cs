@@ -98,6 +98,20 @@ namespace ThailandHorrorJam.Core
         public VisualState CurrentState => _currentState;
         public bool IsFacingRight => _isFacingRight;
 
+        public void SetFacing(bool faceRight)
+        {
+            _isFacingRight = faceRight;
+            if (_visualHolder != null)
+            {
+                float dirX = _isFacingRight ? 1f : -1f;
+                _visualHolder.localScale = new Vector3(
+                    dirX * _baseScale.x * _scaleModifier.x,
+                    _baseScale.y * _scaleModifier.y,
+                    1f
+                );
+            }
+        }
+
         private void Awake()
         {
             if (_controller == null)
@@ -207,6 +221,8 @@ namespace ThailandHorrorJam.Core
 
         private void UpdateFacingDirection()
         {
+            if (_controller != null && _controller.IsInputLocked) return;
+
             // 1. If aiming needle, face towards aim cursor
             if (_faceAimWhenPinning && _needleController != null && _needleController.IsPinning)
             {
@@ -264,7 +280,7 @@ namespace ThailandHorrorJam.Core
                 bool isMoving = Mathf.Abs(_controller.Velocity.x) > 0.05f;
                 if (isMoving)
                 {
-                    bool shouldUseHaulWalk = (_controller.IsHauling || _controller.IsAiming) && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
+                    bool shouldUseHaulWalk = _controller.IsHauling && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
                     SetState(shouldUseHaulWalk ? VisualState.HaulWalk : VisualState.Walk);
                 }
                 else
