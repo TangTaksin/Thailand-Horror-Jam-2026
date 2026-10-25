@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.masyo-lab.favorites-asset": "https://github.com/MasyoLab/UnityTools-FavoritesAsset.git?path=Assets/MasyoLab/FavoritesAsset",
     "com.unity.2d.animation": "17.0.2",
     "com.unity.2d.aseprite": "7.0.1",
     "com.unity.2d.sprite": "1.0.0",

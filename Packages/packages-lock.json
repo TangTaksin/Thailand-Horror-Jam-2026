@@ -1,12 +1,5 @@
 {
   "dependencies": {
-    "com.masyo-lab.favorites-asset": {
-      "version": "https://github.com/MasyoLab/UnityTools-FavoritesAsset.git?path=Assets/MasyoLab/FavoritesAsset",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "a035a3aec268b9ee41649eb793f738f34998b9ae"
-    },
     "com.mibdev.fullscreen-editor": {
       "version": "file:com.mibdev.fullscreen-editor",
       "depth": 0,
