@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using ThailandHorrorJam.Systems.Needle;
+using ThailandHorrorJam.Systems.Gameplay;
 
 namespace ThailandHorrorJam.Core
 {
@@ -58,6 +59,16 @@ namespace ThailandHorrorJam.Core
         [Tooltip("ระยะเวลาลอยตัวกลางอากาศสูงสุดขณะลากของ ก่อนที่สายด้ายจะขาด/หลุดออกอัตโนมัติ (เช่น ตกขอบแท่นสูงหรือตกเหว)")]
         [SerializeField] private float _maxHaulAirborneDuration = 0.25f;
 
+        [Header("Crush Hazard")]
+        [Tooltip("เปิดใช้งานระบบบดขยี้ตายเมื่อศีรษะติดเพดานหรือถูกวัตถุทับ (Limbo Style)")]
+        [SerializeField] private bool _enableCrushDeath = true;
+        [Tooltip("ระยะเวลาถูกบีบอัดต่อเนื่องก่อนตาย (วินาที)")]
+        [SerializeField] private float _crushDeathDelay = 0.08f;
+        [Tooltip("ระยะตรวจสอบสิ่งกีดขวางเหนือศีรษะ")]
+        [SerializeField] private float _ceilingCheckDistance = 0.18f;
+        [Tooltip("ความเร็วตกขั้นต่ำของวัตถุที่ร่วงกระแทกศีรษะแล้วทำให้ตายทันที (m/s)")]
+        [SerializeField] private float _crushImpactVelocityThreshold = 2.5f;
+
         private Rigidbody2D _rb;
         private Collider2D _col;
         private PlayerVisuals _playerVisuals;
@@ -84,6 +95,7 @@ namespace ThailandHorrorJam.Core
         private bool _isInputLocked;
         private Vector2? _aimLeashAnchor;
         private float _aimLeashDistance;
+        private float _crushTimer;
 
         public bool IsGrounded => _isGrounded;
         public bool IsHauling => _isHauling;
@@ -235,6 +247,7 @@ namespace ThailandHorrorJam.Core
         {
             ApplyPlatformMovement();
             CheckGround();
+            CheckCrushHazard();
 
             // ตรวจสอบกรณีผูกลากของแล้วตัวลอยอยู่ในอากาศ (เช่น เดินตกขอบแท่นสูงหรือตกเหว)
             // ถ้าลอยค้างกลางอากาศเกินกำหนด ให้ปลดสายด้ายหลุดอัตโนมัติ เพื่อให้ตัวละครตกลงสู่พื้นอย่างเป็นธรรมชาติ
@@ -450,6 +463,8 @@ namespace ThailandHorrorJam.Core
 
         private void ApplyJumpPhysics()
         {
+            if (_isGrounded) return;
+
             float velY = _rb.linearVelocity.y;
 
             if (velY < 0f)
@@ -549,11 +564,25 @@ namespace ThailandHorrorJam.Core
 
             UpdateCachedGround(detectedGround);
 
-            // นับว่าอยู่บนพื้นเฉพาะเมื่อไม่ได้กำลังพุ่งตัวขึ้นจากการกระโดด
-            _isGrounded = detectedGround != null && _rb.linearVelocity.y <= 0.1f;
+            // คำนวณความเร็วแนวดิ่งของวัตถุใต้เท้า (รองรับ StitchableObject และแพลตฟอร์มเคลื่อนที่ในแนวดิ่ง)
+            float groundVelY = 0f;
+            if (_currentStitchable != null)
+            {
+                groundVelY = _currentStitchable.CurrentVelocity.y;
+            }
+            else if (detectedGround != null && detectedGround.attachedRigidbody != null)
+            {
+                groundVelY = detectedGround.attachedRigidbody.linearVelocity.y;
+            }
+
+            float relVertVelocity = _rb.linearVelocity.y - groundVelY;
+
+            // นับว่าอยู่บนพื้นเมื่อสัมผัส Collider พื้น และความเร็วสัมพัทธ์ไม่ได้พุ่งตัวขึ้นจากการกระโดด
+            _isGrounded = detectedGround != null && relVertVelocity <= 0.35f;
 
             if (!wasGrounded && _isGrounded)
             {
+                _isJumpCut = false;
                 HandleLandingImpact();
             }
 
@@ -607,6 +636,153 @@ namespace ThailandHorrorJam.Core
                 {
                     _currentStitchable.OnPlayerWalkingStep(transform.position);
                 }
+            }
+        }
+
+        private void CheckCrushHazard()
+        {
+            if (!_enableCrushDeath || !_isGrounded || _isInputLocked)
+            {
+                _crushTimer = 0f;
+                return;
+            }
+
+            // ความเร็วของพื้นใต้เท้า
+            float platformUpwardSpeed = _currentStitchable != null
+                ? _currentStitchable.CurrentVelocity.y
+                : (_currentGroundCollider != null && _currentGroundCollider.attachedRigidbody != null
+                    ? _currentGroundCollider.attachedRigidbody.linearVelocity.y
+                    : 0f);
+
+            // ตรวจสอบสิ่งกีดขวางเหนือศีรษะ (เพดาน หรือ วัตถุที่อยู่ข้างบน)
+            float colWidth = _col != null ? _col.bounds.size.x : 0.5f;
+            float checkWidth = colWidth * 0.75f;
+            Vector2 headTop = _col != null
+                ? new Vector2(_col.bounds.center.x, _col.bounds.max.y - 0.04f)
+                : (Vector2)transform.position + Vector2.up * 0.9f;
+
+            RaycastHit2D hit = Physics2D.BoxCast(headTop, new Vector2(checkWidth, 0.06f), 0f, Vector2.up, _ceilingCheckDistance, _groundLayer);
+
+            bool isCrushing = false;
+            if (hit.collider != null && hit.collider != _col && !hit.collider.isTrigger)
+            {
+                // ตรวจสอบว่าไม่ใช่ตัววัตถุที่ยืนอยู่เอง
+                Transform currentGroundTransform = _currentGroundCollider != null ? _currentGroundCollider.transform : null;
+                Transform stitchableTransform = _currentStitchable != null ? _currentStitchable.transform : null;
+
+                bool isSameAsGround = (currentGroundTransform != null && (hit.collider.transform == currentGroundTransform || hit.collider.transform.IsChildOf(currentGroundTransform)))
+                    || (stitchableTransform != null && (hit.collider.transform == stitchableTransform || hit.collider.transform.IsChildOf(stitchableTransform)));
+
+                if (!isSameAsGround)
+                {
+                    // กรณีที่ 1: พื้นใต้เท้ากำลังยกตัวขึ้นดันตัวผู้เล่นอัดกับเพดาน
+                    if (platformUpwardSpeed > 0.15f)
+                    {
+                        isCrushing = true;
+                    }
+                    else
+                    {
+                        // กรณีที่ 2: วัตถุด้านบน (เช่น StitchableObject หรือ Rigidbody) กำลังเคลื่อนที่ลงมาทับผู้เล่นที่ยืนบนพื้น
+                        StitchableObject overheadStitchable = hit.collider.GetComponentInParent<StitchableObject>();
+                        float overheadDownSpeed = 0f;
+                        if (overheadStitchable != null)
+                        {
+                            overheadDownSpeed = -overheadStitchable.CurrentVelocity.y;
+                        }
+                        else if (hit.collider.attachedRigidbody != null)
+                        {
+                            overheadDownSpeed = -hit.collider.attachedRigidbody.linearVelocity.y;
+                        }
+
+                        // วัตถุด้านบนกำลังเคลื่อนที่ลงมาทับผู้เล่น
+                        if (overheadDownSpeed > 0.15f)
+                        {
+                            isCrushing = true;
+                        }
+                    }
+                }
+            }
+
+            if (isCrushing)
+            {
+                _crushTimer += Time.fixedDeltaTime;
+                if (_crushTimer >= _crushDeathDelay)
+                {
+                    _crushTimer = 0f;
+                    ExecuteCrushDeath();
+                }
+            }
+            else
+            {
+                _crushTimer = 0f;
+            }
+        }
+
+        private void OnCollisionEnter2D(Collision2D collision)
+        {
+            HandleOverheadCollisionImpact(collision);
+        }
+
+        private void OnCollisionStay2D(Collision2D collision)
+        {
+            if (!_isGrounded) return;
+            HandleOverheadCollisionImpact(collision);
+        }
+
+        private void HandleOverheadCollisionImpact(Collision2D collision)
+        {
+            if (!_enableCrushDeath || _isInputLocked) return;
+
+            StitchableObject so = collision.collider.GetComponentInParent<StitchableObject>();
+            Rigidbody2D otherRb = collision.rigidbody;
+
+            // ตรวจสอบเฉพาะการชนกับ StitchableObject หรือ Rigidbody ที่มีมวล
+            if (so == null && otherRb == null) return;
+
+            // คำนวณความเร็วในการร่วงลงมาของวัตถุ
+            float objDownSpeed = 0f;
+            if (otherRb != null)
+            {
+                objDownSpeed = -otherRb.linearVelocity.y;
+            }
+            if (so != null)
+            {
+                objDownSpeed = Mathf.Max(objDownSpeed, -so.CurrentVelocity.y);
+            }
+
+            // คำนวณระดับความสูงของศีรษะผู้เล่น
+            float playerHeadY = _col != null ? _col.bounds.max.y - 0.2f : transform.position.y + 0.4f;
+
+            for (int i = 0; i < collision.contactCount; i++)
+            {
+                ContactPoint2D contact = collision.GetContact(i);
+
+                // หากจุดสัมผัสเกิดขึ้นที่บริเวณศีรษะ (ด้านบนสุดของผู้เล่น)
+                if (contact.point.y >= playerHeadY)
+                {
+                    // กรณีร่วงตกจากที่สูงกระแทกหัวอย่างรุนแรง (Instant Impact Crush)
+                    if (objDownSpeed >= _crushImpactVelocityThreshold)
+                    {
+                        ExecuteCrushDeath();
+                        return;
+                    }
+
+                    // กรณีผู้เล่นยืนติดพื้นแล้วมีกล่องเลื่อนลงมาทับหรือวางทับต่อเนื่อง
+                    if (_isGrounded && objDownSpeed > 0.12f)
+                    {
+                        ExecuteCrushDeath();
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ExecuteCrushDeath()
+        {
+            if (CheckpointManager.Instance != null && !CheckpointManager.Instance.IsRespawning)
+            {
+                CameraController2D.Instance?.Shake(0.35f, 0.45f);
+                CheckpointManager.Instance.TriggerPlayerDeath(shakeIntensity: 0.35f, shakeDuration: 0.45f);
             }
         }
 
@@ -783,6 +959,16 @@ namespace ThailandHorrorJam.Core
                 Vector2 leftBoxCenter = new Vector2(transform.position.x - (_ledgeRayForwardDistance * 0.5f), feetY + (_ledgeStepUpDistance * 0.5f));
                 Gizmos.color = new Color(0.2f, 0.85f, 1f, 0.2f);
                 Gizmos.DrawCube(leftBoxCenter, new Vector3(_ledgeRayForwardDistance, _ledgeStepUpDistance, 0.05f));
+            }
+
+            // 5. Crush Hazard Ceiling Check (สีส้ม/แดง เหนือศีรษะ)
+            if (_enableCrushDeath)
+            {
+                Gizmos.color = _crushTimer > 0f ? Color.red : new Color(1f, 0.45f, 0.15f, 0.75f);
+                Vector2 headTop = col != null
+                    ? new Vector2(col.bounds.center.x, col.bounds.max.y - 0.04f)
+                    : (Vector2)transform.position + Vector2.up * 0.9f;
+                Gizmos.DrawWireCube(headTop + Vector2.up * (_ceilingCheckDistance * 0.5f), new Vector2(colWidth * 0.75f, _ceilingCheckDistance));
             }
         }
     }

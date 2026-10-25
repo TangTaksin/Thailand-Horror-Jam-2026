@@ -303,9 +303,14 @@ MonoBehaviour:
   _cornerRaySideOffset: 0.26
   _headNudgeStep: 0.06
   _ledgeRayForwardDistance: 0.252
-  _ledgeStepUpDistance: 0.5
+  _ledgeStepUpDistance: -0.13
   _enableGroundSnapping: 1
   _groundSnapDistance: 0.16
+  _maxHaulAirborneDuration: 0.25
+  _enableCrushDeath: 1
+  _crushDeathDelay: 0.1
+  _ceilingCheckDistance: -0.12
+  _crushImpactVelocityThreshold: 2.5
 --- !u!114 &6038937062244345014
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -322,10 +327,10 @@ MonoBehaviour:
   _maxThreadLength: 6.2
   _maxInteractionDistance: 0.9
   _maxAimLeashDistance: 2
-  _maxWaypoints: 2
+  _maxWaypoints: 3
   _requireSurfaceToPin: 1
   _requireAnchorComponent: 1
-  _singleCircuitLimit: 1
+  _singleCircuitLimit: 0
   _stitchableLayer:
     serializedVersion: 2
     m_Bits: 0
@@ -350,7 +355,7 @@ GameObject:
   m_Layer: 0
   m_Name: GroundCheck
   m_TagString: Untagged
-  m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
+  m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
