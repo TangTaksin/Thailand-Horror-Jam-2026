@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Needle
 {
@@ -93,6 +94,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private static readonly List<SutureThread> s_ActiveThreads = new List<SutureThread>();
         public static IReadOnlyList<SutureThread> ActiveThreads => s_ActiveThreads;
+
+        private static readonly Vector2[] s_CardinalDirections = { Vector2.up, Vector2.down, Vector2.right, Vector2.left };
 
         private static Sprite s_PinSprite;
         private Material _threadMaterial;
@@ -244,7 +247,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _cachedWaypoints.Add(waypoints[i]);
             }
 
-            BuildVerletRope();
+            BuildVerletRope(false);
             UpdatePinMarkers(_cachedWaypoints);
             RebuildSplineData();
             ApplySplineToLineRenderer();
@@ -445,7 +448,7 @@ namespace ThailandHorrorJam.Systems.Needle
             // หากยังไม่ได้สร้างโหนดเชือก ให้สร้างทันที
             if (_nodes.Count < 2 || _pinnedWaypointIndices.Count < 2)
             {
-                BuildVerletRope();
+                BuildVerletRope(false);
             }
             else
             {
@@ -489,7 +492,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _isSplineDirty = true;
         }
 
-        private void BuildVerletRope()
+        private void BuildVerletRope(bool applyTwang = false)
         {
             _nodes.Clear();
             _links.Clear();
@@ -535,11 +538,28 @@ namespace ThailandHorrorJam.Systems.Needle
                     Vector2 basePos = Vector2.Lerp(pStart, pEnd, t);
 
                     float envelope = Mathf.Sin(t * Mathf.PI);
-                    Vector2 pluckOffset = (segNormal * (_twangImpulse * 0.12f * envelope)) + (Vector2.down * (0.05f * envelope));
-                    Vector2 pos = basePos + pluckOffset;
+                    Vector2 pos = basePos;
+                    Vector2 oldPos = basePos;
 
-                    Vector2 initialVel = segNormal * (_twangImpulse * envelope);
-                    Vector2 oldPos = pos - (initialVel * dt);
+                    if (applyTwang)
+                    {
+                        Vector2 pluckOffset = (segNormal * (_twangImpulse * 0.12f * envelope)) + (Vector2.down * (0.05f * envelope));
+                        Vector2 candidatePos = basePos + pluckOffset;
+
+                        // ถ้าจุด candidatePos ชนเพดาน/กำแพง ไม่ต้องดีดสายเข้าสิ่งกีดขวาง
+                        if (!_enableGroundCollision || Physics2D.OverlapPoint(candidatePos, _collisionFilter, _pointHitBuffer) == 0)
+                        {
+                            pos = candidatePos;
+                            Vector2 initialVel = segNormal * (_twangImpulse * envelope);
+                            oldPos = pos - (initialVel * dt);
+                        }
+                    }
+                    else
+                    {
+                        // หย่อนลงเล็กน้อยตามธรรมชาติของสายเชือก (Natural catenary sag) ป้องกันการพุ่งเข้าหาเพดาน
+                        pos += Vector2.down * (0.02f * envelope);
+                        oldPos = pos;
+                    }
 
                     _nodes.Add(new VerletNode
                     {
@@ -666,34 +686,130 @@ namespace ThailandHorrorJam.Systems.Needle
                         continue;
                     }
 
-                    Vector2 surfacePoint = hit.ClosestPoint(node.OldPosition);
-                    Vector2 normal = (node.OldPosition - surfacePoint).normalized;
-
-                    // Fallback หาก OldPosition อยู่ข้างในตัว collider ด้วย
-                    if (normal.sqrMagnitude < 0.001f)
+                    // กรอง collider ของผู้เล่นออก เพื่อไม่ให้ด้ายติดขัดในตัวผู้เล่น
+                    if (hit.CompareTag("Player") || hit.GetComponentInParent<PlayerController2D>() != null)
                     {
-                        var rayHit = Physics2D.Raycast(node.Position + Vector2.up * 0.8f, Vector2.down, 1.6f, _collisionMask);
-                        if (rayHit.collider != null)
-                        {
-                            surfacePoint = rayHit.point;
-                            normal = rayHit.normal;
-                        }
-                        else
-                        {
-                            normal = Vector2.up;
-                        }
+                        continue;
                     }
 
-                    node.Position = surfacePoint + normal * _surfaceOffset;
+                    if (ResolvePenetration(hit, node.Position, node.OldPosition, out Vector2 surfacePoint, out Vector2 normal))
+                    {
+                        node.Position = surfacePoint + normal * _surfaceOffset;
 
-                    // ใส่แรงเสียดทาน (Friction) เมื่อสัมผัสพื้น เพื่อให้ด้ายกองนิ่งอยู่กับที่ ไม่ลื่นไหล
-                    Vector2 vel = node.Position - node.OldPosition;
-                    vel *= (1f - _groundFriction);
-                    node.OldPosition = node.Position - vel;
+                        // ลบความเร็วในแนวพุ่งเข้าหาพื้นผิว (Inward velocity) ป้องกันการเด้งทะลุ
+                        Vector2 vel = node.Position - node.OldPosition;
+                        float inwardVel = Vector2.Dot(vel, -normal);
+                        if (inwardVel > 0f)
+                        {
+                            vel += normal * inwardVel;
+                        }
 
-                    _nodes[i] = node;
+                        // ใส่แรงเสียดทาน (Friction) เมื่อสัมผัสพื้นผิว เพื่อให้ด้ายกองนิ่ง ไม่ลื่นไถล
+                        vel *= (1f - _groundFriction);
+                        node.OldPosition = node.Position - vel;
+
+                        _nodes[i] = node;
+                    }
                 }
             }
+        }
+
+        private bool ResolvePenetration(Collider2D hit, Vector2 pos, Vector2 oldPos, out Vector2 surfacePoint, out Vector2 normal)
+        {
+            surfacePoint = pos;
+            normal = Vector2.zero;
+
+            // 1. ถ้า oldPos อยู่นอก collider: ใช้ Linecast จาก oldPos มา pos จะได้จุดกระทบและ normal ที่แม่นยำที่สุด
+            if (!hit.OverlapPoint(oldPos))
+            {
+                RaycastHit2D lineHit = Physics2D.Linecast(oldPos, pos, _collisionMask);
+                if (lineHit.collider == hit)
+                {
+                    surfacePoint = lineHit.point;
+                    normal = lineHit.normal;
+                    return true;
+                }
+
+                Vector2 cp = hit.ClosestPoint(oldPos);
+                Vector2 diff = oldPos - cp;
+                if (diff.sqrMagnitude > 0.0001f)
+                {
+                    surfacePoint = cp;
+                    normal = diff.normalized;
+                    return true;
+                }
+            }
+
+            // 2. ถ้า oldPos อยู่ใน collider ด้วย (เช่น โหนดถูกลากทะลุเข้ามา หรือเริ่มต้นอยู่ใน collider)
+            // ให้ยิง ray ย้อนกลับเข้ามาจาก 4 ทิศทาง (บน, ล่าง, ซ้าย, ขวา) เพื่อหาขอบผิวที่ใกล้ที่สุด (ทางออกที่สั้นที่สุด)
+            // ทำให้กรณีเป็นเพดาน จะได้ทางออกด้านล่าง (normal ชี้ลง) เสมอ ไม่ดีดขึ้นหลังคา
+            float searchDist = Mathf.Max(3.0f, hit.bounds.extents.magnitude * 1.5f);
+            float bestDist = float.MaxValue;
+            Vector2 bestPoint = pos;
+            Vector2 bestNormal = Vector2.zero;
+            bool foundExit = false;
+
+            for (int d = 0; d < s_CardinalDirections.Length; d++)
+            {
+                Vector2 rayDir = s_CardinalDirections[d];
+                Vector2 origin = pos - rayDir * searchDist;
+
+                if (!hit.OverlapPoint(origin))
+                {
+                    RaycastHit2D rayHit = Physics2D.Raycast(origin, rayDir, searchDist + 0.1f, _collisionMask);
+                    if (rayHit.collider == hit)
+                    {
+                        float dist = Vector2.Distance(pos, rayHit.point);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestPoint = rayHit.point;
+                            bestNormal = rayHit.normal;
+                            foundExit = true;
+                        }
+                    }
+                }
+            }
+
+            if (foundExit)
+            {
+                surfacePoint = bestPoint;
+                normal = bestNormal;
+                return true;
+            }
+
+            // 3. Fallback: ดึงออกจากทิศทางของ Waypoint เริ่มต้น (ตำแหน่งกล่อง/ผู้เล่น) ซึ่งอยู่นอก collider
+            if (_cachedWaypoints.Count > 0)
+            {
+                for (int w = 0; w < _cachedWaypoints.Count; w++)
+                {
+                    Vector2 anchor = _cachedWaypoints[w];
+                    if (!hit.OverlapPoint(anchor))
+                    {
+                        RaycastHit2D anchorRay = Physics2D.Linecast(anchor, pos, _collisionMask);
+                        if (anchorRay.collider == hit)
+                        {
+                            surfacePoint = anchorRay.point;
+                            normal = anchorRay.normal;
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // 4. Fallback สุดท้าย: ดันกลับไปหา oldPos หรือทิศทางลงล่าง (ถ้าเป็นเพดาน) ห้ามดันขึ้น Vector2.up เด็ดขาด
+            Vector2 fallbackDiff = oldPos - pos;
+            if (fallbackDiff.sqrMagnitude > 0.0001f)
+            {
+                normal = fallbackDiff.normalized;
+            }
+            else
+            {
+                normal = Vector2.down;
+            }
+
+            surfacePoint = pos;
+            return true;
         }
 
         private void RebuildSplineData()
@@ -726,11 +842,21 @@ namespace ThailandHorrorJam.Systems.Needle
                     if (!_isTautMode && _enableGroundCollision && Physics2D.OverlapPoint(pt, _collisionFilter, _pointHitBuffer) > 0)
                     {
                         Collider2D groundHit = _pointHitBuffer[0];
-                        if (groundHit != null && (_cachedOwner == null || _cachedOwner.ObjectTransform == null ||
-                            !groundHit.transform.IsChildOf(_cachedOwner.ObjectTransform)))
+                        if (groundHit != null &&
+                            (_cachedOwner == null || _cachedOwner.ObjectTransform == null || !groundHit.transform.IsChildOf(_cachedOwner.ObjectTransform)) &&
+                            !groundHit.CompareTag("Player") && groundHit.GetComponentInParent<PlayerController2D>() == null)
                         {
-                            Vector2 surfacePoint = groundHit.ClosestPoint(pt + Vector2.up * 0.15f);
-                            pt = surfacePoint + Vector2.up * _surfaceOffset;
+                            Vector2 segMid = (p1 + p2) * 0.5f;
+                            Vector2 surfacePoint = groundHit.ClosestPoint(segMid);
+                            Vector2 outwardDir = segMid - surfacePoint;
+                            if (outwardDir.sqrMagnitude > 0.0001f)
+                            {
+                                pt = surfacePoint + outwardDir.normalized * _surfaceOffset;
+                            }
+                            else
+                            {
+                                pt = segMid;
+                            }
                         }
                     }
 
