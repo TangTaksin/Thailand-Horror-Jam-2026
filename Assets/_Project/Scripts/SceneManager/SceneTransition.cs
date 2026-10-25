@@ -23,14 +23,24 @@ public class SceneTransition : MonoBehaviour
 
     private int transitionShaderID;
     private Material internalMaterial;
+    private Coroutine _activeCoroutine;
 
     private void Awake()
     {
         transitionShaderID = Shader.PropertyToID(transitionName);
 
-        if (transitionImage != null)
+        if (transitionImage != null && transitionImage.material != null)
         {
-            internalMaterial = transitionImage.material;
+            internalMaterial = new Material(transitionImage.material);
+            transitionImage.material = internalMaterial;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (internalMaterial != null)
+        {
+            Destroy(internalMaterial);
         }
     }
 
@@ -48,8 +58,10 @@ public class SceneTransition : MonoBehaviour
     {
         if (enableAutoPlay)
         {
+            if (eventChannel != null) eventChannel.isTransitioning = true;
             UpdateShaderValue(0f);
-            StartCoroutine(DoTransition(playForward: true));
+            if (_activeCoroutine != null) StopCoroutine(_activeCoroutine);
+            _activeCoroutine = StartCoroutine(DoTransition(playForward: true));
         }
         else
         {
@@ -60,7 +72,8 @@ public class SceneTransition : MonoBehaviour
 
     public void PlayTransition()
     {
-        StartCoroutine(DoTransition(playForward: false));
+        if (_activeCoroutine != null) StopCoroutine(_activeCoroutine);
+        _activeCoroutine = StartCoroutine(DoTransition(playForward: false));
     }
 
     private IEnumerator DoTransition(bool playForward)
@@ -78,6 +91,7 @@ public class SceneTransition : MonoBehaviour
         }
 
         UpdateShaderValue(playForward ? 1f : 0f);
+        _activeCoroutine = null;
         OnTransitionDone?.Invoke();
         if (playForward && eventChannel != null)
         {
