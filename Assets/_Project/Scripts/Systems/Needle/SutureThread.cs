@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.Serialization;
 using ThailandHorrorJam.Core;
@@ -14,10 +15,6 @@ namespace ThailandHorrorJam.Systems.Needle
     [RequireComponent(typeof(LineRenderer))]
     public sealed class SutureThread : MonoBehaviour
     {
-        private static readonly int s_ScrollSpeedId = Shader.PropertyToID("_ScrollSpeed");
-        private static readonly int s_TilingId = Shader.PropertyToID("_Tiling");
-        private static readonly int s_BaseColorId = Shader.PropertyToID("_BaseColor");
-
         [Header("Appearance")]
         [FormerlySerializedAs("lineRenderer")]
         [SerializeField] private LineRenderer _lineRenderer;
@@ -27,6 +24,9 @@ namespace ThailandHorrorJam.Systems.Needle
 
         [FormerlySerializedAs("threadWidth")]
         [SerializeField] private float _threadWidth = 0.045f;
+
+        [Tooltip("Optional custom sprite for anchor pin dots. If null, a default 2D dot is used.")]
+        [SerializeField] private Sprite _pinSprite;
 
         [Header("Webbed Physics (Verlet Rope)")]
         [Tooltip("Number of Verlet particles per segment (higher = smoother wave propagation).")]
@@ -173,38 +173,15 @@ namespace ThailandHorrorJam.Systems.Needle
             _lineRenderer.sortingOrder = 10;
             _lineRenderer.textureMode = LineTextureMode.Tile;
 
-            AnimationCurve widthProfile = new AnimationCurve();
-            widthProfile.AddKey(0.00f, 1.45f);
-            widthProfile.AddKey(0.05f, 1.05f);
-            widthProfile.AddKey(0.50f, 0.75f);
-            widthProfile.AddKey(0.95f, 1.05f);
-            widthProfile.AddKey(1.00f, 1.45f);
-            _lineRenderer.widthCurve = widthProfile;
+            _lineRenderer.widthCurve = SutureVisualUtils.CreateWidthProfile();
             _lineRenderer.widthMultiplier = _threadWidth;
 
             _lineRenderer.startColor = _threadColor;
             _lineRenderer.endColor = _threadColor;
 
-            if (_materialOverride != null)
-            {
-                _threadMaterial = new Material(_materialOverride);
-            }
-            else
-            {
-                Shader shader = Shader.Find("Universal Render Pipeline/2D/AnimatedSutureLine");
-                if (shader == null) shader = Shader.Find("Sprites/Default");
-
-                if (shader != null)
-                {
-                    _threadMaterial = new Material(shader);
-                }
-            }
-
+            _threadMaterial = SutureVisualUtils.CreateSutureMaterial(_materialOverride, _threadColor, _scrollSpeed, _tilingFrequency);
             if (_threadMaterial != null)
             {
-                _threadMaterial.SetColor(s_BaseColorId, _threadColor);
-                _threadMaterial.SetFloat(s_ScrollSpeedId, _scrollSpeed);
-                _threadMaterial.SetFloat(s_TilingId, _tilingFrequency);
                 _lineRenderer.material = _threadMaterial;
             }
         }
@@ -411,8 +388,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (!_pinMarkers[0].activeSelf)
             {
-                _pinMarkers[0].transform.localScale = Vector3.one * 0.38f;
                 _pinMarkers[0].SetActive(true);
+                AnimatePinPop(_pinMarkers[0]);
             }
             _pinMarkers[0].transform.position = origin;
 
@@ -420,6 +397,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_pinMarkers[i] != null)
                 {
+                    _pinMarkers[i].transform.DOKill();
                     _pinMarkers[i].SetActive(false);
                 }
             }
@@ -470,6 +448,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (hideEndPin && _pinMarkers.Count > 1 && _pinMarkers[1] != null)
             {
+                _pinMarkers[1].transform.DOKill();
                 _pinMarkers[1].SetActive(false);
             }
 
@@ -687,7 +666,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
 
                     // กรอง collider ของผู้เล่นออก เพื่อไม่ให้ด้ายติดขัดในตัวผู้เล่น
-                    if (hit.CompareTag("Player") || hit.GetComponentInParent<PlayerController2D>() != null)
+                    if (PlayerController2D.IsPlayer(hit))
                     {
                         continue;
                     }
@@ -838,28 +817,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     float t = (float)step / subdivisions;
                     Vector2 pt = EvaluateCatmullRom(p0, p1, p2, p3, t);
-
-                    if (!_isTautMode && _enableGroundCollision && Physics2D.OverlapPoint(pt, _collisionFilter, _pointHitBuffer) > 0)
-                    {
-                        Collider2D groundHit = _pointHitBuffer[0];
-                        if (groundHit != null &&
-                            (_cachedOwner == null || _cachedOwner.ObjectTransform == null || !groundHit.transform.IsChildOf(_cachedOwner.ObjectTransform)) &&
-                            !groundHit.CompareTag("Player") && groundHit.GetComponentInParent<PlayerController2D>() == null)
-                        {
-                            Vector2 segMid = (p1 + p2) * 0.5f;
-                            Vector2 surfacePoint = groundHit.ClosestPoint(segMid);
-                            Vector2 outwardDir = segMid - surfacePoint;
-                            if (outwardDir.sqrMagnitude > 0.0001f)
-                            {
-                                pt = surfacePoint + outwardDir.normalized * _surfaceOffset;
-                            }
-                            else
-                            {
-                                pt = segMid;
-                            }
-                        }
-                    }
-
                     _renderBuffer.Add(new Vector3(pt.x, pt.y, 0f));
                 }
             }
@@ -935,8 +892,18 @@ namespace ThailandHorrorJam.Systems.Needle
             if (!_enableAnimation || _threadMaterial == null || _renderBuffer.Count < 2) return;
 
             // ใช้ _totalPathLength ที่คำนวณไว้แล้วแทนการวนลูป Vector3.Distance ซ้ำ
-            _threadMaterial.SetFloat(s_TilingId, Mathf.Max(1f, _totalPathLength * _tilingFrequency));
-            _threadMaterial.SetFloat(s_ScrollSpeedId, _scrollSpeed);
+            _threadMaterial.SetFloat(SutureVisualUtils.TilingId, Mathf.Max(1f, _totalPathLength * _tilingFrequency));
+            _threadMaterial.SetFloat(SutureVisualUtils.ScrollSpeedId, _scrollSpeed);
+        }
+
+        private const float k_PinTargetScale = 0.22f;
+        private const float k_PinInitialScale = 0.38f;
+
+        private void AnimatePinPop(GameObject pin)
+        {
+            pin.transform.DOKill();
+            pin.transform.localScale = Vector3.one * k_PinInitialScale;
+            pin.transform.DOScale(Vector3.one * k_PinTargetScale, 0.18f).SetEase(Ease.OutQuad);
         }
 
         private void UpdatePinMarkers(IReadOnlyList<Vector2> waypoints)
@@ -953,20 +920,21 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     if (i == 1 && _hideDestinationPinDot)
                     {
+                        _pinMarkers[i].transform.DOKill();
                         _pinMarkers[i].SetActive(false);
                         continue;
                     }
 
                     if (!_pinMarkers[i].activeSelf)
                     {
-                        _pinMarkers[i].transform.localScale = Vector3.one * 0.38f;
                         _pinMarkers[i].SetActive(true);
+                        AnimatePinPop(_pinMarkers[i]);
                     }
-                    _pinMarkers[i].transform.SetParent(null);
                     _pinMarkers[i].transform.position = waypoints[i];
                 }
                 else
                 {
+                    _pinMarkers[i].transform.DOKill();
                     _pinMarkers[i].SetActive(false);
                 }
             }
@@ -975,60 +943,23 @@ namespace ThailandHorrorJam.Systems.Needle
         private GameObject CreatePinMarker()
         {
             GameObject pin = new GameObject("NeedlePin_2D");
-            pin.transform.SetParent(null);
-            pin.transform.localScale = Vector3.one * 0.38f;
+            pin.transform.localScale = Vector3.one * k_PinTargetScale;
 
             SpriteRenderer sr = pin.AddComponent<SpriteRenderer>();
-            if (s_PinSprite == null)
-            {
-                s_PinSprite = CreateDotSprite();
-            }
-
-            sr.sprite = s_PinSprite;
+            sr.sprite = _pinSprite != null ? _pinSprite : GetOrCreateDefaultPinSprite();
             sr.color = _threadColor;
             sr.sortingOrder = 12;
 
-            pin.AddComponent<PinMarkerPopAnimation>();
             return pin;
         }
 
-        private sealed class PinMarkerPopAnimation : MonoBehaviour
+        private static Sprite GetOrCreateDefaultPinSprite()
         {
-            private const float k_TargetScale = 0.22f;
-
-            private void Update()
+            if (s_PinSprite == null)
             {
-                if (Mathf.Abs(transform.localScale.x - k_TargetScale) > 0.005f)
-                {
-                    transform.localScale = Vector3.MoveTowards(transform.localScale, Vector3.one * k_TargetScale, Time.deltaTime * 1.8f);
-                }
-                else
-                {
-                    transform.localScale = Vector3.one * k_TargetScale;
-                }
+                s_PinSprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 4, 4), Vector2.one * 0.5f, 4);
             }
-        }
-
-        private static Sprite CreateDotSprite()
-        {
-            const int size = 16;
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            float radius = (size - 1) * 0.5f;
-            Vector2 center = new Vector2(radius, radius);
-
-            Color[] colors = new Color[size * size];
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    colors[y * size + x] = dist <= radius ? Color.white : Color.clear;
-                }
-            }
-
-            tex.SetPixels(colors);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 16);
+            return s_PinSprite;
         }
 
         public void Clear()
@@ -1057,6 +988,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_pinMarkers[i] != null)
                 {
+                    _pinMarkers[i].transform.DOKill();
                     _pinMarkers[i].SetActive(false);
                 }
             }
@@ -1068,6 +1000,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_pinMarkers[i] != null)
                 {
+                    _pinMarkers[i].transform.DOKill();
                     Destroy(_pinMarkers[i]);
                 }
             }

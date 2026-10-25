@@ -31,6 +31,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _sweepRadius = 0.08f;
 
         [Header("Visual Orientation")]
+        [Tooltip("Optional custom needle sprite. If unassigned, uses SpriteRenderer's assigned sprite.")]
+        [SerializeField] private Sprite _customNeedleSprite;
+
         [Tooltip("Angular offset in degrees to align the needle tip with flight direction. Set to 0 if the sprite points right (--> like Needle_Sheet_0), or -90 if the sprite points up (^).")]
         [SerializeField] private float _spriteRotationOffset = 0f;
 
@@ -46,7 +49,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private Action<Vector2, Vector2, Collider2D> _onHitCallback;
         private Action _onRewindCompleteCallback;
 
-        private static Sprite s_SharedNeedleSprite;
         private SpriteRenderer _spriteRenderer;
         private Transform _targetToIgnore;
 
@@ -73,10 +75,9 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            if (_spriteRenderer.sprite == null)
+            if (_spriteRenderer.sprite == null && _customNeedleSprite != null)
             {
-                _spriteRenderer.sprite = GenerateNeedleSprite();
-                _spriteRenderer.color = new Color(0.9f, 0.95f, 1f, 1f);
+                _spriteRenderer.sprite = _customNeedleSprite;
             }
 
             if (_spriteRenderer.sortingOrder < 10)
@@ -254,62 +255,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                 transform.rotation = Quaternion.Euler(0f, 0f, angle + _spriteRotationOffset);
             }
-        }
-
-        private static Sprite GenerateNeedleSprite()
-        {
-            if (s_SharedNeedleSprite != null) return s_SharedNeedleSprite;
-
-            const int width = 32;
-            const int height = 8;
-            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            {
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp
-            };
-
-            Color[] pixels = new Color[width * height];
-            Color needleBody = new Color(0.92f, 0.94f, 1f, 1f);
-            Color needleShade = new Color(0.6f, 0.65f, 0.78f, 1f);
-            Color eyeHole = new Color(0.15f, 0.15f, 0.22f, 0.9f);
-            Color clear = Color.clear;
-
-            for (int x = 0; x < width; x++)
-            {
-                float nx = (float)x / width;
-                // Tapered shape: sharp tip at right (x=31), eye at left (x=2..6)
-                float halfH = Mathf.Lerp(3.2f, 0.5f, Mathf.Pow(nx, 1.4f));
-
-                for (int y = 0; y < height; y++)
-                {
-                    float cy = Mathf.Abs((y + 0.5f) - (height * 0.5f));
-                    int idx = y * width + x;
-
-                    if (cy > halfH)
-                    {
-                        pixels[idx] = clear;
-                        continue;
-                    }
-
-                    // Needle eye hole at base (left)
-                    if (x >= 3 && x <= 7 && cy <= 0.8f)
-                    {
-                        pixels[idx] = eyeHole;
-                    }
-                    else
-                    {
-                        // Slight vertical shading for metallic 3D cylinder feel
-                        float shade = Mathf.Clamp01(1f - (cy / halfH) * 0.4f);
-                        pixels[idx] = Color.Lerp(needleShade, needleBody, shade);
-                    }
-                }
-            }
-
-            tex.SetPixels(pixels);
-            tex.Apply(false, true);
-
-            s_SharedNeedleSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.2f, 0.5f), 32);
-            return s_SharedNeedleSprite;
         }
     }
 }
