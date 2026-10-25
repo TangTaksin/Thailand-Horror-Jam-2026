@@ -26,6 +26,7 @@ namespace ThailandHorrorJam.Core
         private float _targetLookAheadX;
 
         private float _shakeTimer;
+        private float _shakeDuration;
         private float _shakeIntensity;
         private Vector3 _punchOffset;
         private float _punchDamping = 12f;
@@ -51,6 +52,14 @@ namespace ThailandHorrorJam.Core
             if (_target != null)
             {
                 _targetRb = _target.GetComponent<Rigidbody2D>();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
             }
         }
 
@@ -80,7 +89,7 @@ namespace ThailandHorrorJam.Core
             if (_shakeTimer > 0f)
             {
                 _shakeTimer -= Time.deltaTime;
-                float trauma = Mathf.Clamp01(_shakeTimer);
+                float trauma = _shakeDuration > 0.0001f ? Mathf.Clamp01(_shakeTimer / _shakeDuration) : 0f;
                 float x = (Mathf.PerlinNoise(Time.time * 35f, 0f) - 0.5f) * 2f * _shakeIntensity * trauma;
                 float y = (Mathf.PerlinNoise(0f, Time.time * 35f) - 0.5f) * 2f * _shakeIntensity * trauma;
                 shakeOffset = new Vector3(
@@ -102,6 +111,7 @@ namespace ThailandHorrorJam.Core
         public void Shake(float intensity, float duration)
         {
             _shakeIntensity = intensity;
+            _shakeDuration = Mathf.Max(0.001f, duration);
             _shakeTimer = duration;
         }
 
