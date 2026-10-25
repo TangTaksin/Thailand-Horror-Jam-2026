@@ -8,6 +8,7 @@ namespace ThailandHorrorJam.Systems.Needle
     /// <summary>
     /// Component attached to any 2D object that can be tethered and scripted into a movement loop along pinned waypoints.
     /// </summary>
+    [DefaultExecutionOrder(-10)]
     public sealed class StitchableObject : MonoBehaviour, IStitchable
     {
         private const float k_ArrivalThreshold = 0.03f;
@@ -15,10 +16,6 @@ namespace ThailandHorrorJam.Systems.Needle
         [Header("Movement Settings")]
         [FormerlySerializedAs("travelSpeed")]
         [SerializeField] private float _travelSpeed = 3.5f;
-
-        [Header("Ground Collision Settings")]
-        [Tooltip("Surfaces that the stitchable object must not penetrate through (e.g. Ground, Walls).")]
-        [SerializeField] private LayerMask _groundLayer;
 
         [Header("Thread Component")]
         [FormerlySerializedAs("sutureThread")]
@@ -47,10 +44,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private float _originalMass = 1f;
         private bool _hasRb;
         private Collider2D _col;
-        private float _halfHeight = 0.5f;
-        private Vector2 _boxCastSize = new Vector2(0.9f, 0.05f);
-        private ContactFilter2D _groundFilter;
-        private readonly RaycastHit2D[] _groundRaycastBuffer = new RaycastHit2D[4];
 
         private DistanceJoint2D _tetherJoint;
         private Transform _tetheredPlayerTransform;
@@ -73,6 +66,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public Transform ObjectTransform => transform;
         public Vector2 CurrentPosition => _hasRb ? _rb.position : (Vector2)transform.position;
         public Vector2 CurrentVelocity => _currentVelocity;
+        public Vector2 FrameDelta { get; private set; }
         public bool IsTetheredToPlayer => _currentState == StitchState.PlayerHarness;
         public float MaxTetherDistance => _maxTetherDistance;
 
@@ -85,7 +79,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _originalMass = _rb.mass;
             }
 
-            EnsureGroundFilter();
+            _col = GetComponent<Collider2D>();
 
             _previousPosition = CurrentPosition;
             _targetFramePosition = _previousPosition;
@@ -109,34 +103,9 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private void EnsureGroundFilter()
-        {
-            if (_col == null)
-            {
-                _col = GetComponent<Collider2D>();
-                if (_col != null)
-                {
-                    _halfHeight = _col.bounds.extents.y;
-                    _boxCastSize = new Vector2(_col.bounds.size.x * 0.9f, 0.05f);
-                }
-            }
-
-            if (_groundFilter.useLayerMask) return;
-
-            if (_groundLayer.value == 0)
-            {
-                int groundLayer = LayerMask.NameToLayer("Ground");
-                _groundLayer = groundLayer != -1 ? (1 << groundLayer) : LayerMask.GetMask("Ground", "Default");
-            }
-
-            _groundFilter = new ContactFilter2D();
-            _groundFilter.SetLayerMask(_groundLayer);
-            _groundFilter.useLayerMask = true;
-            _groundFilter.useTriggers = false;
-        }
-
         private void FixedUpdate()
         {
+            FrameDelta = Vector2.zero;
             _targetFramePosition = CurrentPosition;
 
             if (_currentState == StitchState.Looping)
@@ -191,7 +160,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _rb.linearVelocity = Vector2.zero;
                 _rb.angularVelocity = 0f;
-                _rb.bodyType = RigidbodyType2D.Static;
+                _rb.bodyType = RigidbodyType2D.Kinematic;
             }
 
             if (_sutureThread != null)
@@ -282,7 +251,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _rb.linearVelocity = Vector2.zero;
                 _rb.angularVelocity = 0f;
-                _rb.bodyType = RigidbodyType2D.Static;
+                _rb.bodyType = RigidbodyType2D.Kinematic;
             }
 
             if (_sutureThread != null)
@@ -302,7 +271,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (segDist > 0.001f)
                 {
                     Vector2 dir = segDelta / segDist;
-                    EnsureGroundFilter();
                     float halfW = _col != null ? _col.bounds.extents.x : 0.5f;
                     float halfH = _col != null ? _col.bounds.extents.y : 0.5f;
                     float frontExtent = Mathf.Abs(dir.x) * halfW + Mathf.Abs(dir.y) * halfH;
@@ -355,57 +323,18 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void MoveToPosition(Vector2 pos)
         {
-            // ในโหมดรางลูป (Looping) วัตถุจะแล่นไปตามแนวด้ายตรงเป๊ะโดยไม่ถูกกดลงพื้น
-            Vector2 validPos = (_currentState == StitchState.Looping) ? pos : ClampToGroundSurface(pos);
-            _targetFramePosition = validPos;
+            Vector2 prevPos = CurrentPosition;
+            _targetFramePosition = pos;
+            FrameDelta = pos - prevPos;
             if (_hasRb)
             {
-                _rb.position = validPos;
-                transform.position = validPos;
+                _rb.position = pos;
+                transform.position = pos;
             }
             else
             {
-                transform.position = validPos;
+                transform.position = pos;
             }
-        }
-
-        /// <summary>
-        /// ป้องกันไม่ให้วัตถุทะลุผ่านพื้นดินหรือสิ่งกีดขวาง โดยล็อกระดับ Y ให้อยู่เสมอกับผิวดินพอดีเป๊ะ (Flush 0 cm)
-        /// </summary>
-        public Vector2 ClampToGroundSurface(Vector2 targetPos)
-        {
-            EnsureGroundFilter();
-            if (_col == null) return targetPos;
-
-            Vector2 currentPos = CurrentPosition;
-            float castTopY = Mathf.Max(currentPos.y, targetPos.y) + _halfHeight + 0.2f;
-            Vector2 origin = new Vector2(targetPos.x, castTopY);
-            float castDist = castTopY - (targetPos.y - _halfHeight) + 0.5f;
-
-            int count = Physics2D.BoxCast(origin, _boxCastSize, 0f, Vector2.down, _groundFilter, _groundRaycastBuffer, castDist);
-
-            float highestGroundY = float.MinValue;
-            for (int i = 0; i < count; i++)
-            {
-                Collider2D hitCol = _groundRaycastBuffer[i].collider;
-                if (hitCol == null || hitCol == _col || hitCol.transform.IsChildOf(transform)) continue;
-
-                if (_groundRaycastBuffer[i].point.y > highestGroundY)
-                {
-                    highestGroundY = _groundRaycastBuffer[i].point.y;
-                }
-            }
-
-            if (highestGroundY > float.MinValue)
-            {
-                float minY = highestGroundY + _halfHeight;
-                if (targetPos.y < minY)
-                {
-                    return new Vector2(targetPos.x, minY);
-                }
-            }
-
-            return targetPos;
         }
 
         public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb)
