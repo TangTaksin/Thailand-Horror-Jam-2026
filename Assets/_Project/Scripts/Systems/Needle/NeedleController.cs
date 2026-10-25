@@ -740,12 +740,43 @@ namespace ThailandHorrorJam.Systems.Needle
         private IStitchable SearchStitchableWithFilter(Vector3 worldAimPos, ContactFilter2D filter)
         {
             int hitCount = Physics2D.OverlapCircle(worldAimPos, k_HitSearchRadius, filter, _hitBuffer);
+            IStitchable bestCandidate = null;
+            int highestSortingOrder = int.MinValue;
+            float closestDistanceSqr = float.MaxValue;
+
             for (int i = 0; i < hitCount; i++)
             {
-                IStitchable stitchable = _hitBuffer[i].GetComponentInParent<IStitchable>();
-                if (stitchable != null) return stitchable;
+                Collider2D hitCol = _hitBuffer[i];
+                if (hitCol == null || hitCol == _playerCol) continue;
+
+                IStitchable stitchable = hitCol.GetComponentInParent<IStitchable>();
+                if (stitchable == null || stitchable.ObjectTransform == null) continue;
+
+                // ตรวจหาค่า Sorting Order ของ Sprite เพื่อเลือกชิ้นที่อยู่ด้านหน้าสุดก่อน
+                SpriteRenderer sr = stitchable.ObjectTransform.GetComponentInChildren<SpriteRenderer>();
+                int sortingOrder = sr != null ? sr.sortingOrder : 0;
+
+                // คำนวณระยะห่างจากเคอร์เซอร์เมาส์ไปยังจุดกึ่งกลางของวัตถุ
+                Vector2 targetCenter = hitCol.bounds.center;
+                float distSqr = ((Vector2)worldAimPos - targetCenter).sqrMagnitude;
+
+                // เกณฑ์คัดเลือก:
+                // 1. ให้ความสำคัญกับชิ้นที่มี SortingOrder สูงกว่า (ทับอยู่ข้างหน้าตามสายตา)
+                // 2. ถ้า SortingOrder เท่ากัน ให้เลือกชิ้นที่กึ่งกลางอยู่ใกล้เคอร์เซอร์เมาส์ที่สุด
+                if (sortingOrder > highestSortingOrder)
+                {
+                    highestSortingOrder = sortingOrder;
+                    closestDistanceSqr = distSqr;
+                    bestCandidate = stitchable;
+                }
+                else if (sortingOrder == highestSortingOrder && distSqr < closestDistanceSqr)
+                {
+                    closestDistanceSqr = distSqr;
+                    bestCandidate = stitchable;
+                }
             }
-            return null;
+
+            return bestCandidate;
         }
 
         private void StartStitching(IStitchable target)
