@@ -268,11 +268,11 @@ namespace ThailandHorrorJam.Core
             else
             {
                 // เช็คจากความเร็วจริงเพื่อป้องกันอาการซอยเท้าอยู่กับที่เวลาเดินชนกำแพง
-                bool isMoving = Mathf.Abs(_controller.Velocity.x) > 0.1f;
+                bool isMoving = Mathf.Abs(_controller.Velocity.x) > 0.05f;
                 if (isMoving)
                 {
-                    bool isHaulingWithSprites = _controller.IsHauling && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
-                    SetState(isHaulingWithSprites ? VisualState.HaulWalk : VisualState.Walk);
+                    bool shouldUseHaulWalk = (_controller.IsHauling || _controller.IsAiming) && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
+                    SetState(shouldUseHaulWalk ? VisualState.HaulWalk : VisualState.Walk);
                 }
                 else
                 {

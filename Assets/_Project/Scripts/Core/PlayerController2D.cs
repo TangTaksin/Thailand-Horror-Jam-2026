@@ -18,6 +18,8 @@ namespace ThailandHorrorJam.Core
         [Header("Hauling / Burden Settings")]
         [Tooltip("Speed multiplier applied to player horizontal velocity while tethered and hauling an object.")]
         [SerializeField] private float _haulingSpeedMultiplier = 0.58f;
+        [Tooltip("Speed multiplier applied to player horizontal velocity while aiming/pinning needle (ย่องเล็ง).")]
+        [SerializeField] private float _aimingSpeedMultiplier = 0.38f;
 
         [Header("Jump Settings")]
         [SerializeField] private float _jumpForce = 12f;
@@ -71,9 +73,13 @@ namespace ThailandHorrorJam.Core
         private float _lastVerticalVelocity;
         private float _footstepTimer;
         private bool _isHauling;
+        private bool _isAiming;
+        private Vector2? _aimLeashAnchor;
+        private float _aimLeashDistance;
 
         public bool IsGrounded => _isGrounded;
         public bool IsHauling => _isHauling;
+        public bool IsAiming => _isAiming;
         public float HorizontalInput => _horizontalInput;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
 
@@ -83,6 +89,33 @@ namespace ThailandHorrorJam.Core
         public void SetHauling(bool isHauling)
         {
             _isHauling = isHauling;
+        }
+
+        public void SetAiming(bool isAiming, Vector2? leashAnchor = null, float leashDistance = 0f)
+        {
+            _isAiming = isAiming;
+            if (isAiming)
+            {
+                _aimLeashAnchor = leashAnchor;
+                _aimLeashDistance = leashDistance;
+            }
+            else
+            {
+                _aimLeashAnchor = null;
+                _aimLeashDistance = 0f;
+            }
+        }
+
+        public void UpdateAimLeash(Vector2 leashAnchor, float leashDistance)
+        {
+            _aimLeashAnchor = leashAnchor;
+            _aimLeashDistance = leashDistance;
+        }
+
+        public void ClearAimLeash()
+        {
+            _aimLeashAnchor = null;
+            _aimLeashDistance = 0f;
         }
 
         private void Awake()
@@ -128,6 +161,8 @@ namespace ThailandHorrorJam.Core
             {
                 ApplyCornerCorrection();
             }
+
+            ApplyAimLeashConstraint();
 
             // เก็บค่าความเร็วแกน Y ไว้ท้ายสุด เพื่อใช้วัดแรงกระแทกก่อนที่ Physics Step รอบถัดไปจะปรับเป็น 0
             _lastVerticalVelocity = _rb.linearVelocity.y;
@@ -216,7 +251,7 @@ namespace ThailandHorrorJam.Core
 
             _jumpBufferCounter -= Time.deltaTime;
 
-            if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isHauling)
+            if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isHauling && !_isAiming)
             {
                 _jumpRequested = true;
                 _jumpBufferCounter = 0f;
@@ -249,8 +284,34 @@ namespace ThailandHorrorJam.Core
 
         private void ApplyHorizontalMovement()
         {
-            float speed = _isHauling ? _moveSpeed * _haulingSpeedMultiplier : _moveSpeed;
+            float speed = _moveSpeed;
+            if (_isAiming)
+            {
+                speed *= _aimingSpeedMultiplier;
+            }
+            else if (_isHauling)
+            {
+                speed *= _haulingSpeedMultiplier;
+            }
+
             float targetSpeed = _horizontalInput * speed;
+
+            // หน่วงความเร็วแนวนอนไม่ให้เร่งหนีออกจากระยะด้ายเมื่อด้ายถูกขึงตึงถึงระยะจำกัด
+            if (_isAiming && _aimLeashAnchor.HasValue && _aimLeashDistance > 0f)
+            {
+                Vector2 anchor = _aimLeashAnchor.Value;
+                float currentDist = Vector2.Distance(_rb.position, anchor);
+                float dx = _rb.position.x - anchor.x;
+
+                if (currentDist >= _aimLeashDistance - 0.05f)
+                {
+                    if ((dx > 0.01f && targetSpeed > 0f) || (dx < -0.01f && targetSpeed < 0f))
+                    {
+                        targetSpeed = 0f;
+                    }
+                }
+            }
+
             float accelRate = Mathf.Abs(targetSpeed) > 0.01f ? _acceleration : _deceleration;
             float newVelX = Mathf.MoveTowards(_rb.linearVelocity.x, targetSpeed, accelRate * Time.fixedDeltaTime);
 
@@ -271,6 +332,29 @@ namespace ThailandHorrorJam.Core
             {
                 velY += Physics2D.gravity.y * (_lowJumpMultiplier - 1f) * Time.fixedDeltaTime;
                 _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, velY);
+            }
+        }
+
+        private void ApplyAimLeashConstraint()
+        {
+            if (!_isAiming || !_aimLeashAnchor.HasValue || _aimLeashDistance <= 0f) return;
+
+            Vector2 anchor = _aimLeashAnchor.Value;
+            Vector2 toPlayer = _rb.position - anchor;
+            float dist = toPlayer.magnitude;
+
+            if (dist > _aimLeashDistance)
+            {
+                Vector2 clampedDir = dist > 0.0001f ? toPlayer / dist : Vector2.right;
+                Vector2 clampedPos = anchor + clampedDir * _aimLeashDistance;
+
+                _rb.position = clampedPos;
+
+                float outgoingSpeed = Vector2.Dot(_rb.linearVelocity, clampedDir);
+                if (outgoingSpeed > 0f)
+                {
+                    _rb.linearVelocity -= clampedDir * outgoingSpeed;
+                }
             }
         }
 

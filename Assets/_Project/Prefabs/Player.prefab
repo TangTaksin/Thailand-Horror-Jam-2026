@@ -156,15 +156,15 @@ MonoBehaviour:
   _landSquash: {x: 1.38, y: 0.68, z: 1}
   _squashRecoverySpeed: 10
   _enableHaulTilt: 1
-  _haulForwardTiltAngle: -22
-  _haulBraceTiltAngle: 10
+  _haulForwardTiltAngle: -6
+  _haulBraceTiltAngle: 0
   _tiltSpeed: 90
   _enableThrowRecoil: 1
   _throwRecoilDistance: 0.22
   _throwRecoilSquash: {x: 1.16, y: 0.88, z: 1}
   _recoilRecoverySpeed: 16
   _enableAimLean: 1
-  _maxAimTiltAngle: 12
+  _maxAimTiltAngle: 4
   _enableAirStretch: 1
   _fallStretchThreshold: -1.2
   _maxFallStretchY: 1.3
@@ -289,6 +289,7 @@ MonoBehaviour:
   _acceleration: 50
   _deceleration: 60
   _haulingSpeedMultiplier: 0.58
+  _aimingSpeedMultiplier: 0.38
   _jumpForce: 6
   _coyoteTime: 0.15
   _jumpBufferTime: 0.15
@@ -321,7 +322,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
   _maxThreadLength: 9.5
-  _maxInteractionDistance: 1.5
+  _maxInteractionDistance: 2
+  _maxAimLeashDistance: 2
   _maxWaypoints: 2
   _requireSurfaceToPin: 1
   _singleCircuitLimit: 1

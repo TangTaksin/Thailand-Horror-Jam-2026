@@ -28,6 +28,7 @@ namespace ThailandHorrorJam.Systems.Needle
         void AttachThread();
         void UpdatePinnedWaypoints(IReadOnlyList<Vector2> waypoints);
         void UpdateInFlightNeedle(Vector2 needlePos);
+        void UpdateAimLeash(Vector2 playerPos, float maxLeashDistance);
         void StartLoopAlongWaypoints(IReadOnlyList<Vector2> waypoints, LoopPlaybackMode mode);
         void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb);
         void ReleasePlayerTether();

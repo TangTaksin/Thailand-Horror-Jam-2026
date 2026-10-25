@@ -187,6 +187,13 @@ namespace ThailandHorrorJam.Systems.Needle
             _waypoints.Clear();
             _waypoints.Add(CurrentPosition);
 
+            if (_hasRb)
+            {
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
+                _rb.bodyType = RigidbodyType2D.Static;
+            }
+
             if (_sutureThread != null)
             {
                 _sutureThread.RenderPath(_waypoints);
@@ -227,6 +234,20 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_sutureThread != null)
             {
                 _sutureThread.UpdateInFlightNeedle(_waypoints[0], needlePos);
+            }
+        }
+
+        public void UpdateAimLeash(Vector2 playerPos, float maxLeashDistance)
+        {
+            if (_currentState != StitchState.Tethered) return;
+
+            Vector2 objPos = CurrentPosition;
+            float currentDist = Vector2.Distance(objPos, playerPos);
+            float leashRest = Mathf.Clamp(currentDist, 0.5f, maxLeashDistance);
+
+            if (_sutureThread != null)
+            {
+                _sutureThread.UpdateDynamicEndpoints(objPos, playerPos, leashRest);
             }
         }
 

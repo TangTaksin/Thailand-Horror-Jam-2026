@@ -422,7 +422,7 @@ namespace ThailandHorrorJam.Systems.Needle
         /// <summary>
         /// Continuously updates start and end positions for a dynamic 2-point thread (e.g., tethered to the player hauling a burden).
         /// </summary>
-        public void UpdateDynamicEndpoints(Vector2 startPos, Vector2 endPos, float restLengthBudget = -1f)
+        public void UpdateDynamicEndpoints(Vector2 startPos, Vector2 endPos, float restLengthBudget = -1f, bool hideEndPin = true)
         {
             _isInFlightMode = false;
             _isTautMode = false;
@@ -462,6 +462,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
             UpdatePinMarkers(_cachedWaypoints);
 
+            if (hideEndPin && _pinMarkers.Count > 1 && _pinMarkers[1] != null)
+            {
+                _pinMarkers[1].SetActive(false);
+            }
+
             float targetRestLength = restLengthBudget > 0f
                 ? restLengthBudget
                 : Vector2.Distance(startPos, endPos);
@@ -477,7 +482,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            UpdatePinMarkers(_cachedWaypoints);
             RebuildSplineData();
             _isSplineDirty = true;
         }

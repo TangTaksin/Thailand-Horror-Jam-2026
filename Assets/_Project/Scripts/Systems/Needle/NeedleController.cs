@@ -38,6 +38,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Maximum distance the player can be from an object to start stitching (Waypoint 1). Set <= 0 for unlimited range.")]
         [SerializeField] private float _maxInteractionDistance = 3.5f;
 
+        [Tooltip("Maximum leash distance the player can walk away from the stitched object while aiming. Set <= 0 to use maxInteractionDistance.")]
+        [SerializeField] private float _maxAimLeashDistance = 3.5f;
+
         [Tooltip("Maximum number of waypoints per stitch (default: 2 = Start -> Destination).")]
         [FormerlySerializedAs("maxWaypoints")]
         [SerializeField] private int _maxWaypoints = 2;
@@ -96,6 +99,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public bool IsPinning => _isPinning;
         public bool IsTetheredToPlayer => _tetheredStitchable != null;
         public IStitchable TetheredStitchable => _tetheredStitchable;
+        public float MaxAimLeashDistance => _maxAimLeashDistance > 0f ? _maxAimLeashDistance : (_maxInteractionDistance > 0f ? _maxInteractionDistance : 3.5f);
         public float RemainingThreadLength => Mathf.Max(0f, _maxThreadLength - GetUsedThreadLength());
 
         public event System.Action<Vector2> OnNeedleLaunched;
@@ -217,6 +221,27 @@ namespace ThailandHorrorJam.Systems.Needle
             HandleInput(worldAimPos);
             UpdatePreviewVisual(worldAimPos);
             UpdateInFlightThread();
+            UpdateAimLeashThread();
+        }
+
+        private void UpdateAimLeashThread()
+        {
+            if (_isPinning && !_isNeedleInFlight && _activeTarget != null)
+            {
+                Vector2 objPos = _pinnedWaypoints.Count > 0 ? _pinnedWaypoints[0] : _activeTarget.CurrentPosition;
+                float leashLimit = MaxAimLeashDistance;
+
+                EnsurePlayerComponents();
+                if (_playerController != null)
+                {
+                    _playerController.UpdateAimLeash(objPos, leashLimit);
+                }
+
+                if (_playerTransform != null)
+                {
+                    _activeTarget.UpdateAimLeash(_playerTransform.position, leashLimit);
+                }
+            }
         }
 
         private void UpdateInFlightThread()
@@ -789,7 +814,18 @@ namespace ThailandHorrorJam.Systems.Needle
             _activeTarget.UpdatePinnedWaypoints(_pinnedWaypoints);
             _isPinning = true;
 
-            Log($"[Needle] Tethered to {target.ObjectTransform.name}. Remaining thread: {RemainingThreadLength:F1}m. Click a wall/surface to pin (Max points: {_maxWaypoints}).");
+            EnsurePlayerComponents();
+            if (_playerController != null)
+            {
+                _playerController.SetAiming(true, _activeTarget.CurrentPosition, MaxAimLeashDistance);
+            }
+
+            if (_playerTransform != null)
+            {
+                _activeTarget.UpdateAimLeash(_playerTransform.position, MaxAimLeashDistance);
+            }
+
+            Log($"[Needle] Tethered to {target.ObjectTransform.name}. Aim leash: {MaxAimLeashDistance:F1}m. Click a wall/surface to pin (Max points: {_maxWaypoints}).");
         }
 
         private void CompleteStitchingRail()
@@ -816,6 +852,13 @@ namespace ThailandHorrorJam.Systems.Needle
             _isPinning = false;
             _activeTarget = null;
             _pinnedWaypoints.Clear();
+
+            EnsurePlayerComponents();
+            if (_playerController != null)
+            {
+                _playerController.SetAiming(false);
+            }
+
             if (_needleProjectile != null)
             {
                 _needleProjectile.Cancel();
