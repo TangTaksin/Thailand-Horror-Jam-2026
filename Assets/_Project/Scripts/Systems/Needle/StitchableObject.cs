@@ -221,28 +221,35 @@ namespace ThailandHorrorJam.Systems.Needle
             float currentDist = Vector2.Distance(anchorWorld, connectedWorld);
             bool isTaut = currentDist >= (joint.distance - _tetherSlackTolerance);
 
-            // เช็กว่าผู้ดึงกำลังเคลื่อนที่ "ออกห่าง" จากกล่อง (ดึง)
+            // เช็กทิศทางการป้อน Input และความเร็วของผู้เล่น
             float dirToPullerX = pullerRb.position.x - _rb.position.x;
-            bool isMovingAway = (dirToPullerX * pullerRb.linearVelocity.x) > 0.01f;
+            float moveInputX = _tetheredPlayerController != null ? _tetheredPlayerController.HorizontalInput : 0f;
+
+            // เช็กว่าผู้ดึงกำลังเคลื่อนที่หรือกดเดิน "ออกห่าง" จากกล่อง (ดึง)
+            bool isMovingAway = (dirToPullerX * pullerRb.linearVelocity.x) > 0.01f || (dirToPullerX * moveInputX) > 0.01f;
             bool isPulling = isTaut && isMovingAway;
 
-            // เช็กว่าผู้เล่นกำลังเคลื่อนที่ "เข้าหากล่อง" เพื่อผลัก (ดัน)
-            bool isMovingTowards = (dirToPullerX * pullerRb.linearVelocity.x) < -0.01f;
+            // เช็กว่าผู้เล่นกำลังเคลื่อนที่หรือกดเดิน "เข้าหากล่อง" เพื่อผลัก (ดัน)
+            bool isMovingTowards = (dirToPullerX * pullerRb.linearVelocity.x) < -0.01f || (dirToPullerX * moveInputX) < -0.01f;
             bool isPushing = false;
 
             if (isMovingTowards)
             {
                 // ตรวจสอบว่าอยู่ชิดกล่องในระยะที่สามารถผลักได้
-                Collider2D pullerCol = pullerRb.GetComponent<Collider2D>();
+                Collider2D pullerCol = _tetheredPlayerController != null && _tetheredPlayerController.MainCollider != null
+                    ? _tetheredPlayerController.MainCollider
+                    : pullerRb.GetComponentInChildren<Collider2D>();
+
                 if (pullerCol != null && _col != null)
                 {
                     ColliderDistance2D colDist = _col.Distance(pullerCol);
-                    isPushing = colDist.isOverlapped || colDist.distance <= 0.2f;
+                    isPushing = colDist.isOverlapped || colDist.distance <= 0.35f;
                 }
                 else
                 {
+                    float boxHalfWidth = _col != null ? _col.bounds.extents.x : 0.8f;
                     float centerDistX = Mathf.Abs(dirToPullerX);
-                    isPushing = centerDistX <= 1.25f;
+                    isPushing = centerDistX <= (boxHalfWidth + 0.6f);
                 }
             }
 
@@ -502,8 +509,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
             Vector2 playerPos = playerRb != null ? playerRb.position : (Vector2)playerTransform.position;
             float currentDist = Vector2.Distance(CurrentPosition, playerPos);
-            // ให้ระยะสายจูงเริ่มต้นมีความยืดหยุ่นเพียงพอ (อย่างน้อย 1.8m) เพื่อไม่ให้รั้งตัวลอยเมื่อก้าวลงพื้นต่างระดับ
-            _activeTetherLeashLength = Mathf.Clamp(Mathf.Max(currentDist, 1.8f), _minTetherDistance, MaxTetherDistance);
+            // ให้ระยะสายจูงเริ่มต้นอิงตามระยะจริงของผู้เล่น แต่ไม่ต่ำกว่า _minTetherDistance และไม่เกิน MaxTetherDistance
+            _activeTetherLeashLength = Mathf.Clamp(currentDist, _minTetherDistance, MaxTetherDistance);
 
             _tetherJoint.enabled = true;
             _tetherJoint.connectedBody = playerRb;
@@ -616,12 +623,12 @@ namespace ThailandHorrorJam.Systems.Needle
             float strain = 0f;
             if (dist > MaxTetherDistance)
             {
-                float stretchBudget = MaxTetherDistance * 0.8f;
+                float stretchBudget = MaxTetherDistance * 1.2f;
                 strain = Mathf.Clamp01((dist - MaxTetherDistance) / stretchBudget);
             }
 
             // Snap if pulled beyond extreme distance (e.g. falling into pit)
-            if (dist > MaxTetherDistance * 1.8f)
+            if (dist > MaxTetherDistance * 2.2f)
             {
                 CameraController2D.Instance?.Shake(0.07f, 0.14f);
                 ReleasePlayerTether();

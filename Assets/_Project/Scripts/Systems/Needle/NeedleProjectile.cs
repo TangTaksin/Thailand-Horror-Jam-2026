@@ -42,6 +42,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private float _maxDistance;
         private float _traveledDistance;
         private Transform _returnTransform;
+        private Vector3 _returnOffset;
         private Transform _playerTransform;
         private ContactFilter2D _collisionFilter;
         private readonly RaycastHit2D[] _hitBuffer = new RaycastHit2D[8];
@@ -96,7 +97,8 @@ namespace ThailandHorrorJam.Systems.Needle
             ContactFilter2D collisionFilter,
             Action<Vector2, Vector2, Collider2D> onHit,
             Action onRewindComplete,
-            Transform playerTransform = null)
+            Transform playerTransform = null,
+            Vector3 returnOffset = default)
         {
             EnsureSpriteRenderer();
 
@@ -110,6 +112,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _maxDistance = maxDistance;
             _traveledDistance = 0f;
             _returnTransform = returnTransform;
+            _returnOffset = returnOffset;
             _playerTransform = playerTransform;
             _targetToIgnore = targetToIgnore;
             _collisionFilter = collisionFilter;
@@ -207,12 +210,12 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             Vector2 currentPos = transform.position;
-            Vector2 returnPos = _returnTransform.position;
+            Vector2 returnPos = (Vector2)_returnTransform.position + (Vector2)_returnOffset;
             Vector2 toReturn = returnPos - currentPos;
             float dist = toReturn.magnitude;
             float step = _rewindSpeed * dt;
 
-            if (dist <= step || dist < 0.15f)
+            if (dist <= step || dist < 0.25f)
             {
                 // Reached origin target — rewind finished
                 Cancel();
