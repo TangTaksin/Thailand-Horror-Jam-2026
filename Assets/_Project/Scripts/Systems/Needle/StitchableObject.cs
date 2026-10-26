@@ -147,7 +147,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _sutureThread = GetComponentInChildren<SutureThread>(true);
             }
 
-            if (_sutureThread == null)
+            if (_sutureThread == null && Application.isPlaying)
             {
                 Debug.LogWarning($"[StitchableObject] Missing SutureThread reference on '{name}'! Please assign SutureThread.prefab in the Inspector.", this);
             }
