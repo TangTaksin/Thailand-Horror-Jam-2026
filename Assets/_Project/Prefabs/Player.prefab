@@ -408,7 +408,7 @@ MonoBehaviour:
   _reticlePulseScale: 0.12
   _minSliceDistance: 0.04
   _sliceTrailDuration: 0.18
-  _sliceTouchRadius: 0.2
+  _sliceTouchRadius: 0.45
   _sliceTrailStartColor: {r: 1, g: 1, b: 1, a: 0.95}
   _sliceTrailEndColor: {r: 0.9, g: 0.2, b: 0.2, a: 0}
 --- !u!1 &6100000000000000001

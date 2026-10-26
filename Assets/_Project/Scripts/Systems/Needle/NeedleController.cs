@@ -91,7 +91,7 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Lifetime of the slicing blade trail in seconds.")]
         [SerializeField] private float _sliceTrailDuration = 0.18f;
         [Tooltip("Touch/grazing radius around the slice segment to make cutting feel responsive and forgiving.")]
-        [SerializeField] private float _sliceTouchRadius = 0.2f;
+        [SerializeField] private float _sliceTouchRadius = 0.45f;
         [Tooltip("Starting color of the blade slash trail (cursor tip).")]
         [SerializeField] private Color _sliceTrailStartColor = new Color(1f, 1f, 1f, 0.95f);
         [Tooltip("Ending color of the blade slash trail.")]
