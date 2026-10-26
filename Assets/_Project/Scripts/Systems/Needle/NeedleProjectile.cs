@@ -52,9 +52,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private SpriteRenderer _spriteRenderer;
         private Transform _targetToIgnore;
 
-        public bool IsInFlight => _state == ProjectileState.Flying || _state == ProjectileState.Rewinding;
-        public bool IsFlying => _state == ProjectileState.Flying;
-        public bool IsRewinding => _state == ProjectileState.Rewinding;
         public bool IsEmbedded => _state == ProjectileState.Embedded;
         public float SweepRadius => _sweepRadius;
         public Vector2 CurrentPosition => transform.position;

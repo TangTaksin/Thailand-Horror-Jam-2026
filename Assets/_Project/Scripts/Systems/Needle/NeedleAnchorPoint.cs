@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -80,15 +79,11 @@ namespace ThailandHorrorJam.Systems.Needle
             set => _isAnchorEnabled = value;
         }
 
-        public AnchorSnapMode SnapMode => _snapMode;
         public bool IsPinned => _isPinned;
 
         public Vector2 SnapWorldPosition => _customSnapTransform != null
             ? (Vector2)_customSnapTransform.position
             : (Vector2)transform.position + _snapOffset;
-
-        public event Action<NeedleAnchorPoint> OnPinned;
-        public event Action<NeedleAnchorPoint> OnUnpinned;
 
         private void Awake()
         {
@@ -173,7 +168,6 @@ namespace ThailandHorrorJam.Systems.Needle
             _targetColor = _pinnedColor;
             _targetScale = _baseScale;
             _onNeedlePinned?.Invoke();
-            OnPinned?.Invoke(this);
         }
 
         /// <summary>
@@ -187,7 +181,6 @@ namespace ThailandHorrorJam.Systems.Needle
             _targetColor = _idleColor;
             _targetScale = _baseScale;
             _onNeedleUnpinned?.Invoke();
-            OnUnpinned?.Invoke(this);
         }
 
         /// <summary>

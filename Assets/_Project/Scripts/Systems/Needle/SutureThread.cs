@@ -122,8 +122,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private static readonly List<SutureThread> s_ActiveThreads = new List<SutureThread>();
         public static IReadOnlyList<SutureThread> ActiveThreads => s_ActiveThreads;
 
-        private static readonly Vector2[] s_CardinalDirections = { Vector2.up, Vector2.down, Vector2.right, Vector2.left };
-
         private static Sprite s_PinSprite;
         private Material _threadMaterial;
         private IStitchable _cachedOwner;
@@ -146,24 +144,6 @@ namespace ThailandHorrorJam.Systems.Needle
             _currentStrain = Mathf.Clamp01(strain);
         }
 
-        public void SetOutlineEnabled(bool enabled)
-        {
-            _enableOutline = enabled;
-            if (_threadMaterial != null)
-            {
-                _threadMaterial.SetFloat(SutureVisualUtils.EnableOutlineId, enabled ? 1f : 0f);
-            }
-        }
-
-        public void SetOutlineColor(Color color)
-        {
-            _outlineColor = color;
-            if (_threadMaterial != null)
-            {
-                _threadMaterial.SetColor(SutureVisualUtils.OutlineColorId, color);
-            }
-        }
-
         private void ApplyThreadColor(Color color)
         {
             if (_lineRenderer != null)
@@ -182,11 +162,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private bool _isSplineDirty;
         private bool _isTautMode;
         private bool _isInFlightMode;
-
-        public int NodeCount => _nodes.Count;
-        public float TotalPathLength => _totalPathLength;
-        public bool IsTaut => _isTautMode;
-        public IReadOnlyList<Vector2> CachedWaypoints => _cachedWaypoints;
 
         private void Awake()
         {
@@ -1152,27 +1127,6 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        public bool TrySeverAt(Vector2 point, float radius)
-        {
-            if (_renderBuffer.Count < 2) return false;
-
-            float sqrRadius = radius * radius;
-
-            for (int i = 0; i < _renderBuffer.Count - 1; i++)
-            {
-                Vector2 segA = _renderBuffer[i];
-                Vector2 segB = _renderBuffer[i + 1];
-
-                if (SqrDistanceToSegment(point, segA, segB) <= sqrRadius)
-                {
-                    Sever();
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         /// <summary>
         /// Checks if a slice segment [sliceStart, sliceEnd] intersects with this suture thread polyline
         /// or passes within touchRadius (for grazing touches). Severing releases the thread immediately.
@@ -1249,19 +1203,6 @@ namespace ThailandHorrorJam.Systems.Needle
             float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / lenSq);
             Vector2 projection = a + t * ab;
             return (p - projection).sqrMagnitude;
-        }
-
-        public static bool TrySeverAnyThreadNear(Vector2 point, float radius)
-        {
-            bool anySevered = false;
-            for (int i = s_ActiveThreads.Count - 1; i >= 0; i--)
-            {
-                if (i < s_ActiveThreads.Count && s_ActiveThreads[i] != null && s_ActiveThreads[i].TrySeverAt(point, radius))
-                {
-                    anySevered = true;
-                }
-            }
-            return anySevered;
         }
 
         /// <summary>

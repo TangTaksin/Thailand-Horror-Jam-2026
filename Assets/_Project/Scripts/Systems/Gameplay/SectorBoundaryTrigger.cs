@@ -30,9 +30,6 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private Collider2D _collider;
 
-        public int TargetSectorIndex => _targetSectorIndex;
-        public GameObject TargetSectorObject => _targetSectorObject;
-
         private void Awake()
         {
             _collider = GetComponent<Collider2D>();

@@ -32,7 +32,6 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public Vector2 SpawnPosition => (Vector2)transform.position + _spawnOffset;
         public bool RespawnFacingRight => _respawnFacingRight;
         public IReadOnlyList<StitchableObject> AssociatedStitchables => _associatedStitchables;
-        public bool IsActivated => _isActivated;
 
         private void Awake()
         {

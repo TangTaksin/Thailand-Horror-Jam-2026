@@ -126,7 +126,6 @@ namespace ThailandHorrorJam.Systems.Needle
         public bool IsTetheredToPlayer => _tetheredStitchable != null;
         public IStitchable TetheredStitchable => _tetheredStitchable;
         public float MaxAimLeashDistance => _maxAimLeashDistance > 0f ? _maxAimLeashDistance : (_maxInteractionDistance > 0f ? _maxInteractionDistance : 3.5f);
-        public float RemainingThreadLength => Mathf.Max(0f, _maxThreadLength - GetUsedThreadLength());
 
         public event System.Action<Vector2> OnNeedleLaunched;
         public event System.Action OnActionDenied;
@@ -1176,16 +1175,6 @@ namespace ThailandHorrorJam.Systems.Needle
             }
             SetReticleColor(s_ValidColor);
             UpdateAnchorPointsFeedback(false, Vector2.zero, null);
-        }
-
-        private float GetUsedThreadLength()
-        {
-            float length = 0f;
-            for (int i = 0; i < _pinnedWaypoints.Count - 1; i++)
-            {
-                length += Vector2.Distance(_pinnedWaypoints[i], _pinnedWaypoints[i + 1]);
-            }
-            return length;
         }
 
         private bool TryCastNeedleTrajectory(

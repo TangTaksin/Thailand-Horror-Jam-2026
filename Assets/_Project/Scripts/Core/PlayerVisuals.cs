@@ -96,7 +96,6 @@ namespace ThailandHorrorJam.Core
         private Vector3 _recoilOffset = Vector3.zero;
 
         public VisualState CurrentState => _currentState;
-        public bool IsFacingRight => _isFacingRight;
 
         public void SetFacing(bool faceRight)
         {

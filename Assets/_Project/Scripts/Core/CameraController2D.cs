@@ -29,7 +29,7 @@ namespace ThailandHorrorJam.Core
         private float _shakeDuration;
         private float _shakeIntensity;
         private Vector3 _punchOffset;
-        private float _punchDamping = 12f;
+        private const float k_PunchDamping = 12f;
 
         private void Awake()
         {
@@ -100,7 +100,7 @@ namespace ThailandHorrorJam.Core
             }
 
             // 4. Apply punch recoil
-            _punchOffset = Vector3.MoveTowards(_punchOffset, Vector3.zero, _punchDamping * Time.deltaTime);
+            _punchOffset = Vector3.MoveTowards(_punchOffset, Vector3.zero, k_PunchDamping * Time.deltaTime);
 
             transform.position = smoothPos + shakeOffset + _punchOffset;
         }

@@ -47,11 +47,6 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private int _currentSectorIndex = -1;
 
-        public int CurrentSectorIndex => _currentSectorIndex;
-        public IReadOnlyList<SectorEntry> Sectors => _sectors;
-
-        public event Action<int, int> OnSectorChanged; // (previousIndex, newIndex)
-
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -100,7 +95,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     ? _initialSectorIndex
                     : AutoDetectSectorFromPlayerPosition();
 
-                SetCurrentSector(startingIndex, immediate: true);
+                SetCurrentSector(startingIndex);
             }
         }
 
@@ -177,11 +172,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
             objTransform.SetParent(targetSector.rootObject.transform, worldPositionStays: true);
         }
 
-        public void SetCurrentSector(int newIndex, bool immediate = false)
+        public void SetCurrentSector(int newIndex)
         {
             if (newIndex < 0 || newIndex >= _sectors.Count) return;
 
-            int previousIndex = _currentSectorIndex;
             _currentSectorIndex = newIndex;
 
             // Apply visibility window: Current ± _activeRadius
@@ -196,11 +190,6 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 {
                     sector.rootObject.SetActive(shouldBeActive);
                 }
-            }
-
-            if (previousIndex != _currentSectorIndex)
-            {
-                OnSectorChanged?.Invoke(previousIndex, _currentSectorIndex);
             }
         }
 
@@ -218,7 +207,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 int cpSectorIndex = FindSectorForCheckpoint(cp);
                 if (cpSectorIndex >= 0)
                 {
-                    SetCurrentSector(cpSectorIndex, immediate: true);
+                    SetCurrentSector(cpSectorIndex);
                 }
             }
         }

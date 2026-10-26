@@ -114,11 +114,7 @@ namespace ThailandHorrorJam.Core
         private Vector2 _slopeParallel = Vector2.right;
 
         public bool IsGrounded => _isGrounded;
-        public bool IsOnSlope => _isOnSlope;
-        public float SlopeAngle => _slopeAngle;
-        public Vector2 SlopeNormal => _slopeNormal;
         public bool IsHauling => _isHauling;
-        public bool IsAiming => _isAiming;
         public bool IsInputLocked => _isInputLocked;
         public float HorizontalInput => _horizontalInput;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
@@ -241,12 +237,6 @@ namespace ThailandHorrorJam.Core
         {
             _aimLeashAnchor = leashAnchor;
             _aimLeashDistance = leashDistance;
-        }
-
-        public void ClearAimLeash()
-        {
-            _aimLeashAnchor = null;
-            _aimLeashDistance = 0f;
         }
 
         private void Awake()
