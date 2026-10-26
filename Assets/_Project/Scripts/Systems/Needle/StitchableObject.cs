@@ -32,6 +32,12 @@ namespace ThailandHorrorJam.Systems.Needle
         [Range(0.01f, 1f)]
         [SerializeField] private float _tetheredMassMultiplier = 0.1f;
 
+        [Header("Push Resistance")]
+        [Tooltip("เมื่อเปิดใช้งาน วัตถุจะล็อคแกน X ขณะอยู่เฉยๆ เพื่อไม่ให้ Player เดินชนแล้วดันวัตถุได้ และจะปลดล็อค X อัตโนมัติเฉพาะตอนถูกผูกเชือกลาก (Hauling)")]
+        [SerializeField] private bool _freezePositionXWhenIdle = true;
+        [Tooltip("ระยะเผื่อความหย่อนของสายด้ายก่อนถือว่าตึงและเริ่มปลดล็อคแกน X")]
+        [SerializeField] private float _tetherSlackTolerance = 0.05f;
+
         [Header("Webbed Trampoline Settings")]
         [Tooltip("Multiplier for the bounce deflection impulse when the player lands.")]
         [SerializeField] private float _landingPluckMultiplier = 1.4f;
@@ -41,6 +47,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private Rigidbody2D _rb;
         private RigidbodyType2D _originalBodyType;
+        private RigidbodyConstraints2D _originalConstraints;
         private float _originalMass = 1f;
         private bool _hasRb;
         private Collider2D _col;
@@ -79,6 +86,9 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _originalBodyType = _rb.bodyType;
                 _originalMass = _rb.mass;
+                _originalConstraints = _rb.constraints;
+
+                SetHorizontalLock(true);
             }
 
             _col = GetComponent<Collider2D>();
@@ -152,6 +162,49 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        private void SetHorizontalLock(bool locked)
+        {
+            if (!_hasRb || !_freezePositionXWhenIdle) return;
+
+            RigidbodyConstraints2D targetConstraints = locked
+                ? (RigidbodyConstraints2D.FreezeRotation | RigidbodyConstraints2D.FreezePositionX)
+                : RigidbodyConstraints2D.FreezeRotation;
+
+            if (_rb.constraints != targetConstraints)
+            {
+                if (locked)
+                {
+                    _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
+                }
+                _rb.constraints = targetConstraints;
+                _rb.WakeUp();
+            }
+        }
+
+        private void UpdateTetherLockState(Rigidbody2D pullerRb, DistanceJoint2D joint)
+        {
+            if (!_freezePositionXWhenIdle || !_hasRb) return;
+
+            if (pullerRb == null || joint == null || !joint.enabled)
+            {
+                SetHorizontalLock(true);
+                return;
+            }
+
+            // เช็กว่าสายด้ายตึงหรือยัง
+            Vector2 anchorWorld = _rb.transform.TransformPoint(joint.anchor);
+            Vector2 connectedWorld = pullerRb.transform.TransformPoint(joint.connectedAnchor);
+            float currentDist = Vector2.Distance(anchorWorld, connectedWorld);
+            bool isTaut = currentDist >= (joint.distance - _tetherSlackTolerance);
+
+            // เช็กว่าผู้ดึงกำลังเคลื่อนที่ "ออกห่าง" จากกล่อง (ดึง) ไม่ใช่เดินพุ่งเข้าหากล่อง (ดัน)
+            float dirToPullerX = pullerRb.position.x - _rb.position.x;
+            bool isMovingAway = (dirToPullerX * pullerRb.linearVelocity.x) > 0.01f;
+
+            bool shouldUnlock = isTaut && isMovingAway;
+            SetHorizontalLock(!shouldUnlock);
+        }
+
         private void SetKinematicState()
         {
             if (!_hasRb) return;
@@ -166,6 +219,16 @@ namespace ThailandHorrorJam.Systems.Needle
             _rb.bodyType = _originalBodyType;
             _rb.mass = _originalMass;
             _rb.angularVelocity = 0f;
+
+            if (_freezePositionXWhenIdle)
+            {
+                SetHorizontalLock(true);
+            }
+            else
+            {
+                _rb.constraints = _originalConstraints;
+            }
+
             _rb.WakeUp();
         }
 
@@ -379,6 +442,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _rb.bodyType = RigidbodyType2D.Dynamic;
                 _rb.mass = Mathf.Max(0.1f, _originalMass * _tetheredMassMultiplier);
+                SetHorizontalLock(true);
             }
 
             if (_tetherJoint == null && !TryGetComponent(out _tetherJoint))
@@ -397,6 +461,8 @@ namespace ThailandHorrorJam.Systems.Needle
             _tetherJoint.maxDistanceOnly = true;
             _tetherJoint.distance = _activeTetherLeashLength;
             _tetherJoint.enableCollision = true;
+
+            UpdateTetherLockState(_tetheredPlayerRb, _tetherJoint);
 
             _waypoints.Clear();
             _waypoints.Add(CurrentPosition);
@@ -453,6 +519,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_hasRb)
             {
                 _rb.mass = _originalMass;
+                SetHorizontalLock(true);
             }
 
             _tetheredPlayerTransform = null;
@@ -496,6 +563,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 ReleasePlayerTether();
                 return;
             }
+
+            UpdateTetherLockState(_tetheredPlayerRb, _tetherJoint);
 
             if (_sutureThread != null)
             {
