@@ -117,11 +117,19 @@ namespace ThailandHorrorJam.Core
             if (_controller == null)
             {
                 _controller = GetComponentInParent<PlayerController2D>();
+                if (_controller == null)
+                {
+                    _controller = transform.root.GetComponentInChildren<PlayerController2D>();
+                }
             }
 
             if (_needleController == null)
             {
                 _needleController = GetComponentInParent<NeedleController>();
+                if (_needleController == null)
+                {
+                    _needleController = transform.root.GetComponentInChildren<NeedleController>();
+                }
             }
 
             if (_spriteRenderer == null)

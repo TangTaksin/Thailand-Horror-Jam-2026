@@ -862,9 +862,22 @@ namespace ThailandHorrorJam.Systems.Needle
         private void EnsurePlayerComponents()
         {
             if (_playerTransform == null) _playerTransform = transform;
-            if (_playerRb == null) _playerRb = GetComponent<Rigidbody2D>();
-            if (_playerCol == null) _playerCol = GetComponent<Collider2D>();
-            if (_playerController == null) _playerController = GetComponent<PlayerController2D>();
+            if (_playerRb == null)
+            {
+                _playerRb = GetComponent<Rigidbody2D>();
+                if (_playerRb == null) _playerRb = GetComponentInParent<Rigidbody2D>();
+            }
+            if (_playerCol == null)
+            {
+                _playerCol = GetComponent<Collider2D>();
+                if (_playerCol == null) _playerCol = GetComponentInChildren<Collider2D>();
+            }
+            if (_playerController == null)
+            {
+                _playerController = GetComponent<PlayerController2D>();
+                if (_playerController == null) _playerController = GetComponentInParent<PlayerController2D>();
+                if (_playerController == null) _playerController = GetComponentInChildren<PlayerController2D>();
+            }
         }
 
         private bool IsAimingAtPlayer(Vector3 worldAimPos)
