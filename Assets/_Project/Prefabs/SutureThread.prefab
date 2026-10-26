@@ -158,6 +158,8 @@ MonoBehaviour:
   _lineRenderer: {fileID: 6780262508308102681}
   _threadColor: {r: 0.92, g: 0.15, b: 0.15, a: 0.95}
   _threadWidth: 0.09375
+  _enablePixelSnapping: 1
+  _pixelSnapPPU: 32
   _enableOutline: 1
   _outlineColor: {r: 0.08, g: 0.06, b: 0.08, a: 1}
   _outlineThickness: 0.333
@@ -165,7 +167,8 @@ MonoBehaviour:
   _tensionColorThreshold: 0.15
   _quiverStrainThreshold: 0.35
   _maxVibrationAmplitude: 0.035
-  _pinSprite: {fileID: 0}
+  _pinSprite: {fileID: 1492931370793147927, guid: 82621ff8da8542a99f0fb1a179866f3c, type: 3}
+  _pinScale: 0.6
   _nodesPerSegment: 10
   _constraintIterations: 6
   _gravity: 3
