@@ -35,6 +35,12 @@ namespace ThailandHorrorJam.Systems.Needle
         [Range(0.01f, 1f)]
         [SerializeField] private float _tetheredMassMultiplier = 0.1f;
 
+        [Tooltip("ระยะตกแนวดิ่งสูงสุดเมื่อกล่องร่วงลงต่ำกว่าตัวผู้เล่น ก่อนที่สายด้ายจะขาด (เช่น ถูกผลักตกแท่น/ตกเหว)")]
+        [SerializeField] private float _maxTetherVerticalDrop = 0.85f;
+
+        [Tooltip("ระยะเวลาที่กล่องลอยค้างกลางอากาศขณะถูกจูง ก่อนที่สายด้ายจะขาดอัตโนมัติ (วินาที)")]
+        [SerializeField] private float _maxTetherAirborneDuration = 0.2f;
+
         [Header("Push Resistance")]
         [Tooltip("เมื่อเปิดใช้งาน วัตถุจะล็อคแกน X ขณะอยู่เฉยๆ เพื่อไม่ให้ Player เดินชนแล้วดันวัตถุได้ และจะปลดล็อค X อัตโนมัติเฉพาะตอนถูกผูกเชือกลาก (Hauling)")]
         [SerializeField] private bool _freezePositionXWhenIdle = true;
@@ -62,7 +68,9 @@ namespace ThailandHorrorJam.Systems.Needle
         private PlayerController2D _tetheredPlayerController;
         private NeedleController _tetheredNeedleController;
         private float _activeTetherLeashLength;
+        private float _tetherAirborneTimer;
         private bool _isReleasingTether;
+        private readonly RaycastHit2D[] _boxGroundHits = new RaycastHit2D[4];
 
         private StitchState _currentState = StitchState.Idle;
         private readonly List<Vector2> _waypoints = new List<Vector2>();
@@ -261,6 +269,55 @@ namespace ThailandHorrorJam.Systems.Needle
             // ปลดล็อคแกน X เมื่อ: กำลังดึง (สายตึงและเดินออกห่าง) หรือ กำลังผลัก (เดินชนเข้าหากล่อง)
             bool shouldUnlock = isPulling || isPushing;
             SetHorizontalLock(!shouldUnlock);
+        }
+
+        private bool IsBoxGrounded()
+        {
+            if (_col == null) return false;
+
+            Bounds bounds = _col.bounds;
+            Vector2 checkOrigin = new Vector2(bounds.center.x, bounds.min.y + 0.05f);
+            float checkDist = 0.2f;
+
+            ContactFilter2D filter = new ContactFilter2D();
+            filter.SetLayerMask(~LayerMask.GetMask("Player", "Needle", "Ignore Raycast"));
+            filter.useLayerMask = true;
+            filter.useTriggers = false;
+
+            // ตรวจสอบตรงกลาง
+            int hitCount = Physics2D.Raycast(checkOrigin, Vector2.down, filter, _boxGroundHits, checkDist + 0.05f);
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider2D hit = _boxGroundHits[i].collider;
+                if (hit != null && hit != _col && !hit.isTrigger && !hit.transform.IsChildOf(transform) && !PlayerController2D.IsPlayer(hit))
+                {
+                    return true;
+                }
+            }
+
+            // ตรวจสอบขอบซ้ายและขวา เพื่อรองรับกรณีกล่องยืนหมิ่นขอบแท่น (Corner overhang)
+            float halfWidth = bounds.extents.x * 0.75f;
+            int leftHits = Physics2D.Raycast(checkOrigin + Vector2.left * halfWidth, Vector2.down, filter, _boxGroundHits, checkDist + 0.05f);
+            for (int i = 0; i < leftHits; i++)
+            {
+                Collider2D hit = _boxGroundHits[i].collider;
+                if (hit != null && hit != _col && !hit.isTrigger && !hit.transform.IsChildOf(transform) && !PlayerController2D.IsPlayer(hit))
+                {
+                    return true;
+                }
+            }
+
+            int rightHits = Physics2D.Raycast(checkOrigin + Vector2.right * halfWidth, Vector2.down, filter, _boxGroundHits, checkDist + 0.05f);
+            for (int i = 0; i < rightHits; i++)
+            {
+                Collider2D hit = _boxGroundHits[i].collider;
+                if (hit != null && hit != _col && !hit.isTrigger && !hit.transform.IsChildOf(transform) && !PlayerController2D.IsPlayer(hit))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void SetStaticState()
@@ -540,6 +597,7 @@ namespace ThailandHorrorJam.Systems.Needle
             float currentDist = Vector2.Distance(CurrentPosition, playerPos);
             // ให้ระยะสายจูงเริ่มต้นอิงตามระยะจริงของผู้เล่น แต่ไม่ต่ำกว่า _minTetherDistance และไม่เกิน MaxTetherDistance
             _activeTetherLeashLength = Mathf.Clamp(currentDist, _minTetherDistance, MaxTetherDistance);
+            _tetherAirborneTimer = 0f;
 
             _tetherJoint.enabled = true;
             _tetherJoint.connectedBody = playerRb;
@@ -638,6 +696,37 @@ namespace ThailandHorrorJam.Systems.Needle
             Vector2 playerPos = _tetheredPlayerRb != null ? _tetheredPlayerRb.position : (Vector2)_tetheredPlayerTransform.position;
             float dist = Vector2.Distance(objPos, playerPos);
 
+            // ตรวจสอบกรณีกล่องถูกผลักหรือร่วงตกจากแท่น (Ledge / Cliff / Pit Drop)
+            // ถ้ากล่องไม่มีพื้นรองรับและร่วงลงต่ำกว่าระดับตัวผู้เล่น ให้ตัดสายด้ายขาดทันที กล่องจะได้ร่วงลงไปอย่างเป็นธรรมชาติ
+            float verticalDrop = playerPos.y - objPos.y;
+            bool isBoxAirborne = !IsBoxGrounded();
+
+            if (isBoxAirborne)
+            {
+                _tetherAirborneTimer += Time.fixedDeltaTime;
+
+                // 1. กล่องตกลงต่ำกว่าระดับผู้เล่นเกินระยะกำหนด (ตกแท่นสูง/เหว)
+                bool isDroppingBelow = verticalDrop > _maxTetherVerticalDrop;
+
+                // 2. กล่องลอยค้างกลางอากาศเกินกำหนด (เช่น ห้อยต่องแต่งอยู่ใต้ขอบแท่น)
+                bool isHangingTooLong = _tetherAirborneTimer >= _maxTetherAirborneDuration && verticalDrop > 0.45f;
+
+                // 3. กล่องมีความเร็วร่วงลงแนวดิ่งอย่างรวดเร็ว (Freefall shock)
+                bool isFallingFast = _hasRb && _rb.linearVelocity.y < -1.2f && verticalDrop > 0.5f;
+
+                if (isDroppingBelow || isHangingTooLong || isFallingFast)
+                {
+                    _tetherAirborneTimer = 0f;
+                    CameraController2D.Instance?.Shake(0.05f, 0.12f);
+                    ReleasePlayerTether();
+                    return;
+                }
+            }
+            else
+            {
+                _tetherAirborneTimer = 0f;
+            }
+
             // คลายระยะสายจูงออกได้อย่างยืดหยุ่นตามระยะเดินของผู้เล่นจนถึงขีดจำกัดสูงสุด MaxTetherDistance
             if (dist > _activeTetherLeashLength && dist <= MaxTetherDistance)
             {
@@ -656,8 +745,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 strain = Mathf.Clamp01((dist - MaxTetherDistance) / stretchBudget);
             }
 
-            // Snap if pulled beyond extreme distance (e.g. falling into pit)
-            if (dist > MaxTetherDistance * 2.2f)
+            // Snap if pulled beyond extreme distance (e.g. falling into pit or pulled hard)
+            if (dist > MaxTetherDistance * 1.35f)
             {
                 CameraController2D.Instance?.Shake(0.07f, 0.14f);
                 ReleasePlayerTether();

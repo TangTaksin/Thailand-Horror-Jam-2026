@@ -116,5 +116,64 @@ namespace ThailandHorrorJam.Editor.Tests
             Assert.AreEqual(StitchState.Idle, _stitchable.CurrentState);
             Assert.AreEqual(RigidbodyType2D.Dynamic, _rb.bodyType);
         }
+
+        [Test]
+        public void WhenBoxPushedOffLedgeDuringHauling_TetherSnapsAndReleasesAutomatically()
+        {
+            GameObject playerObj = new GameObject("TestHaulPlayer");
+            var playerRb = playerObj.AddComponent<Rigidbody2D>();
+            playerObj.transform.position = new Vector3(0f, 2f, 0f);
+
+            // Tether box at player position level
+            _stitchable.StartPlayerTether(playerObj.transform, playerRb);
+            Assert.AreEqual(StitchState.PlayerHarness, _stitchable.CurrentState);
+            Assert.IsTrue(_stitchable.IsTetheredToPlayer);
+
+            // Simulate box pushed off ledge, dropping below player into mid-air (vertical drop > 0.85m)
+            _go.transform.position = new Vector3(1f, 0.9f, 0f);
+            _rb.position = new Vector2(1f, 0.9f);
+            _rb.linearVelocity = new Vector2(0f, -2.5f);
+            Physics2D.SyncTransforms();
+
+            // Run FixedUpdate step
+            typeof(StitchableObject).GetMethod("FixedUpdate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.Invoke(_stitchable, null);
+
+            Assert.AreEqual(StitchState.Idle, _stitchable.CurrentState, "Tether must snap and release when box falls off platform.");
+            Assert.IsFalse(_stitchable.IsTetheredToPlayer, "IsTetheredToPlayer must be false after snapping.");
+
+            Object.DestroyImmediate(playerObj);
+        }
+
+        [Test]
+        public void WhenBoxAirborneBeneathPlayerForDuration_TetherSnapsAndReleasesAutomatically()
+        {
+            GameObject playerObj = new GameObject("TestHaulPlayer");
+            var playerRb = playerObj.AddComponent<Rigidbody2D>();
+            playerObj.transform.position = new Vector3(0f, 2f, 0f);
+
+            _stitchable.StartPlayerTether(playerObj.transform, playerRb);
+            Assert.AreEqual(StitchState.PlayerHarness, _stitchable.CurrentState);
+
+            // Box suspended in mid-air 0.6m below player (verticalDrop > 0.45m)
+            _go.transform.position = new Vector3(0.8f, 1.4f, 0f);
+            _rb.position = new Vector2(0.8f, 1.4f);
+            _rb.linearVelocity = Vector2.zero;
+            Physics2D.SyncTransforms();
+
+            var fixedUpdateMethod = typeof(StitchableObject).GetMethod("FixedUpdate", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            // Advance multiple fixed updates (> 0.2s = 10 frames of 0.02s)
+            for (int i = 0; i < 15; i++)
+            {
+                fixedUpdateMethod?.Invoke(_stitchable, null);
+                if (_stitchable.CurrentState == StitchState.Idle) break;
+            }
+
+            Assert.AreEqual(StitchState.Idle, _stitchable.CurrentState, "Tether must snap after box hangs in mid-air below platform for duration.");
+            Assert.IsFalse(_stitchable.IsTetheredToPlayer);
+
+            Object.DestroyImmediate(playerObj);
+        }
     }
 }
