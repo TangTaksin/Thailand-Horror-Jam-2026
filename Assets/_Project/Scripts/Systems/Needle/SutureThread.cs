@@ -218,6 +218,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
+            if (!s_ActiveThreads.Contains(this))
+            {
+                s_ActiveThreads.Add(this);
+            }
+
             _cachedWaypoints.Clear();
             for (int i = 0; i < waypoints.Count; i++)
             {
@@ -940,9 +945,34 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        private static Transform s_PinContainer;
+
+        private static Transform GetOrCreatePinContainer()
+        {
+            if (s_PinContainer == null)
+            {
+                GameObject container = GameObject.Find("[NeedlePins_Runtime]");
+                if (container == null)
+                {
+                    container = new GameObject("[NeedlePins_Runtime]");
+                    container.hideFlags = HideFlags.DontSave;
+                }
+                s_PinContainer = container.transform;
+            }
+            return s_PinContainer;
+        }
+
         private GameObject CreatePinMarker()
         {
             GameObject pin = new GameObject("NeedlePin_2D");
+            pin.hideFlags = HideFlags.DontSave;
+
+            Transform container = GetOrCreatePinContainer();
+            if (container != null)
+            {
+                pin.transform.SetParent(container, false);
+            }
+
             pin.transform.localScale = Vector3.one * k_PinTargetScale;
 
             SpriteRenderer sr = pin.AddComponent<SpriteRenderer>();
@@ -1001,7 +1031,14 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (_pinMarkers[i] != null)
                 {
                     _pinMarkers[i].transform.DOKill();
-                    Destroy(_pinMarkers[i]);
+                    if (Application.isPlaying)
+                    {
+                        Destroy(_pinMarkers[i]);
+                    }
+                    else
+                    {
+                        DestroyImmediate(_pinMarkers[i]);
+                    }
                 }
             }
             _pinMarkers.Clear();
@@ -1021,6 +1058,23 @@ namespace ThailandHorrorJam.Systems.Needle
             HidePinMarkers();
         }
 
+        public void Sever()
+        {
+            if (_cachedOwner == null)
+            {
+                _cachedOwner = GetComponentInParent<IStitchable>();
+            }
+
+            if (_cachedOwner != null)
+            {
+                _cachedOwner.CutThread();
+            }
+            else
+            {
+                Clear();
+            }
+        }
+
         public bool TrySeverAt(Vector2 point, float radius)
         {
             if (_renderBuffer.Count < 2) return false;
@@ -1034,24 +1088,79 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 if (SqrDistanceToSegment(point, segA, segB) <= sqrRadius)
                 {
-                    if (_cachedOwner == null)
-                    {
-                        _cachedOwner = GetComponentInParent<IStitchable>();
-                    }
-
-                    if (_cachedOwner != null)
-                    {
-                        _cachedOwner.CutThread();
-                    }
-                    else
-                    {
-                        Clear();
-                    }
+                    Sever();
                     return true;
                 }
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Checks if a slice segment [sliceStart, sliceEnd] intersects with this suture thread polyline
+        /// or passes within touchRadius (for grazing touches). Severing releases the thread immediately.
+        /// </summary>
+        public bool TrySeverBySegment(Vector2 sliceStart, Vector2 sliceEnd, float touchRadius = 0.2f)
+        {
+            if (_renderBuffer.Count < 2) return false;
+
+            float sqrTouchRadius = touchRadius * touchRadius;
+            float minX = Mathf.Min(sliceStart.x, sliceEnd.x) - touchRadius;
+            float maxX = Mathf.Max(sliceStart.x, sliceEnd.x) + touchRadius;
+            float minY = Mathf.Min(sliceStart.y, sliceEnd.y) - touchRadius;
+            float maxY = Mathf.Max(sliceStart.y, sliceEnd.y) + touchRadius;
+
+            for (int i = 0; i < _renderBuffer.Count - 1; i++)
+            {
+                Vector2 segA = _renderBuffer[i];
+                Vector2 segB = _renderBuffer[i + 1];
+
+                float sMinX = Mathf.Min(segA.x, segB.x);
+                float sMaxX = Mathf.Max(segA.x, segB.x);
+                float sMinY = Mathf.Min(segA.y, segB.y);
+                float sMaxY = Mathf.Max(segA.y, segB.y);
+
+                // Quick AABB rejection
+                if (maxX < sMinX || minX > sMaxX || maxY < sMinY || minY > sMaxY)
+                    continue;
+
+                // 1. Direct segment-segment crossing
+                if (SegmentsIntersect(sliceStart, sliceEnd, segA, segB))
+                {
+                    Sever();
+                    return true;
+                }
+
+                // 2. Grazing touch distance check
+                if (touchRadius > 0f)
+                {
+                    if (SqrDistanceToSegment(sliceStart, segA, segB) <= sqrTouchRadius ||
+                        SqrDistanceToSegment(sliceEnd, segA, segB) <= sqrTouchRadius ||
+                        SqrDistanceToSegment(segA, sliceStart, sliceEnd) <= sqrTouchRadius ||
+                        SqrDistanceToSegment(segB, sliceStart, sliceEnd) <= sqrTouchRadius)
+                    {
+                        Sever();
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public static bool SegmentsIntersect(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
+        {
+            Vector2 r = b - a;
+            Vector2 s = d - c;
+            float rxs = r.x * s.y - r.y * s.x;
+
+            if (Mathf.Abs(rxs) < 1e-7f) return false; // Parallel or collinear
+
+            Vector2 ca = c - a;
+            float t = (ca.x * s.y - ca.y * s.x) / rxs;
+            float u = (ca.x * r.y - ca.y * r.x) / rxs;
+
+            return (t >= 0f && t <= 1f && u >= 0f && u <= 1f);
         }
 
         private static float SqrDistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
@@ -1070,7 +1179,7 @@ namespace ThailandHorrorJam.Systems.Needle
             bool anySevered = false;
             for (int i = s_ActiveThreads.Count - 1; i >= 0; i--)
             {
-                if (s_ActiveThreads[i] != null && s_ActiveThreads[i].TrySeverAt(point, radius))
+                if (i < s_ActiveThreads.Count && s_ActiveThreads[i] != null && s_ActiveThreads[i].TrySeverAt(point, radius))
                 {
                     anySevered = true;
                 }
@@ -1078,12 +1187,40 @@ namespace ThailandHorrorJam.Systems.Needle
             return anySevered;
         }
 
+        /// <summary>
+        /// Severs all active threads intersecting or grazed by a swipe line segment [sliceStart, sliceEnd].
+        /// Supports slicing multiple threads in a single swipe (Cut the Rope multi-cut).
+        /// </summary>
+        public static int SeverThreadsIntersectingSegment(Vector2 sliceStart, Vector2 sliceEnd, float touchRadius = 0.2f)
+        {
+            int severedCount = 0;
+            for (int i = s_ActiveThreads.Count - 1; i >= 0; i--)
+            {
+                if (i < s_ActiveThreads.Count && s_ActiveThreads[i] != null)
+                {
+                    if (s_ActiveThreads[i].TrySeverBySegment(sliceStart, sliceEnd, touchRadius))
+                    {
+                        severedCount++;
+                    }
+                }
+            }
+            return severedCount;
+        }
+
         private void OnDestroy()
         {
+            s_ActiveThreads.Remove(this);
             DestroyPinMarkers();
             if (_threadMaterial != null)
             {
-                Destroy(_threadMaterial);
+                if (Application.isPlaying)
+                {
+                    Destroy(_threadMaterial);
+                }
+                else
+                {
+                    DestroyImmediate(_threadMaterial);
+                }
             }
         }
     }

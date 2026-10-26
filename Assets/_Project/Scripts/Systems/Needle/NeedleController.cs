@@ -80,6 +80,18 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("reticleTransform")]
         [SerializeField] private Transform _reticleTransform;
 
+        [Header("Slice to Cut (Cut the Rope Style)")]
+        [Tooltip("Minimum distance cursor must move before evaluating slice segment intersection.")]
+        [SerializeField] private float _minSliceDistance = 0.04f;
+        [Tooltip("Lifetime of the slicing blade trail in seconds.")]
+        [SerializeField] private float _sliceTrailDuration = 0.18f;
+        [Tooltip("Touch/grazing radius around the slice segment to make cutting feel responsive and forgiving.")]
+        [SerializeField] private float _sliceTouchRadius = 0.2f;
+        [Tooltip("Starting color of the blade slash trail (cursor tip).")]
+        [SerializeField] private Color _sliceTrailStartColor = new Color(1f, 1f, 1f, 0.95f);
+        [Tooltip("Ending color of the blade slash trail.")]
+        [SerializeField] private Color _sliceTrailEndColor = new Color(0.9f, 0.2f, 0.2f, 0f);
+
         private Transform _playerTransform;
         private Rigidbody2D _playerRb;
         private Collider2D _playerCol;
@@ -103,6 +115,12 @@ namespace ThailandHorrorJam.Systems.Needle
         private SpriteRenderer _reticleSprite;
         private Vector3 _reticleBaseScale = Vector3.one;
         private float _deniedFlashTimer;
+
+        private TrailRenderer _sliceTrailRenderer;
+        private GameObject _sliceTrailObj;
+        private Material _sliceTrailMaterial;
+        private bool _isSlicing;
+        private Vector2 _lastSliceWorldPos;
 
         public bool IsPinning => _isPinning;
         public bool IsTetheredToPlayer => _tetheredStitchable != null;
@@ -387,9 +405,16 @@ namespace ThailandHorrorJam.Systems.Needle
                     IStitchable hovered = FindStitchableAt(worldAimPos);
                     if (hovered != null)
                     {
-                        bool isStandingOnHovered = _playerController != null && _playerController.IsStandingOn(hovered.ObjectTransform);
-                        bool isValid = IsPlayerNearObject(hovered) && !isStandingOnHovered;
-                        SetReticleColor(isValid ? s_PlayerTetherColor : s_InvalidColor);
+                        if (hovered.CurrentState == StitchState.Looping)
+                        {
+                            SetReticleColor(s_ValidColor);
+                        }
+                        else
+                        {
+                            bool isStandingOnHovered = _playerController != null && _playerController.IsStandingOn(hovered.ObjectTransform);
+                            bool isValid = IsPlayerNearObject(hovered) && !isStandingOnHovered;
+                            SetReticleColor(isValid ? s_PlayerTetherColor : s_InvalidColor);
+                        }
                     }
                     else
                     {
@@ -409,12 +434,29 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     if (Mouse.current.leftButton.wasPressedThisFrame)
                     {
-                        OnPrimaryClick(worldAimPos);
+                        OnPrimaryDown(worldAimPos);
+                    }
+
+                    if (Mouse.current.leftButton.isPressed)
+                    {
+                        OnPrimaryHold(worldAimPos);
+                    }
+
+                    if (Mouse.current.leftButton.wasReleasedThisFrame)
+                    {
+                        OnPrimaryUp(worldAimPos);
                     }
 
                     if (Mouse.current.rightButton.wasPressedThisFrame)
                     {
                         OnSecondaryClick(worldAimPos);
+                    }
+                }
+                else
+                {
+                    if (_isSlicing)
+                    {
+                        StopSlicing();
                     }
                 }
             }
@@ -426,7 +468,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private void OnPrimaryClick(Vector3 worldAimPos)
+        private void OnPrimaryDown(Vector3 worldAimPos)
         {
             if (!_isPinning)
             {
@@ -459,10 +501,23 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
 
                 IStitchable stitchable = FindStitchableAt(worldAimPos);
-                if (stitchable != null && CanInteractWithStitchable(stitchable, "stitch"))
+                if (stitchable != null)
                 {
-                    StartStitching(stitchable);
+                    // ถ้ากำลัง Loop อยู่: ให้ Ignore ข้ามไป ไม่แช่แข็งกล่อง และไม่เริ่มเย็บใหม่
+                    if (stitchable.CurrentState == StitchState.Looping)
+                    {
+                        return;
+                    }
+
+                    if (CanInteractWithStitchable(stitchable, "stitch"))
+                    {
+                        StartStitching(stitchable);
+                    }
+                    return;
                 }
+
+                // คลิกบนพื้นที่ว่าง (Empty Space) -> เริ่มต้นโหมดลากตัดเส้นด้าย (Slice Drag)
+                StartSlicing(worldAimPos);
             }
             else
             {
@@ -480,6 +535,23 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 // ยิงเข็ม (Needle Projectile) พุ่งไปยังตำแหน่งเป้าหมาย
                 LaunchNeedleProjectile(worldAimPos);
+            }
+        }
+
+        private void OnPrimaryHold(Vector3 worldAimPos)
+        {
+            if (_isSlicing)
+            {
+                UpdateSlicing(worldAimPos);
+            }
+        }
+
+        private void OnPrimaryUp(Vector3 worldAimPos)
+        {
+            if (_isSlicing)
+            {
+                UpdateSlicing(worldAimPos);
+                StopSlicing();
             }
         }
 
@@ -604,6 +676,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void OnSecondaryClick(Vector3 worldAimPos)
         {
+            if (_isSlicing)
+            {
+                StopSlicing();
+            }
+
             if (_tetheredStitchable != null)
             {
                 ReleasePlayerTether();
@@ -633,9 +710,86 @@ namespace ThailandHorrorJam.Systems.Needle
                 OnThreadSevered?.Invoke();
                 return;
             }
+        }
 
-            // ตัดด้ายที่อยู่ใกล้จุดชี้เคอร์เซอร์ (Scissor fallback)
-            if (SutureThread.TrySeverAnyThreadNear(worldAimPos, 0.75f))
+        private void EnsureSliceTrail()
+        {
+            if (_sliceTrailObj == null)
+            {
+                _sliceTrailObj = new GameObject("SliceBladeTrail");
+                _sliceTrailObj.transform.SetParent(transform);
+                _sliceTrailRenderer = _sliceTrailObj.AddComponent<TrailRenderer>();
+                _sliceTrailRenderer.time = _sliceTrailDuration;
+
+                AnimationCurve widthCurve = new AnimationCurve();
+                widthCurve.AddKey(0f, 0.2f);
+                widthCurve.AddKey(0.15f, 1.0f);
+                widthCurve.AddKey(1f, 0.0f);
+                _sliceTrailRenderer.widthCurve = widthCurve;
+                _sliceTrailRenderer.widthMultiplier = 0.08f;
+                _sliceTrailRenderer.sortingOrder = 20;
+
+                Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+                if (shader != null)
+                {
+                    _sliceTrailMaterial = new Material(shader);
+                    _sliceTrailRenderer.material = _sliceTrailMaterial;
+                }
+
+                Gradient gradient = new Gradient();
+                gradient.SetKeys(
+                    new GradientColorKey[] {
+                        new GradientColorKey(_sliceTrailStartColor, 0f),
+                        new GradientColorKey(_sliceTrailEndColor, 1f)
+                    },
+                    new GradientAlphaKey[] {
+                        new GradientAlphaKey(_sliceTrailStartColor.a, 0f),
+                        new GradientAlphaKey(0f, 1f)
+                    }
+                );
+                _sliceTrailRenderer.colorGradient = gradient;
+                _sliceTrailRenderer.emitting = false;
+            }
+        }
+
+        private void StartSlicing(Vector2 startPos)
+        {
+            _isSlicing = true;
+            _lastSliceWorldPos = startPos;
+            EnsureSliceTrail();
+            if (_sliceTrailObj != null)
+            {
+                _sliceTrailObj.transform.position = startPos;
+                _sliceTrailRenderer.Clear();
+                _sliceTrailRenderer.emitting = true;
+            }
+
+            // Check if user clicked directly onto or right next to an existing thread
+            CheckAndSeverSlice(startPos, startPos);
+        }
+
+        private void UpdateSlicing(Vector2 currentPos)
+        {
+            if (!_isSlicing) return;
+
+            if (_sliceTrailObj != null)
+            {
+                _sliceTrailObj.transform.position = currentPos;
+            }
+
+            float movedDist = Vector2.Distance(_lastSliceWorldPos, currentPos);
+            if (movedDist >= _minSliceDistance)
+            {
+                CheckAndSeverSlice(_lastSliceWorldPos, currentPos);
+                _lastSliceWorldPos = currentPos;
+            }
+        }
+
+        private void CheckAndSeverSlice(Vector2 sliceStart, Vector2 sliceEnd)
+        {
+            int severedCount = SutureThread.SeverThreadsIntersectingSegment(sliceStart, sliceEnd, _sliceTouchRadius);
+            if (severedCount > 0)
             {
                 if (_currentlyLoopingTarget != null && _currentlyLoopingTarget.CurrentState != StitchState.Looping)
                 {
@@ -646,9 +800,19 @@ namespace ThailandHorrorJam.Systems.Needle
                     _needleProjectile.Cancel();
                 }
                 ClearCurrentPinnedAnchor();
-                CameraController2D.Instance?.Shake(0.04f, 0.08f);
+                CameraController2D.Instance?.Shake(0.045f, 0.09f);
                 OnThreadSevered?.Invoke();
-                Log("[Needle] Thread severed by pointer release.");
+                Log($"[Needle] Severed {severedCount} thread(s) via swipe slice!");
+            }
+        }
+
+        private void StopSlicing()
+        {
+            if (!_isSlicing) return;
+            _isSlicing = false;
+            if (_sliceTrailRenderer != null)
+            {
+                _sliceTrailRenderer.emitting = false;
             }
         }
 
@@ -749,6 +913,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void CancelStitchingOrTether()
         {
+            if (_isSlicing)
+            {
+                StopSlicing();
+            }
+
             if (_isPinning)
             {
                 CancelStitching();
@@ -1187,6 +1356,14 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        private void OnDisable()
+        {
+            if (_isSlicing)
+            {
+                StopSlicing();
+            }
+        }
+
         private void OnDestroy()
         {
             if (_reticleTransform != null) _reticleTransform.DOKill();
@@ -1194,6 +1371,14 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_previewMaterial != null)
             {
                 Destroy(_previewMaterial);
+            }
+            if (_sliceTrailMaterial != null)
+            {
+                Destroy(_sliceTrailMaterial);
+            }
+            if (_sliceTrailObj != null)
+            {
+                Destroy(_sliceTrailObj);
             }
             if (_needleProjectile != null && _needleProjectile.gameObject != null && _needleProjectile.gameObject.scene.IsValid())
             {

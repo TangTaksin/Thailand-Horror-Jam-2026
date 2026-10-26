@@ -49,6 +49,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private RigidbodyType2D _originalBodyType;
         private RigidbodyConstraints2D _originalConstraints;
         private float _originalMass = 1f;
+        private float _originalGravityScale = 1f;
         private bool _hasRb;
         private Collider2D _col;
 
@@ -86,6 +87,7 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _originalBodyType = _rb.bodyType;
                 _originalMass = _rb.mass;
+                _originalGravityScale = _rb.gravityScale;
                 _originalConstraints = _rb.constraints;
 
                 SetHorizontalLock(true);
@@ -164,7 +166,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void SetHorizontalLock(bool locked)
         {
-            if (!_hasRb || !_freezePositionXWhenIdle) return;
+            if (!_hasRb || !_freezePositionXWhenIdle || _rb.bodyType == RigidbodyType2D.Static) return;
 
             RigidbodyConstraints2D targetConstraints = locked
                 ? (RigidbodyConstraints2D.FreezeRotation | RigidbodyConstraints2D.FreezePositionX)
@@ -172,7 +174,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_rb.constraints != targetConstraints)
             {
-                if (locked)
+                if (locked && _rb.bodyType != RigidbodyType2D.Static)
                 {
                     _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
                 }
@@ -205,31 +207,40 @@ namespace ThailandHorrorJam.Systems.Needle
             SetHorizontalLock(!shouldUnlock);
         }
 
-        private void SetKinematicState()
+        private void SetStaticState()
         {
             if (!_hasRb) return;
-            _rb.linearVelocity = Vector2.zero;
-            _rb.angularVelocity = 0f;
-            _rb.bodyType = RigidbodyType2D.Kinematic;
+            if (_rb.bodyType != RigidbodyType2D.Static)
+            {
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
+                _rb.bodyType = RigidbodyType2D.Static;
+            }
         }
 
         private void RestoreOriginalBodyState()
         {
             if (!_hasRb) return;
             _rb.bodyType = _originalBodyType;
+            _rb.gravityScale = _originalGravityScale;
             _rb.mass = _originalMass;
-            _rb.angularVelocity = 0f;
 
-            if (_freezePositionXWhenIdle)
+            if (_rb.bodyType != RigidbodyType2D.Static)
             {
-                SetHorizontalLock(true);
-            }
-            else
-            {
-                _rb.constraints = _originalConstraints;
-            }
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
 
-            _rb.WakeUp();
+                if (_freezePositionXWhenIdle)
+                {
+                    SetHorizontalLock(true);
+                }
+                else
+                {
+                    _rb.constraints = _originalConstraints;
+                }
+
+                _rb.WakeUp();
+            }
         }
 
         private void SetWaypoints(IReadOnlyList<Vector2> waypoints)
@@ -254,7 +265,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _waypoints.Clear();
             _waypoints.Add(CurrentPosition);
 
-            SetKinematicState();
+            SetStaticState();
             _targetFramePosition = CurrentPosition;
             _previousPosition = CurrentPosition;
             _currentVelocity = Vector2.zero;
@@ -337,7 +348,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _currentWaypointIndex = 0;
             _isReversing = false;
 
-            SetKinematicState();
+            SetStaticState();
             _targetFramePosition = CurrentPosition;
             _previousPosition = CurrentPosition;
             _currentVelocity = Vector2.zero;
@@ -413,14 +424,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_hasRb)
             {
-                if (_rb.bodyType == RigidbodyType2D.Kinematic)
-                {
-                    _rb.MovePosition(pos);
-                }
-                else
-                {
-                    _rb.position = pos;
-                }
+                _rb.position = pos;
+                transform.position = pos;
             }
             else
             {
@@ -440,7 +445,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_hasRb)
             {
-                _rb.bodyType = RigidbodyType2D.Dynamic;
+                _rb.bodyType = _originalBodyType;
+                _rb.gravityScale = _originalGravityScale;
                 _rb.mass = Mathf.Max(0.1f, _originalMass * _tetheredMassMultiplier);
                 SetHorizontalLock(true);
             }
@@ -598,10 +604,15 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_hasRb)
             {
+                _rb.bodyType = _originalBodyType;
+                _rb.gravityScale = _originalGravityScale;
                 _rb.position = _initialPosition;
                 _rb.rotation = _initialRotation.eulerAngles.z;
-                _rb.linearVelocity = Vector2.zero;
-                _rb.angularVelocity = 0f;
+                if (_rb.bodyType != RigidbodyType2D.Static)
+                {
+                    _rb.linearVelocity = Vector2.zero;
+                    _rb.angularVelocity = 0f;
+                }
             }
 
             transform.position = _initialPosition;
