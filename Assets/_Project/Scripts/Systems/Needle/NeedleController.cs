@@ -417,26 +417,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (!_isPinning)
             {
-                if (_tetheredStitchable != null)
-                {
-                    SetReticleActive(true);
-                    if (_reticleTransform != null) _reticleTransform.position = worldAimPos;
-                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint anchor))
-                    {
-                        float dist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
-                        bool hasLOS = HasLineOfSight(_tetheredStitchable.CurrentPosition, anchorPos, _tetheredStitchable.ObjectTransform, anchor);
-                        bool canTransfer = IsWithinThreadBudget(dist) && hasLOS;
-                        SetReticleColor(canTransfer ? s_ValidColor : s_InvalidColor);
-                    }
-                    else
-                    {
-                        SetReticleColor(s_PlayerTetherColor);
-                    }
-                }
-                else
-                {
-                    SetReticleActive(false);
-                }
+                SetReticleActive(false);
             }
         }
 
@@ -476,12 +457,6 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
             }
-
-            if (Keyboard.current != null &&
-                (Keyboard.current.escapeKey.wasPressedThisFrame || Keyboard.current.qKey.wasPressedThisFrame))
-            {
-                CancelStitchingOrTether();
-            }
         }
 
         private void OnPrimaryDown(Vector3 worldAimPos)
@@ -490,28 +465,27 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_tetheredStitchable != null)
                 {
-                    if (IsAimingAtPlayer(worldAimPos) || FindStitchableAt(worldAimPos) == _tetheredStitchable)
+                    IStitchable target = _tetheredStitchable;
+                    if (_playerController != null && _playerController.IsStandingOn(target.ObjectTransform))
                     {
-                        ReleasePlayerTether();
+                        LogWarning($"[Needle] Cannot aim {target.ObjectTransform.name} while standing on it!");
+                        CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                        NotifyActionDenied();
                         return;
                     }
 
-                    if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint foundAnchor))
+                    float dist = Vector2.Distance(_playerTransform.position, target.CurrentPosition);
+                    if (dist <= MaxAimLeashDistance + 0.5f)
                     {
-                        float tetherTransferDist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
-                        bool hasLOS = HasLineOfSight(_tetheredStitchable.CurrentPosition, anchorPos, _tetheredStitchable.ObjectTransform, foundAnchor);
-
-                        if (IsWithinThreadBudget(tetherTransferDist) && hasLOS)
-                        {
-                            TransferTetherToAnchor(anchorPos, foundAnchor);
-                        }
-                        else
-                        {
-                            LogWarning(!hasLOS
-                                ? "[Needle] Cannot transfer tether: wall or obstacle is blocking the path to the anchor."
-                                : "[Needle] Cannot transfer tether: target wall is out of thread budget or too close.");
-                            NotifyActionDenied();
-                        }
+                        ReleasePlayerTether();
+                        StartStitching(target);
+                        return;
+                    }
+                    else
+                    {
+                        LogWarning($"[Needle] Too far from {target.ObjectTransform.name} to aim! Distance: {dist:F1}m (Max: {MaxAimLeashDistance:F1}m). Move closer.");
+                        CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                        NotifyActionDenied();
                         return;
                     }
                 }
@@ -892,7 +866,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
             CameraController2D.Instance?.Punch((_playerTransform.position - (Vector3)target.CurrentPosition).normalized, 0.04f);
             OnPlayerTetherAttached?.Invoke();
-            Log($"[Needle] Tethered {target.ObjectTransform.name} to Player! Walk to haul it. Right-click to release, or click a wall to anchor.");
+            Log($"[Needle] Tethered {target.ObjectTransform.name} to Player! Walk to haul it. Left-click to aim, Right-click to release.");
 
             ResetPinningState();
         }
