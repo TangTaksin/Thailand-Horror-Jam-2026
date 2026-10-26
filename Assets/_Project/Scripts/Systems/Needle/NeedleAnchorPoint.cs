@@ -41,22 +41,16 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _surfaceOffset = 0.02f;
 
         [Header("Visual Feedback")]
-        [Tooltip("Optional SpriteRenderer to tint and scale for aiming feedback. Auto-detected if left empty.")]
+        [Tooltip("Optional SpriteRenderer to scale for aiming feedback. Auto-detected if left empty.")]
         [SerializeField] private SpriteRenderer _visualRenderer;
 
-        [Tooltip("Whether to tint and scale the visual renderer based on aiming state and thread range.")]
+        [Tooltip("Whether to scale the visual renderer based on aiming state.")]
         [SerializeField] private bool _enableVisualFeedback = true;
-
-        [SerializeField] private Color _idleColor = Color.white;
-        [SerializeField] private Color _inRangeColor = new Color(0.75f, 0.95f, 1f, 1f);
-        [SerializeField] private Color _outOfRangeColor = new Color(1f, 0.4f, 0.4f, 0.65f);
-        [SerializeField] private Color _hoveredColor = new Color(0.45f, 1f, 0.65f, 1f);
-        [SerializeField] private Color _pinnedColor = new Color(1f, 0.9f, 0.45f, 1f);
 
         [Tooltip("Scale multiplier applied when the player's aim trajectory is targeting this anchor.")]
         [SerializeField] private float _hoverScaleMultiplier = 1.18f;
 
-        [Tooltip("Speed of procedural scale and color transitions.")]
+        [Tooltip("Speed of procedural scale transitions.")]
         [SerializeField] private float _feedbackTransitionSpeed = 12f;
 
         [Header("Events")]
@@ -70,7 +64,6 @@ namespace ThailandHorrorJam.Systems.Needle
         private Collider2D _col;
         private Vector3 _baseScale = Vector3.one;
         private Vector3 _targetScale = Vector3.one;
-        private Color _targetColor = Color.white;
         private bool _isPinned;
 
         public bool IsAnchorEnabled
@@ -103,8 +96,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 _visualTransform = _visualRenderer.transform;
                 _baseScale = _visualTransform.localScale;
                 _targetScale = _baseScale;
-                _idleColor = _visualRenderer.color;
-                _targetColor = _idleColor;
             }
             else
             {
@@ -138,11 +129,6 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _visualTransform.localScale = Vector3.MoveTowards(_visualTransform.localScale, _targetScale, dt);
             }
-
-            if (_visualRenderer != null && _visualRenderer.color != _targetColor)
-            {
-                _visualRenderer.color = Color.Lerp(_visualRenderer.color, _targetColor, Mathf.Clamp01(dt));
-            }
         }
 
         /// <summary>
@@ -165,7 +151,6 @@ namespace ThailandHorrorJam.Systems.Needle
         public void NotifyPinned()
         {
             _isPinned = true;
-            _targetColor = _pinnedColor;
             _targetScale = _baseScale;
             _onNeedlePinned?.Invoke();
         }
@@ -178,7 +163,6 @@ namespace ThailandHorrorJam.Systems.Needle
             if (!_isPinned) return;
 
             _isPinned = false;
-            _targetColor = _idleColor;
             _targetScale = _baseScale;
             _onNeedleUnpinned?.Invoke();
         }
@@ -195,16 +179,8 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (!_enableVisualFeedback) return;
 
-            if (_isPinned)
+            if (_isPinned || !isPlayerAiming || !_isAnchorEnabled)
             {
-                _targetColor = _pinnedColor;
-                _targetScale = _baseScale;
-                return;
-            }
-
-            if (!isPlayerAiming || !_isAnchorEnabled)
-            {
-                _targetColor = _idleColor;
                 _targetScale = _baseScale;
                 return;
             }
@@ -218,17 +194,10 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (isTrajectoryTargetingThis && inRange)
             {
-                _targetColor = _hoveredColor;
                 _targetScale = _baseScale * _hoverScaleMultiplier;
-            }
-            else if (inRange)
-            {
-                _targetColor = _inRangeColor;
-                _targetScale = _baseScale;
             }
             else
             {
-                _targetColor = _outOfRangeColor;
                 _targetScale = _baseScale;
             }
         }
@@ -238,10 +207,6 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_visualTransform != null)
             {
                 _visualTransform.localScale = _baseScale;
-            }
-            if (_visualRenderer != null)
-            {
-                _visualRenderer.color = _idleColor;
             }
         }
 
