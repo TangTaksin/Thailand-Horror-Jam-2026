@@ -24,8 +24,10 @@ namespace ThailandHorrorJam.Core
         [Header("Hauling / Burden Settings")]
         [Tooltip("Speed multiplier applied to player horizontal velocity while tethered and hauling an object.")]
         [SerializeField] private float _haulingSpeedMultiplier = 0.58f;
-        [Tooltip("Speed multiplier applied to player horizontal velocity while aiming/pinning needle (ย่องเล็ง).")]
-        [SerializeField] private float _aimingSpeedMultiplier = 0.38f;
+        [Tooltip("Allow player to walk while aiming needle. If false, player stays stationary in aim stance.")]
+        [SerializeField] private bool _canMoveWhileAiming = false;
+        [Tooltip("Speed multiplier applied to player horizontal velocity while aiming/pinning needle (ย่องเล็ง) when _canMoveWhileAiming is true.")]
+        [SerializeField] private float _aimingSpeedMultiplier = 0f;
 
         [Header("Jump & Gravity Settings")]
         [SerializeField] private float _jumpForce = 12f;
@@ -70,7 +72,7 @@ namespace ThailandHorrorJam.Core
 
         [Header("Haul Airborne Settings")]
         [Tooltip("ระยะเวลาลอยตัวกลางอากาศสูงสุดขณะลากของ ก่อนที่สายด้ายจะขาด/หลุดออกอัตโนมัติ (เช่น ตกขอบแท่นสูงหรือตกเหว)")]
-        [SerializeField] private float _maxHaulAirborneDuration = 0.25f;
+        [SerializeField] private float _maxHaulAirborneDuration = 0.85f;
 
         [Header("Crush Hazard")]
         [Tooltip("เปิดใช้งานระบบบดขยี้ตายเมื่อศีรษะติดเพดานหรือถูกวัตถุทับ (Limbo Style)")]
@@ -107,6 +109,8 @@ namespace ThailandHorrorJam.Core
         private Vector2? _aimLeashAnchor;
         private float _aimLeashDistance;
         private float _crushTimer;
+        private float _throwSlowdownTimer;
+        private float _throwSlowdownMultiplier = 1f;
 
         private bool _isOnSlope;
         private Vector2 _slopeNormal = Vector2.up;
@@ -117,6 +121,7 @@ namespace ThailandHorrorJam.Core
         public bool IsHauling => _isHauling;
         public bool IsInputLocked => _isInputLocked;
         public float HorizontalInput => _horizontalInput;
+        public Collider2D MainCollider => _col;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
         public Vector2 PlatformVelocity => _currentStitchable != null ? _currentStitchable.CurrentVelocity : Vector2.zero;
         public Vector2 RelativeVelocity => Velocity - PlatformVelocity;
@@ -168,6 +173,20 @@ namespace ThailandHorrorJam.Core
             if (locked && _rb != null)
             {
                 _rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        public void ApplyThrowSlowdown(float duration = 0.15f, float multiplier = 0.25f)
+        {
+            _throwSlowdownTimer = duration;
+            _throwSlowdownMultiplier = multiplier;
+        }
+
+        public void StopHorizontalMovement()
+        {
+            if (_rb != null)
+            {
+                _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
             }
         }
 
@@ -225,6 +244,10 @@ namespace ThailandHorrorJam.Core
             {
                 _aimLeashAnchor = leashAnchor;
                 _aimLeashDistance = leashDistance;
+                if (!_canMoveWhileAiming)
+                {
+                    StopHorizontalMovement();
+                }
             }
             else
             {
@@ -471,9 +494,23 @@ namespace ThailandHorrorJam.Core
         private void ApplyHorizontalMovement()
         {
             float speed = _moveSpeed;
+
+            if (_throwSlowdownTimer > 0f)
+            {
+                _throwSlowdownTimer -= Time.fixedDeltaTime;
+                speed *= _throwSlowdownMultiplier;
+            }
+
             if (_isAiming)
             {
-                speed *= _aimingSpeedMultiplier;
+                if (!_canMoveWhileAiming)
+                {
+                    speed = 0f;
+                }
+                else
+                {
+                    speed *= _aimingSpeedMultiplier;
+                }
             }
             else if (_isHauling)
             {

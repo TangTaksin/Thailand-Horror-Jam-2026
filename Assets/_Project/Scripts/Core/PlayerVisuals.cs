@@ -1,6 +1,7 @@
 using UnityEngine;
 using DG.Tweening;
 using ThailandHorrorJam.Systems.Needle;
+using ThailandHorrorJam.Systems.Gameplay;
 
 namespace ThailandHorrorJam.Core
 {
@@ -13,7 +14,10 @@ namespace ThailandHorrorJam.Core
             HaulWalk,
             Jump,
             Fall,
-            FallLoop
+            FallLoop,
+            Aim,
+            Throw,
+            Dead
         }
 
         [Header("References")]
@@ -30,6 +34,20 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private Sprite[] _jumpSprites;
         [SerializeField] private Sprite[] _fallSprites;
         [SerializeField] private Sprite[] _fallLoopSprites;
+        [SerializeField] private Sprite[] _aimSprites;
+        [SerializeField] private Sprite[] _throwSprites;
+        [SerializeField] private Sprite[] _deadSprites;
+
+        [Header("Throw FX & Ripple")]
+        [SerializeField] private GameObject _rippleEffectPrefab;
+        [SerializeField] private Vector3 _throwFxOffset = new Vector3(0.22f, 0.05f, 0f);
+
+        [Header("Aim Needle Visual (Hand-held)")]
+        [SerializeField] private GameObject _aimNeedleObj;
+        [SerializeField] private SpriteRenderer _aimNeedleRenderer;
+        [Tooltip("Hand anchor offset in VisualHolder local space where the needle eye is held.")]
+        [SerializeField] private Vector3 _aimNeedleHandOffset = new Vector3(-0.328f, 0.02f, 0f);
+        [SerializeField] private bool _flipNeedleWhenAimingLeft = true;
 
         [Header("Frame Rates (FPS)")]
         [SerializeField] private float _idleFps = 6.6f;
@@ -39,6 +57,10 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private float _jumpFps = 12f;
         [SerializeField] private float _fallFps = 12f;
         [SerializeField] private float _fallLoopFps = 10f;
+        [SerializeField] private float _aimFps = 6f;
+        [SerializeField] private float _throwFps = 14f;
+        [SerializeField] private float _deadFps = 8f;
+        [SerializeField] private float _throwDuration = 0.18f;
 
         [Header("Airborne Thresholds")]
         [Tooltip("Downward vertical velocity required to transition from Jump/Apex into Fall.")]
@@ -94,6 +116,9 @@ namespace ThailandHorrorJam.Core
         private Vector3 _baseScale = Vector3.one;
         private float _currentTiltAngle;
         private Vector3 _recoilOffset = Vector3.zero;
+        private float _throwTimer;
+        private bool _isDead;
+        private bool _isSubscribedToCheckpointManager;
 
         public VisualState CurrentState => _currentState;
 
@@ -163,6 +188,7 @@ namespace ThailandHorrorJam.Core
             }
 
             _isFacingRight = _startFacingRight;
+            EnsureAimNeedleVisual();
         }
 
         private void OnEnable()
@@ -179,6 +205,8 @@ namespace ThailandHorrorJam.Core
                 _needleController.OnThreadSevered += HandleThreadSevered;
                 _needleController.OnPlayerTetherAttached += HandlePlayerTetherAttached;
             }
+
+            SubscribeToCheckpointManager();
         }
 
         private void OnDisable()
@@ -196,12 +224,17 @@ namespace ThailandHorrorJam.Core
                 _needleController.OnPlayerTetherAttached -= HandlePlayerTetherAttached;
             }
 
+            UnsubscribeFromCheckpointManager();
+
+            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
             if (_spriteRenderer != null) _spriteRenderer.DOKill();
             if (_visualHolder != null) _visualHolder.DOKill();
         }
 
         private void Start()
         {
+            SubscribeToCheckpointManager();
+
             if (_visualHolder != null)
             {
                 float dirX = _isFacingRight ? 1f : -1f;
@@ -209,6 +242,48 @@ namespace ThailandHorrorJam.Core
                 _visualHolder.localRotation = Quaternion.identity;
                 _visualHolder.localPosition = Vector3.zero;
             }
+            SetState(VisualState.Idle, forceRestart: true);
+        }
+
+        private void SubscribeToCheckpointManager()
+        {
+            if (_isSubscribedToCheckpointManager) return;
+            if (CheckpointManager.Instance != null)
+            {
+                CheckpointManager.Instance.OnPlayerDied += HandlePlayerDied;
+                CheckpointManager.Instance.OnPlayerRespawned += HandlePlayerRespawned;
+                _isSubscribedToCheckpointManager = true;
+            }
+        }
+
+        private void UnsubscribeFromCheckpointManager()
+        {
+            if (!_isSubscribedToCheckpointManager) return;
+            if (CheckpointManager.Instance != null)
+            {
+                CheckpointManager.Instance.OnPlayerDied -= HandlePlayerDied;
+                CheckpointManager.Instance.OnPlayerRespawned -= HandlePlayerRespawned;
+            }
+            _isSubscribedToCheckpointManager = false;
+        }
+
+        private void HandlePlayerDied()
+        {
+            _isDead = true;
+            _throwTimer = 0f;
+            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
+            if (_controller != null)
+            {
+                _controller.StopHorizontalMovement();
+            }
+            SetState(VisualState.Dead, forceRestart: true);
+        }
+
+        private void HandlePlayerRespawned()
+        {
+            _isDead = false;
+            _throwTimer = 0f;
+            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
             SetState(VisualState.Idle, forceRestart: true);
         }
 
@@ -222,12 +297,14 @@ namespace ThailandHorrorJam.Core
             UpdateProceduralTilt();
             UpdateProceduralRecoil();
             UpdateSquashAndStretch();
+            UpdateAimNeedleVisual();
         }
 
         #region Facing Direction
 
         private void UpdateFacingDirection()
         {
+            if (_isDead) return;
             if (_controller != null && _controller.IsInputLocked) return;
 
             // 1. If aiming needle, face towards aim cursor
@@ -260,6 +337,19 @@ namespace ThailandHorrorJam.Core
 
         private void UpdateVisualState()
         {
+            if (_isDead)
+            {
+                SetState(VisualState.Dead);
+                return;
+            }
+
+            if (_throwTimer > 0f)
+            {
+                _throwTimer -= Time.deltaTime;
+                SetState(VisualState.Throw);
+                return;
+            }
+
             if (!_controller.IsGrounded)
             {
                 // ท่า Jump จะคงอยู่เฉพาะเมื่อผู้เล่นกดกระโดดขึ้นมาจริงๆ (ถูกเริ่มจาก HandlePlayerJumped)
@@ -287,7 +377,13 @@ namespace ThailandHorrorJam.Core
             {
                 // เช็คจากความเร็วสัมพัทธ์กับพื้นผิว เพื่อป้องกันอาการเดินเองเวลาแพลตฟอร์มเคลื่อนที่ และป้องกันซอยเท้าเวลาชนกำแพง
                 bool isMoving = Mathf.Abs(_controller.RelativeVelocity.x) > 0.05f;
-                if (isMoving)
+                bool isPinning = _needleController != null && _needleController.IsPinning;
+
+                if (isPinning && _aimSprites != null && _aimSprites.Length > 0)
+                {
+                    SetState(VisualState.Aim);
+                }
+                else if (isMoving)
                 {
                     bool shouldUseHaulWalk = _controller.IsHauling && _haulWalkSprites != null && _haulWalkSprites.Length > 0;
                     SetState(shouldUseHaulWalk ? VisualState.HaulWalk : VisualState.Walk);
@@ -335,6 +431,12 @@ namespace ThailandHorrorJam.Core
                     return _fallLoopSprites != null && _fallLoopSprites.Length > 0
                         ? _fallLoopSprites
                         : (_fallSprites != null && _fallSprites.Length > 0 ? _fallSprites : _idleSprites);
+                case VisualState.Aim:
+                    return _aimSprites != null && _aimSprites.Length > 0 ? _aimSprites : _idleSprites;
+                case VisualState.Throw:
+                    return _throwSprites != null && _throwSprites.Length > 0 ? _throwSprites : _idleSprites;
+                case VisualState.Dead:
+                    return _deadSprites != null && _deadSprites.Length > 0 ? _deadSprites : _idleSprites;
                 default:
                     return _idleSprites;
             }
@@ -360,6 +462,13 @@ namespace ThailandHorrorJam.Core
                 int previousFrame = _currentFrame;
 
                 if (_currentState == VisualState.Jump)
+                {
+                    if (_currentFrame < _currentClip.Length - 1)
+                    {
+                        _currentFrame++;
+                    }
+                }
+                else if (_currentState == VisualState.Dead || _currentState == VisualState.Throw || _currentState == VisualState.Aim)
                 {
                     if (_currentFrame < _currentClip.Length - 1)
                     {
@@ -422,6 +531,12 @@ namespace ThailandHorrorJam.Core
                     return _fallFps;
                 case VisualState.FallLoop:
                     return _fallLoopFps;
+                case VisualState.Aim:
+                    return _aimFps;
+                case VisualState.Throw:
+                    return _throwFps;
+                case VisualState.Dead:
+                    return _deadFps;
                 default:
                     return 10f;
             }
@@ -434,6 +549,13 @@ namespace ThailandHorrorJam.Core
         private void UpdateProceduralTilt()
         {
             if (_visualHolder == null) return;
+
+            if (_isDead)
+            {
+                _currentTiltAngle = Mathf.MoveTowards(_currentTiltAngle, 0f, _tiltSpeed * Time.deltaTime);
+                _visualHolder.localRotation = Quaternion.Euler(0f, 0f, _currentTiltAngle);
+                return;
+            }
 
             float targetAngle = 0f;
             float facingSign = _isFacingRight ? 1f : -1f;
@@ -490,6 +612,18 @@ namespace ThailandHorrorJam.Core
 
         private void HandleNeedleLaunched(Vector2 aimDir)
         {
+            if (_isDead) return;
+
+            _throwTimer = _throwDuration;
+            SetState(VisualState.Throw, forceRestart: true);
+
+            if (_controller != null)
+            {
+                _controller.ApplyThrowSlowdown(0.15f, 0.25f);
+            }
+
+            SpawnThrowRipple(aimDir);
+
             if (!_enableThrowRecoil) return;
 
             if (aimDir.sqrMagnitude > 0.001f)
@@ -503,6 +637,137 @@ namespace ThailandHorrorJam.Core
             {
                 _scaleModifier = _throwRecoilSquash;
             }
+        }
+
+        private void SpawnThrowRipple(Vector2 aimDir)
+        {
+            if (_rippleEffectPrefab == null) return;
+
+            Vector3 spawnPos = transform.position;
+            float facingSign = _isFacingRight ? 1f : -1f;
+            Vector3 offset = new Vector3(_throwFxOffset.x * facingSign, _throwFxOffset.y, 0f);
+            spawnPos += offset;
+
+            float angle = Mathf.Atan2(aimDir.y, aimDir.x) * Mathf.Rad2Deg;
+            Quaternion rotation = Quaternion.Euler(0f, 0f, angle);
+
+            GameObject fxObj = Instantiate(_rippleEffectPrefab, spawnPos, rotation);
+            if (fxObj.TryGetComponent(out SpriteRenderer fxSr) && _spriteRenderer != null)
+            {
+                fxSr.sortingLayerID = _spriteRenderer.sortingLayerID;
+                fxSr.sortingOrder = _spriteRenderer.sortingOrder + 1;
+            }
+        }
+
+        private void EnsureAimNeedleVisual()
+        {
+            if (_aimNeedleObj == null)
+            {
+                Transform parentRoot = transform.parent != null ? transform.parent : transform;
+                Transform existing = parentRoot.Find("AimNeedle");
+                if (existing == null)
+                {
+                    existing = transform.Find("AimNeedle");
+                }
+
+                if (existing != null)
+                {
+                    _aimNeedleObj = existing.gameObject;
+                    _aimNeedleRenderer = _aimNeedleObj.GetComponent<SpriteRenderer>();
+                }
+            }
+
+            if (_aimNeedleObj != null)
+            {
+                _aimNeedleObj.SetActive(false);
+            }
+        }
+
+        private void UpdateAimNeedleVisual()
+        {
+            if (_aimNeedleObj == null) return;
+
+            bool shouldShow = !_isDead
+                              && _currentState == VisualState.Aim
+                              && _throwTimer <= 0f
+                              && _needleController != null
+                              && _needleController.IsPinning
+                              && !_needleController.IsNeedleInFlight;
+
+            if (_aimNeedleObj.activeSelf != shouldShow)
+            {
+                _aimNeedleObj.SetActive(shouldShow);
+            }
+
+            if (!shouldShow) return;
+
+            if (_aimNeedleRenderer != null && _spriteRenderer != null)
+            {
+                _aimNeedleRenderer.sortingLayerID = _spriteRenderer.sortingLayerID;
+                _aimNeedleRenderer.sortingOrder = _spriteRenderer.sortingOrder + 1;
+                if (_flipNeedleWhenAimingLeft)
+                {
+                    _aimNeedleRenderer.flipY = !_isFacingRight;
+                }
+            }
+
+            Vector3 handWorldPos = _visualHolder != null
+                ? _visualHolder.TransformPoint(_aimNeedleHandOffset)
+                : transform.position + _aimNeedleHandOffset;
+
+            _aimNeedleObj.transform.position = handWorldPos;
+
+            Vector3 aimWorldPos = _needleController.GetAimWorldPosition();
+            Vector2 aimDir = (Vector2)aimWorldPos - (Vector2)handWorldPos;
+
+            if (aimDir.sqrMagnitude > 0.0001f)
+            {
+                aimDir.Normalize();
+                float angle = Mathf.Atan2(aimDir.y, aimDir.x) * Mathf.Rad2Deg;
+                _aimNeedleObj.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            }
+        }
+
+        public bool TryGetNeedleTipPosition(out Vector2 tipPosition)
+        {
+            if (_aimNeedleObj != null && (_aimNeedleObj.activeSelf || (_needleController != null && _needleController.IsPinning && !_needleController.IsNeedleInFlight)))
+            {
+                Vector3 handWorldPos = _visualHolder != null
+                    ? _visualHolder.TransformPoint(_aimNeedleHandOffset)
+                    : transform.position + _aimNeedleHandOffset;
+
+                Vector3 aimWorldPos = _needleController != null ? _needleController.GetAimWorldPosition() : handWorldPos + Vector3.right;
+                Vector2 aimDir = (Vector2)aimWorldPos - (Vector2)handWorldPos;
+                if (aimDir.sqrMagnitude > 0.0001f)
+                {
+                    aimDir.Normalize();
+                }
+                else
+                {
+                    aimDir = _isFacingRight ? Vector2.right : Vector2.left;
+                }
+
+                // 25.3 pixels from pivot at 32 PPU = ~0.79m along needle axis
+                tipPosition = (Vector2)handWorldPos + aimDir * 0.79f;
+                return true;
+            }
+
+            tipPosition = Vector2.zero;
+            return false;
+        }
+
+        public bool TryGetNeedleHandPosition(out Vector2 handPosition)
+        {
+            if (_aimNeedleObj != null)
+            {
+                handPosition = _visualHolder != null
+                    ? _visualHolder.TransformPoint(_aimNeedleHandOffset)
+                    : transform.position + _aimNeedleHandOffset;
+                return true;
+            }
+
+            handPosition = transform.position;
+            return false;
         }
 
         private void UpdateProceduralRecoil()
