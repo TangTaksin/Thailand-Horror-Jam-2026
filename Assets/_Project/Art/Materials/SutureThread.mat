@@ -13,7 +13,8 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
-  - _USEPROCEDURALDASH_ON
+  - _ENABLEOUTLINE_ON
+  - _USEPIXELSTYLE_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -31,10 +32,14 @@ Material:
     m_Ints: []
     m_Floats:
     - _DashRatio: 0.65
+    - _EnableOutline: 1
+    - _OutlineThickness: 0.333
     - _ScrollSpeed: 2.5
     - _Tiling: 2.5
-    - _UseProceduralDash: 1
+    - _UsePixelStyle: 1
+    - _UseProceduralDash: 0
     m_Colors:
-    - _BaseColor: {r: 0.95, g: 0.95, b: 1, a: 0.95}
+    - _BaseColor: {r: 0.92, g: 0.15, b: 0.15, a: 0.95}
+    - _OutlineColor: {r: 0.08, g: 0.06, b: 0.08, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

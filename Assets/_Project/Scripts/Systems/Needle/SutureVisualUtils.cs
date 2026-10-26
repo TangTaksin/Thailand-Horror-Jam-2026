@@ -10,28 +10,36 @@ namespace ThailandHorrorJam.Systems.Needle
         public static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         public static readonly int ScrollSpeedId = Shader.PropertyToID("_ScrollSpeed");
         public static readonly int TilingId = Shader.PropertyToID("_Tiling");
+        public static readonly int EnableOutlineId = Shader.PropertyToID("_EnableOutline");
+        public static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
+        public static readonly int OutlineThicknessId = Shader.PropertyToID("_OutlineThickness");
+        public static readonly int UsePixelStyleId = Shader.PropertyToID("_UsePixelStyle");
 
         private const string k_SutureShaderName = "Universal Render Pipeline/2D/AnimatedSutureLine";
         private const string k_FallbackShaderName = "Sprites/Default";
 
         /// <summary>
-        /// Creates the standard 5-key width profile curve for suture thread lines (tapered waist, flared endpoints).
+        /// Creates a uniform flat width profile curve for crisp pixel-art line rendering.
         /// </summary>
         public static AnimationCurve CreateWidthProfile()
         {
             AnimationCurve curve = new AnimationCurve();
-            curve.AddKey(0.00f, 1.45f);
-            curve.AddKey(0.05f, 1.05f);
-            curve.AddKey(0.50f, 0.75f);
-            curve.AddKey(0.95f, 1.05f);
-            curve.AddKey(1.00f, 1.45f);
+            curve.AddKey(0f, 1f);
+            curve.AddKey(1f, 1f);
             return curve;
         }
 
         /// <summary>
         /// Creates a material using the specified override or finds the URP 2D suture shader (falling back to Sprites/Default).
         /// </summary>
-        public static Material CreateSutureMaterial(Material materialOverride, Color color, float scrollSpeed, float tiling = 2.5f)
+        public static Material CreateSutureMaterial(
+            Material materialOverride,
+            Color color,
+            float scrollSpeed,
+            float tiling = 2.5f,
+            bool enableOutline = true,
+            Color? outlineColor = null,
+            float outlineThickness = 0.333f)
         {
             Material mat = null;
             if (materialOverride != null)
@@ -53,6 +61,10 @@ namespace ThailandHorrorJam.Systems.Needle
                 mat.SetColor(BaseColorId, color);
                 mat.SetFloat(ScrollSpeedId, scrollSpeed);
                 mat.SetFloat(TilingId, tiling);
+                mat.SetFloat(EnableOutlineId, enableOutline ? 1f : 0f);
+                mat.SetColor(OutlineColorId, outlineColor ?? new Color(0.08f, 0.06f, 0.08f, 1f));
+                mat.SetFloat(OutlineThicknessId, outlineThickness);
+                mat.SetFloat(UsePixelStyleId, 1f);
             }
 
             return mat;
