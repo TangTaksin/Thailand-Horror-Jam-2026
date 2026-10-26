@@ -263,18 +263,20 @@ namespace ThailandHorrorJam.Core
         {
             if (!_controller.IsGrounded)
             {
-                float velY = _controller.Velocity.y;
-
-                // เข้าสู่ท่า Jump เมื่อพุ่งตัวขึ้น หรือค้างท่า Jump ไว้จนกว่าความเร็วตกจะเลยค่า _fallThreshold (Apex)
-                bool isRisingOrAtJumpApex = velY > 0.1f || (_currentState == VisualState.Jump && velY > _fallThreshold);
-
-                if (isRisingOrAtJumpApex)
+                // ท่า Jump จะคงอยู่เฉพาะเมื่อผู้เล่นกดกระโดดขึ้นมาจริงๆ (ถูกเริ่มจาก HandlePlayerJumped)
+                // และจะค้างท่า Jump ไว้จนกว่าความเร็วสัมพัทธ์ในแนวดิ่งจะตกลงมาถึงจุดยอด Apex (_fallThreshold)
+                if (_currentState == VisualState.Jump)
                 {
-                    SetState(VisualState.Jump);
+                    float relVelY = _controller.RelativeVelocity.y;
+                    if (relVelY <= _fallThreshold)
+                    {
+                        bool hasFallEntry = _fallSprites != null && _fallSprites.Length > 0;
+                        SetState(hasFallEntry ? VisualState.Fall : VisualState.FallLoop);
+                    }
                 }
                 else
                 {
-                    // กรณีเดินตกขอบพื้น (ไม่ได้มาจากท่า Jump) หรือร่วงผ่านจุด Apex มาแล้ว ให้เข้าสู่ท่า Fall ทันที
+                    // กรณีเดินตกขอบพื้น ร่วงจากแท่น หรือลอยตัวบนแท่นที่กำลังยกขึ้น ให้เข้าท่า Fall/FallLoop (ห้ามเข้าท่า Jump เด็ดขาด)
                     if (_currentState != VisualState.Fall && _currentState != VisualState.FallLoop)
                     {
                         bool hasFallEntry = _fallSprites != null && _fallSprites.Length > 0;

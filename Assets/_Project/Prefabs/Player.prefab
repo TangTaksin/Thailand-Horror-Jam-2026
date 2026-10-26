@@ -337,14 +337,14 @@ MonoBehaviour:
   _headRayDistance: 0.11
   _cornerRaySideOffset: 0.26
   _headNudgeStep: 0.06
-  _ledgeRayForwardDistance: -0.17
-  _ledgeStepUpDistance: -0.06
+  _ledgeRayForwardDistance: 0.25
+  _ledgeStepUpDistance: 0.35
   _enableGroundSnapping: 1
   _groundSnapDistance: 0.16
   _maxHaulAirborneDuration: 0.25
   _enableCrushDeath: 1
-  _crushDeathDelay: 0.1
-  _ceilingCheckDistance: -0.12
+  _crushDeathDelay: 0.08
+  _ceilingCheckDistance: 0.18
   _crushImpactVelocityThreshold: 2.5
 --- !u!114 &6038937062244345014
 MonoBehaviour:
