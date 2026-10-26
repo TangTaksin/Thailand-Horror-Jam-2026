@@ -739,7 +739,7 @@ namespace ThailandHorrorJam.Core
             {
                 // นับว่าอยู่บนพื้นเมื่อสัมผัส Collider พื้น และไม่ได้กำลังกระโดดพุ่งขึ้นหนีออกจากพื้นผิว
                 // ป้องกันกรณีแท่นกำลังเลื่อนลง (groundVelY < 0) หรือกำลังยกตัวขึ้น (groundVelY > 0) จนถูกปฏิเสธ Grounded
-                bool isAscendingAway = _jumpRequested || (_currentStitchable == null && relVertVelocity > 0.8f && _rb.linearVelocity.y > 0.8f);
+                bool isAscendingAway = _jumpRequested || (relVertVelocity > 0.8f && _rb.linearVelocity.y > 0.8f);
                 _isGrounded = detectedGround != null && !isAscendingAway;
             }
 
@@ -806,11 +806,26 @@ namespace ThailandHorrorJam.Core
         {
             if (groundCol == null || IsSelfCollider(groundCol) || groundCol.isTrigger) return false;
 
+            // ตรวจสอบการทับซ้อนในแนวนอน (Horizontal Overlap) ระหว่างตัวผู้เล่นกับวัตถุ
+            // หากตัวผู้เล่นอยู่นอกขอบซ้าย/ขวาของวัตถุ (เช่น เบียดกำแพงหรือผนังกล่องด้านข้าง) ต้องไม่นับเป็นพื้นผิวใต้เท้าเด็ดขาด
+            float playerHalfWidth = _col != null ? _col.bounds.extents.x : (colWidth * 0.5f);
+            float playerMinX = transform.position.x - playerHalfWidth;
+            float playerMaxX = transform.position.x + playerHalfWidth;
+            bool hasHorizontalOverlap = playerMaxX > (groundCol.bounds.min.x + 0.04f) && playerMinX < (groundCol.bounds.max.x - 0.04f);
+
+            if (!hasHorizontalOverlap)
+            {
+                return false;
+            }
+
             StitchableObject so = groundCol.GetComponentInParent<StitchableObject>();
             if (so != null)
             {
-                // สำหรับกล่อง/แท่นเคลื่อนที่ เท้าต้องอยู่ที่ระดับหลังกล่องขึ้นไป (รองรับการแลนดิ้งด้วยความเร็วสูง)
-                return playerFeetY >= groundCol.bounds.max.y - 0.35f;
+                // สำหรับกล่อง/แท่นเคลื่อนที่ เมื่อมี Horizontal Overlap และเท้าอยู่ที่ระดับหลังกล่องขึ้นไป (รองรับการแลนดิ้งด้วยความเร็วสูง)
+                if (playerFeetY >= groundCol.bounds.max.y - 0.35f)
+                {
+                    return true;
+                }
             }
 
             // สำหรับ BoxCollider2D ทั่วไป (เช่น กำแพง เสา บล็อก) ถ้าเท้าอยู่ต่ำกว่าขอบบนเกิน 0.25m แปลว่ากำลังเบียดกำแพงด้านข้างในอากาศ
@@ -837,7 +852,7 @@ namespace ThailandHorrorJam.Core
             RaycastHit2D hitRight = Physics2D.Raycast(rayOrigin + Vector2.right * sideOffset, Vector2.down, rayDistance, _groundLayer);
             if (IsValidGroundHit(hitRight, groundCol)) return true;
 
-            // หากเท้าอยู่เหนือขอบบนของ Collider อิสระ ยอมรับเป็นพื้นได้
+            // หากเท้าอยู่เหนือขอบบนของ Collider อิสระ และมี Horizontal Overlap
             if (playerFeetY >= groundCol.bounds.max.y - 0.25f)
             {
                 return true;
@@ -1130,22 +1145,24 @@ namespace ThailandHorrorJam.Core
             if (_rb.linearVelocity.y <= 0f) return;
 
             Vector2 center = (Vector2)transform.position + Vector2.up * _col.bounds.extents.y;
-            Vector2 leftOrigin = center + Vector2.left * _cornerRaySideOffset;
-            Vector2 rightOrigin = center + Vector2.right * _cornerRaySideOffset;
+            float safeSideOffset = _col != null ? Mathf.Min(_cornerRaySideOffset, _col.bounds.extents.x * 0.85f) : _cornerRaySideOffset;
+            Vector2 leftOrigin = center + Vector2.left * safeSideOffset;
+            Vector2 rightOrigin = center + Vector2.right * safeSideOffset;
 
             RaycastHit2D hitLeft = Physics2D.Raycast(leftOrigin, Vector2.up, _headRayDistance, _groundLayer);
             RaycastHit2D hitRight = Physics2D.Raycast(rightOrigin, Vector2.up, _headRayDistance, _groundLayer);
 
-            bool isRightSolid = hitRight.collider != null && !IsSelfCollider(hitRight.collider) && !hitRight.collider.isTrigger;
-            bool isLeftSolid = hitLeft.collider != null && !IsSelfCollider(hitLeft.collider) && !hitLeft.collider.isTrigger;
+            // เฉพาะกรณีที่ชนเพดานเหนือศีรษะ (Normal หันลงด้านล่าง normal.y < -0.3f) เท่านั้น ไม่เบี่ยงตำแหน่งเมื่อเบียดกำแพงแนวตั้ง
+            bool isRightSolidCeiling = hitRight.collider != null && !IsSelfCollider(hitRight.collider) && !hitRight.collider.isTrigger && hitRight.normal.y < -0.3f;
+            bool isLeftSolidCeiling = hitLeft.collider != null && !IsSelfCollider(hitLeft.collider) && !hitLeft.collider.isTrigger && hitLeft.normal.y < -0.3f;
 
-            // ขวาชน แต่ซ้ายโล่ง -> ดันหลบไปทางซ้าย
-            if (isRightSolid && !isLeftSolid)
+            // ขวาชนเพดาน แต่ซ้ายโล่ง -> ดันหลบไปทางซ้ายให้พ้นมุมเพดาน
+            if (isRightSolidCeiling && !isLeftSolidCeiling)
             {
                 _rb.position = new Vector2(_rb.position.x - _headNudgeStep, _rb.position.y);
             }
-            // ซ้ายชน แต่ขวาโล่ง -> ดันหลบไปทางขวา
-            else if (isLeftSolid && !isRightSolid)
+            // ซ้ายชนเพดาน แต่ขวาโล่ง -> ดันหลบไปทางขวาให้พ้นมุมเพดาน
+            else if (isLeftSolidCeiling && !isRightSolidCeiling)
             {
                 _rb.position = new Vector2(_rb.position.x + _headNudgeStep, _rb.position.y);
             }
@@ -1160,6 +1177,10 @@ namespace ThailandHorrorJam.Core
             // ทำงานเฉพาะเมื่อผู้เล่นกำลังลอยอยู่ และมีทิศทางการเคลื่อนที่หรือป้อน Input เข้าหากำแพง/กล่อง
             float moveDir = Mathf.Abs(_horizontalInput) > 0.05f ? Mathf.Sign(_horizontalInput) : Mathf.Sign(_rb.linearVelocity.x);
             if (Mathf.Abs(moveDir) < 0.05f && Mathf.Abs(_rb.linearVelocity.x) < 0.05f) return;
+
+            // ต้องไม่ทำงานขณะที่ผู้เล่นกำลังพุ่งขึ้นในแนวดิ่งด้วยแรงกระโดด เพื่อให้ผู้เล่นกระโดดข้ามกล่อง/สิ่งกีดขวางได้อย่างลื่นไหล
+            // (Ledge Step-up จะช่วยยกตัวเฉพาะเมื่ออยู่ที่จุดสูงสุด Apex หรือกำลังร่วงลงมาเฉียดขอบแท่นเท่านั้น)
+            if (_rb.linearVelocity.y > 1.0f) return;
 
             Vector2 forward = Vector2.right * moveDir;
             float extentsY = _col.bounds.extents.y;

@@ -298,5 +298,76 @@ namespace ThailandHorrorJam.Editor.Tests
 
             Object.DestroyImmediate(playerObj);
         }
+
+        [Test]
+        public void PlayerPressedAgainstStitchableCrate_WhenJumping_AscendsAndIsNotClampedOrGroundedOnWall()
+        {
+            // 1. Setup ground floor at Y = 0
+            GameObject floorObj = new GameObject("TestFloor");
+            floorObj.layer = LayerMask.NameToLayer("Ground");
+            var floorCol = floorObj.AddComponent<BoxCollider2D>();
+            floorCol.size = new Vector2(10f, 1f);
+            floorObj.transform.position = new Vector3(0f, -0.5f, 0f); // Top surface at Y = 0
+
+            // 2. Setup StitchableCrate next to player (X from 0.5 to 1.5, Y from 0 to 1)
+            GameObject crateObj = new GameObject("TestStitchableCrate");
+            crateObj.layer = LayerMask.NameToLayer("Stitchable");
+            var crateCol = crateObj.AddComponent<BoxCollider2D>();
+            crateCol.size = new Vector2(1f, 1f);
+            crateObj.transform.position = new Vector3(1f, 0.5f, 0f);
+            var crateRb = crateObj.AddComponent<Rigidbody2D>();
+            crateRb.bodyType = RigidbodyType2D.Dynamic;
+            var crateStitchable = crateObj.AddComponent<StitchableObject>();
+            typeof(StitchableObject).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(crateStitchable, null);
+
+            // 3. Setup Player pressing against crate at X = 0.28 (capsule width 0.42, right edge touches crate at X = 0.5)
+            GameObject playerObj = new GameObject("TestPlayer");
+            var playerRb = playerObj.AddComponent<Rigidbody2D>();
+            playerRb.bodyType = RigidbodyType2D.Dynamic;
+            playerRb.gravityScale = 0f; // Controlled manually by PlayerController2D
+
+            var playerCol = playerObj.AddComponent<CapsuleCollider2D>();
+            playerCol.size = new Vector2(0.42f, 0.84f);
+
+            var pc = playerObj.AddComponent<ThailandHorrorJam.Core.PlayerController2D>();
+            int mask = (1 << LayerMask.NameToLayer("Ground")) | (1 << LayerMask.NameToLayer("Stitchable"));
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetField("_groundLayer", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pc, (LayerMask)mask);
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+            playerObj.transform.position = new Vector3(0.28f, 0.42f, 0f);
+            Physics2D.SyncTransforms();
+
+            // Settle on ground initially
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+            Assert.IsTrue(pc.IsGrounded, "Player must initially be grounded on the floor.");
+
+            // 4. Player presses Jump and pushes Right into the crate
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetField("_jumpRequested", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pc, true);
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetField("_horizontalInput", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pc, 1f);
+
+            // Frame 0: Jump executed
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+            Assert.IsFalse(pc.IsGrounded, "Player must not be grounded immediately after jump execution.");
+            Assert.Greater(playerRb.linearVelocity.y, 10f, "Player must have full upward jump velocity.");
+
+            // Frames 1-5: Ascending along the crate wall
+            for (int i = 1; i <= 5; i++)
+            {
+                playerRb.position += playerRb.linearVelocity * 0.02f;
+                playerObj.transform.position = playerRb.position;
+                Physics2D.SyncTransforms();
+
+                typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+                Assert.IsFalse(pc.IsGrounded, $"Player must NOT be falsely grounded on crate side wall while ascending (frame {i}).");
+                Assert.Greater(playerRb.linearVelocity.y, 5f, $"Player upward velocity must NOT be clamped to 0 by crate wall (frame {i}, velY={playerRb.linearVelocity.y}).");
+            }
+
+            Assert.Greater(playerObj.transform.position.y, 0.8f, "Player must have ascended smoothly above the crate height.");
+
+            Object.DestroyImmediate(playerObj);
+            Object.DestroyImmediate(crateObj);
+            Object.DestroyImmediate(floorObj);
+        }
     }
 }

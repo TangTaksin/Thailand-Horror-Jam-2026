@@ -70,6 +70,12 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t2.SetUp(); t2.PlayerPushingAgainstVerticalWall_IsNotGrounded_AndFallsUnderGravity(); t2.TearDown(); },
                 "WaypointNav: Player Pressing Against Vertical Wall Never Floats (Falls Under Gravity)");
 
+            RunTest(() => { t2.SetUp(); t2.PlayerPressedAgainstStitchableCrate_WhenJumping_AscendsAndIsNotClampedOrGroundedOnWall(); t2.TearDown(); },
+                "WaypointNav: Player Pressed Against Stitchable Crate Jumps Freely Without Sticking To Wall");
+
+            RunTest(() => { t2.SetUp(); t2.PlayerStandingOnRisingLoopingBox_AtApexReversal_RemainsGroundedAndNeverEntersFallVisualState(); t2.TearDown(); },
+                "WaypointNav: Player Standing On Rising Box At Apex Reversal Remains Grounded In Idle");
+
             // 3. NeedleBudgetAndInteractionTests
             var t3 = new NeedleBudgetAndInteractionTests();
 
