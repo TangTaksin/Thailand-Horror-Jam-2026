@@ -42,6 +42,12 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private Collider2D _feetCollider;
         [SerializeField] private LayerMask _groundLayer;
 
+        [Header("Slope Settings")]
+        [Tooltip("มุมทางลาดสูงสุดที่ผู้เล่นสามารถเดินขึ้นได้ (องศา)")]
+        [SerializeField] private float _maxSlopeAngle = 55f;
+        [Tooltip("ระยะยิง Raycast ตรวจจับทางลาดใต้ฝ่าเท้า")]
+        [SerializeField] private float _slopeCheckDistance = 0.35f;
+
         [Header("Ledge & Corner Assistance (Limbo Style)")]
         [Tooltip("เปิดใช้งานระบบช่วยดูด/ดันตัวผู้เล่นขึ้นแพลตฟอร์มเมื่อกระโดดเฉียดมุม 90 องศา")]
         [SerializeField] private bool _enableCornerCorrection = true;
@@ -102,7 +108,15 @@ namespace ThailandHorrorJam.Core
         private float _aimLeashDistance;
         private float _crushTimer;
 
+        private bool _isOnSlope;
+        private Vector2 _slopeNormal = Vector2.up;
+        private float _slopeAngle;
+        private Vector2 _slopeParallel = Vector2.right;
+
         public bool IsGrounded => _isGrounded;
+        public bool IsOnSlope => _isOnSlope;
+        public float SlopeAngle => _slopeAngle;
+        public Vector2 SlopeNormal => _slopeNormal;
         public bool IsHauling => _isHauling;
         public bool IsAiming => _isAiming;
         public bool IsInputLocked => _isInputLocked;
@@ -451,6 +465,10 @@ namespace ThailandHorrorJam.Core
 
             _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, _jumpForce + extraBounce);
             _isGrounded = false;
+            _isOnSlope = false;
+            _slopeNormal = Vector2.up;
+            _slopeAngle = 0f;
+            _slopeParallel = Vector2.right;
             _currentStitchable = null;
             _currentGroundCollider = null;
             // ถ้าระหว่างติด Jump Buffer ผู้เล่นปล่อยปุ่มกระโดดไปแล้ว ให้ตัดความสูงกระโดดทันที (Short Hop)
@@ -498,10 +516,24 @@ namespace ThailandHorrorJam.Core
             }
 
             float accelRate = Mathf.Abs(targetRelSpeed) > 0.01f ? _acceleration : _deceleration;
-            float currentRelVelX = _rb.linearVelocity.x - platVel.x;
-            float newRelVelX = Mathf.MoveTowards(currentRelVelX, targetRelSpeed, accelRate * Time.fixedDeltaTime);
 
-            _rb.linearVelocity = new Vector2(platVel.x + newRelVelX, _rb.linearVelocity.y);
+            if (_isGrounded && _isOnSlope && !_jumpRequested)
+            {
+                // เคลื่อนที่ไปตามแนวความชันของทางลาด (Slope Parallel)
+                Vector2 currentRelVel = _rb.linearVelocity - platVel;
+                float currentSlopeSpeed = Vector2.Dot(currentRelVel, _slopeParallel);
+                float newSlopeSpeed = Mathf.MoveTowards(currentSlopeSpeed, targetRelSpeed, accelRate * Time.fixedDeltaTime);
+
+                Vector2 targetSlopeVel = _slopeParallel * newSlopeSpeed;
+                _rb.linearVelocity = platVel + targetSlopeVel;
+            }
+            else
+            {
+                float currentRelVelX = _rb.linearVelocity.x - platVel.x;
+                float newRelVelX = Mathf.MoveTowards(currentRelVelX, targetRelSpeed, accelRate * Time.fixedDeltaTime);
+
+                _rb.linearVelocity = new Vector2(platVel.x + newRelVelX, _rb.linearVelocity.y);
+            }
         }
 
         private void ApplyJumpPhysics()
@@ -552,17 +584,21 @@ namespace ThailandHorrorJam.Core
         {
             Vector2 checkPos;
             Vector2 effectiveCheckSize;
+            float feetBottomY;
+            float colWidth;
 
             if (_feetCollider != null)
             {
                 checkPos = _feetCollider.bounds.center;
                 effectiveCheckSize = _feetCollider.bounds.size;
+                feetBottomY = _feetCollider.bounds.min.y;
+                colWidth = _feetCollider.bounds.size.x;
             }
             else
             {
-                float feetY = _col != null ? _col.bounds.min.y : transform.position.y - 0.5f;
-                float colWidth = _col != null ? _col.bounds.size.x : 0.5f;
-                checkPos = new Vector2(transform.position.x, feetY);
+                colWidth = _col != null ? _col.bounds.size.x : 0.5f;
+                feetBottomY = _col != null ? _col.bounds.min.y : transform.position.y - 0.5f;
+                checkPos = new Vector2(transform.position.x, feetBottomY + 0.07f);
                 effectiveCheckSize = new Vector2(colWidth * 0.85f, 0.14f);
             }
 
@@ -593,25 +629,39 @@ namespace ThailandHorrorJam.Core
                 }
             }
 
-            // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (velocity Y <= 0 และเฟรมก่อนอยู่บนพื้น)
+            // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (และเฟรมก่อนอยู่บนพื้น)
             // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก และไม่ดูดติด Trigger colliders
-            if (_enableGroundSnapping && detectedGround == null && wasGrounded && _rb.linearVelocity.y <= 0.05f)
+            if (_enableGroundSnapping && detectedGround == null && wasGrounded && !_jumpRequested && _rb.linearVelocity.y <= 0.2f)
             {
-                int snapCount = Physics2D.Raycast(checkPos, Vector2.down, _groundFilter, _snapHitBuffer, _groundSnapDistance);
+                Vector2 rayStart = new Vector2(checkPos.x, feetBottomY + 0.05f);
+                float snapDist = _groundSnapDistance + 0.05f;
+                int snapCount = Physics2D.Raycast(rayStart, Vector2.down, _groundFilter, _snapHitBuffer, snapDist);
                 for (int s = 0; s < snapCount; s++)
                 {
                     RaycastHit2D snapHit = _snapHitBuffer[s];
                     if (snapHit.collider != null && !IsSelfCollider(snapHit.collider) && !snapHit.collider.isTrigger)
                     {
-                        float snapDeltaY = snapHit.point.y - checkPos.y;
-                        if (snapDeltaY < 0f && Mathf.Abs(snapDeltaY) <= _groundSnapDistance)
+                        float snapGap = snapHit.point.y - feetBottomY;
+                        if (snapGap <= 0.001f && Mathf.Abs(snapGap) <= _groundSnapDistance)
                         {
-                            _rb.position = new Vector2(_rb.position.x, _rb.position.y + snapDeltaY);
+                            _rb.position = new Vector2(_rb.position.x, _rb.position.y + snapGap);
                             detectedGround = snapHit.collider;
                             break;
                         }
                     }
                 }
+            }
+
+            if (detectedGround != null)
+            {
+                UpdateSlopeState(checkPos, feetBottomY, colWidth);
+            }
+            else
+            {
+                _isOnSlope = false;
+                _slopeNormal = Vector2.up;
+                _slopeAngle = 0f;
+                _slopeParallel = Vector2.right;
             }
 
             UpdateCachedGround(detectedGround);
@@ -629,15 +679,44 @@ namespace ThailandHorrorJam.Core
 
             float relVertVelocity = _rb.linearVelocity.y - groundVelY;
 
-            // นับว่าอยู่บนพื้นเมื่อสัมผัส Collider พื้น และความเร็วสัมพัทธ์ไม่ได้พุ่งตัวขึ้นจากการกระโดด
-            _isGrounded = detectedGround != null && relVertVelocity <= 0.35f;
+            if (_isOnSlope && detectedGround != null)
+            {
+                // บนทางลาด การเดินขึ้นจะเกิดความเร็วแนวดิ่งตามความชันตามธรรมชาติ
+                // จึงยอมรับความเร็วแนวดิ่งที่สอดคล้องกับการไต่ทางลาดได้ โดยไม่หลุดสถานะ Grounded
+                float maxAllowedUpwardVel = Mathf.Abs(_moveSpeed * Mathf.Sin(_slopeAngle * Mathf.Deg2Rad)) + 0.75f;
+                _isGrounded = !_jumpRequested && relVertVelocity <= maxAllowedUpwardVel;
+            }
+            else
+            {
+                // นับว่าอยู่บนพื้นเมื่อสัมผัส Collider พื้น และความเร็วสัมพัทธ์ไม่ได้พุ่งตัวขึ้นจากการกระโดด
+                _isGrounded = detectedGround != null && relVertVelocity <= 0.35f;
+            }
+
+            if (!_isGrounded)
+            {
+                _isOnSlope = false;
+                _slopeNormal = Vector2.up;
+                _slopeAngle = 0f;
+                _slopeParallel = Vector2.right;
+            }
 
             if (_isGrounded && !_jumpRequested)
             {
-                // เมื่อยืนอยู่บนพื้นหรือแท่นเคลื่อนที่ ล็อคความเร็วแนวดิ่งให้ซิงค์ตรงกับแท่น เพื่อไม่ให้ลื่นไหลลงทางลาด
-                if (_rb.linearVelocity.y < groundVelY)
+                if (_isOnSlope)
                 {
-                    _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, groundVelY);
+                    // หากยืนอยู่นิ่งๆ บนทางลาด ล็อคความเร็วให้หยุดนิ่งสนิทเพื่อไม่ให้ลื่นไหลลงทางลาด
+                    if (Mathf.Abs(_horizontalInput) < 0.01f)
+                    {
+                        _rb.linearVelocity = new Vector2(PlatformVelocity.x, groundVelY);
+                    }
+                }
+                else
+                {
+                    // เมื่อยืนอยู่บนพื้นราบหรือแท่นเคลื่อนที่ ล็อคความเร็วแนวดิ่งให้ซิงค์ตรงกับแท่น เพื่อไม่ให้ลื่นไถล
+                    if (_rb.linearVelocity.y < groundVelY)
+                    {
+                        _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, groundVelY);
+                    }
                 }
             }
 
@@ -666,6 +745,56 @@ namespace ThailandHorrorJam.Core
             {
                 _currentStitchable.ReleasePlayerTether();
             }
+        }
+
+        private void UpdateSlopeState(Vector2 feetCenter, float feetBottomY, float colWidth)
+        {
+            float rayDistance = 0.1f + _slopeCheckDistance;
+            Vector2 rayOrigin = new Vector2(feetCenter.x, feetBottomY + 0.1f);
+
+            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidSlopeHit(hit))
+            {
+                SetSlopeFromHit(hit);
+                return;
+            }
+
+            // Probe ด้านซ้ายและขวาของฝ่าเท้าเผื่อกรณีเดินอยู่ตรงรอยต่อของทางลาด
+            float sideOffset = colWidth * 0.35f;
+            RaycastHit2D hitLeft = Physics2D.Raycast(rayOrigin + Vector2.left * sideOffset, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidSlopeHit(hitLeft))
+            {
+                SetSlopeFromHit(hitLeft);
+                return;
+            }
+
+            RaycastHit2D hitRight = Physics2D.Raycast(rayOrigin + Vector2.right * sideOffset, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidSlopeHit(hitRight))
+            {
+                SetSlopeFromHit(hitRight);
+                return;
+            }
+
+            _isOnSlope = false;
+            _slopeNormal = Vector2.up;
+            _slopeAngle = 0f;
+            _slopeParallel = Vector2.right;
+        }
+
+        private bool IsValidSlopeHit(RaycastHit2D hit)
+        {
+            if (hit.collider == null || IsSelfCollider(hit.collider) || hit.collider.isTrigger) return false;
+            float angle = Vector2.Angle(hit.normal, Vector2.up);
+            return angle > 0.01f && angle <= _maxSlopeAngle;
+        }
+
+        private void SetSlopeFromHit(RaycastHit2D hit)
+        {
+            _isOnSlope = true;
+            _slopeNormal = hit.normal;
+            _slopeAngle = Vector2.Angle(hit.normal, Vector2.up);
+            Vector2 parallel = new Vector2(hit.normal.y, -hit.normal.x);
+            _slopeParallel = parallel.x < 0f ? -parallel : parallel;
         }
 
         private void HandleLandingImpact()
@@ -1040,6 +1169,15 @@ namespace ThailandHorrorJam.Core
                     ? new Vector2(col.bounds.center.x, col.bounds.max.y - 0.04f)
                     : (Vector2)transform.position + Vector2.up * 0.9f;
                 Gizmos.DrawWireCube(headTop + Vector2.up * (_ceilingCheckDistance * 0.5f), new Vector2(colWidth * 0.75f, _ceilingCheckDistance));
+            }
+
+            // 6. Slope Normal & Direction (เหลือง = Normal, ฟ้า/เขียว = Slope Tangent)
+            if (_isOnSlope)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawRay(checkPos, _slopeNormal * 0.6f);
+                Gizmos.color = new Color(0f, 1f, 0.8f, 0.9f);
+                Gizmos.DrawRay(checkPos - _slopeParallel * 0.4f, _slopeParallel * 0.8f);
             }
         }
     }

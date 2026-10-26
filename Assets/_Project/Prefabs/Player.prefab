@@ -211,7 +211,7 @@ CapsuleCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 653f24cf6312e2643bbca28d5c1d4921, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -331,6 +331,8 @@ MonoBehaviour:
   _groundLayer:
     serializedVersion: 2
     m_Bits: 192
+  _maxSlopeAngle: 55
+  _slopeCheckDistance: 0.35
   _enableCornerCorrection: 1
   _headRayDistance: 0.11
   _cornerRaySideOffset: 0.26
@@ -451,7 +453,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 653f24cf6312e2643bbca28d5c1d4921, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
