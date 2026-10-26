@@ -83,6 +83,16 @@ Shader "Universal Render Pipeline/2D/AnimatedSutureLine"
             {
                 float alpha = input.color.a;
 
+                // Procedural dashed cut (e.g. for aim trajectory guide line)
+                if (_UseProceduralDash > 0.5)
+                {
+                    float dashPattern = frac(input.uv.x);
+                    if (dashPattern > _DashRatio)
+                    {
+                        discard;
+                    }
+                }
+
                 // 1. Pixel Style with Optional Outline (Default for Retro Pixel Art)
                 if (_UsePixelStyle > 0.5)
                 {
@@ -98,23 +108,8 @@ Shader "Universal Render Pipeline/2D/AnimatedSutureLine"
                 }
 
                 // 2. Legacy / Alternative Soft Procedural Dash
-                if (_UseProceduralDash > 0.5)
-                {
-                    // Procedural moving suture dashes (ForeignGods style)
-                    float dashPattern = frac(input.uv.x);
-                    float dashMask = smoothstep(_DashRatio + 0.05, _DashRatio - 0.05, dashPattern);
-
-                    // Soft round edge along thread thickness (Y axis 0..1)
-                    float yDist = abs(input.uv.y - 0.5) * 2.0;
-                    float edgeSoftness = 1.0 - (yDist * yDist);
-
-                    alpha *= (dashMask * edgeSoftness);
-                }
-                else
-                {
-                    float4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
-                    alpha *= tex.a;
-                }
+                float4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                alpha *= tex.a;
 
                 return float4(input.color.rgb, alpha);
             }

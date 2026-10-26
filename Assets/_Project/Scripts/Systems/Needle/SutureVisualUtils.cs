@@ -14,6 +14,8 @@ namespace ThailandHorrorJam.Systems.Needle
         public static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
         public static readonly int OutlineThicknessId = Shader.PropertyToID("_OutlineThickness");
         public static readonly int UsePixelStyleId = Shader.PropertyToID("_UsePixelStyle");
+        public static readonly int UseProceduralDashId = Shader.PropertyToID("_UseProceduralDash");
+        public static readonly int DashRatioId = Shader.PropertyToID("_DashRatio");
 
         private const string k_SutureShaderName = "Universal Render Pipeline/2D/AnimatedSutureLine";
         private const string k_FallbackShaderName = "Sprites/Default";
@@ -39,7 +41,9 @@ namespace ThailandHorrorJam.Systems.Needle
             float tiling = 2.5f,
             bool enableOutline = true,
             Color? outlineColor = null,
-            float outlineThickness = 0.333f)
+            float outlineThickness = 0.333f,
+            bool useProceduralDash = false,
+            float dashRatio = 0.5f)
         {
             Material mat = null;
             if (materialOverride != null)
@@ -65,6 +69,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 mat.SetColor(OutlineColorId, outlineColor ?? new Color(0.08f, 0.06f, 0.08f, 1f));
                 mat.SetFloat(OutlineThicknessId, outlineThickness);
                 mat.SetFloat(UsePixelStyleId, 1f);
+                mat.SetFloat(UseProceduralDashId, useProceduralDash ? 1f : 0f);
+                mat.SetFloat(DashRatioId, dashRatio);
             }
 
             return mat;

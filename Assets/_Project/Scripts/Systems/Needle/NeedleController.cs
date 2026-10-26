@@ -77,8 +77,13 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("mainCamera")]
         [SerializeField] private Camera _mainCamera;
 
+        [Header("Aim Reticle (Eyelet & Pin)")]
         [FormerlySerializedAs("reticleTransform")]
         [SerializeField] private Transform _reticleTransform;
+        [SerializeField] private SpriteRenderer _reticleRingSprite;
+        [SerializeField] private SpriteRenderer _reticleDotSprite;
+        [SerializeField] private float _reticlePulseSpeed = 7.5f;
+        [SerializeField] private float _reticlePulseScale = 0.12f;
 
         [Header("Slice to Cut (Cut the Rope Style)")]
         [Tooltip("Minimum distance cursor must move before evaluating slice segment intersection.")]
@@ -96,6 +101,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private Rigidbody2D _playerRb;
         private Collider2D _playerCol;
         private PlayerController2D _playerController;
+        private PlayerVisuals _playerVisuals;
 
         private IStitchable _activeTarget;
         private IStitchable _currentlyLoopingTarget;
@@ -123,6 +129,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private Vector2 _lastSliceWorldPos;
 
         public bool IsPinning => _isPinning;
+        public bool IsNeedleInFlight => _isNeedleInFlight;
         public bool IsTetheredToPlayer => _tetheredStitchable != null;
         public IStitchable TetheredStitchable => _tetheredStitchable;
         public float MaxAimLeashDistance => _maxAimLeashDistance > 0f ? _maxAimLeashDistance : (_maxInteractionDistance > 0f ? _maxInteractionDistance : 3.5f);
@@ -141,11 +148,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 _mainCamera = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
             }
 
-            if (_reticleTransform != null)
-            {
-                _reticleSprite = _reticleTransform.GetComponent<SpriteRenderer>();
-                _reticleBaseScale = _reticleTransform.localScale;
-            }
+            EnsureReticle();
+            SetReticleActive(false);
 
             if (_stitchableLayer.value == 0)
             {
@@ -214,7 +218,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             _previewLine.useWorldSpace = true;
             _previewLine.widthCurve = SutureVisualUtils.CreateWidthProfile();
-            _previewLine.widthMultiplier = 0.09375f;
+            _previewLine.widthMultiplier = 0.05f;
 
             _previewLine.startColor = s_ValidColor;
             _previewLine.endColor = s_ValidColor;
@@ -222,7 +226,17 @@ namespace ThailandHorrorJam.Systems.Needle
             _previewLine.sortingOrder = 15;
             _previewLine.textureMode = LineTextureMode.Tile;
 
-            _previewMaterial = SutureVisualUtils.CreateSutureMaterial(_lineMaterial, s_ValidColor, 3.2f);
+            _previewMaterial = SutureVisualUtils.CreateSutureMaterial(
+                _lineMaterial,
+                s_ValidColor,
+                scrollSpeed: 2.0f,
+                tiling: 4.0f,
+                enableOutline: true,
+                outlineColor: new Color(0f, 0f, 0f, 0.65f),
+                outlineThickness: 0.25f,
+                useProceduralDash: true,
+                dashRatio: 0.55f
+            );
             if (_previewMaterial != null)
             {
                 _previewLine.material = _previewMaterial;
@@ -274,10 +288,19 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 Vector2 objPos = _pinnedWaypoints.Count > 0 ? _pinnedWaypoints[0] : _activeTarget.CurrentPosition;
                 EnsurePlayerComponents();
+
+                Vector2 playerHandPos;
+                if (!TryGetNeedleHandPosition(out playerHandPos))
+                {
+                    playerHandPos = _playerTransform != null ? (Vector2)_playerTransform.position + new Vector2(0f, 0.35f) : objPos;
+                }
+
                 if (_playerController != null)
                 {
                     _playerController.UpdateAimLeash(objPos, MaxAimLeashDistance);
                 }
+
+                _activeTarget.UpdateAimLeash(playerHandPos, MaxAimLeashDistance);
             }
         }
 
@@ -384,21 +407,20 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void SetReticleColor(Color color)
         {
-            if (_reticleSprite == null) return;
-            _reticleSprite.color = _deniedFlashTimer > 0f ? s_InvalidColor : color;
+            Color finalColor = _deniedFlashTimer > 0f ? s_InvalidColor : color;
+            if (_reticleSprite != null) _reticleSprite.color = finalColor;
+            if (_reticleRingSprite != null) _reticleRingSprite.color = finalColor;
+            if (_reticleDotSprite != null) _reticleDotSprite.color = finalColor;
         }
 
         private void UpdateReticle(Vector3 worldAimPos)
         {
-            if (_reticleTransform != null)
-            {
-                _reticleTransform.position = worldAimPos;
-            }
-
-            if (!_isPinning && _reticleSprite != null)
+            if (!_isPinning)
             {
                 if (_tetheredStitchable != null)
                 {
+                    SetReticleActive(true);
+                    if (_reticleTransform != null) _reticleTransform.position = worldAimPos;
                     if (TryGetValidAnchorPoint(worldAimPos, _tetheredStitchable, out Vector2 anchorPos, out NeedleAnchorPoint anchor))
                     {
                         float dist = Vector2.Distance(_tetheredStitchable.CurrentPosition, anchorPos);
@@ -413,24 +435,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
                 else
                 {
-                    IStitchable hovered = FindStitchableAt(worldAimPos);
-                    if (hovered != null)
-                    {
-                        if (hovered.CurrentState == StitchState.Looping)
-                        {
-                            SetReticleColor(s_ValidColor);
-                        }
-                        else
-                        {
-                            bool isStandingOnHovered = _playerController != null && _playerController.IsStandingOn(hovered.ObjectTransform);
-                            bool isValid = IsPlayerNearObject(hovered) && !isStandingOnHovered;
-                            SetReticleColor(isValid ? s_PlayerTetherColor : s_InvalidColor);
-                        }
-                    }
-                    else
-                    {
-                        SetReticleColor(s_ValidColor);
-                    }
+                    SetReticleActive(false);
                 }
             }
         }
@@ -572,7 +577,13 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_needleProjectile == null || _activeTarget == null) return;
 
             Vector2 launchOrigin = _pinnedWaypoints[0];
-            Vector2 aimVector = (Vector2)worldAimPos - launchOrigin;
+            Vector2 startPos = launchOrigin;
+            if (TryGetNeedleTipPosition(out Vector2 tipPos))
+            {
+                startPos = tipPos;
+            }
+
+            Vector2 aimVector = (Vector2)worldAimPos - startPos;
             Vector2 aimDir = aimVector.sqrMagnitude > 0.001f ? aimVector.normalized : Vector2.right;
 
             _isNeedleInFlight = true;
@@ -586,24 +597,24 @@ namespace ThailandHorrorJam.Systems.Needle
                 _pinnedWaypoints[1] = launchOrigin;
             }
 
-            Vector2 startPos = GetCastOrigin(launchOrigin, _activeTarget.ObjectTransform, aimDir);
-            float startOffset = Vector2.Distance(launchOrigin, startPos);
-            float maxFlightDist = Mathf.Max(0.2f, _maxThreadLength - startOffset);
+            float maxFlightDist = Mathf.Max(0.2f, _maxThreadLength);
 
             _needleProjectile.Launch(
                 origin: startPos,
                 direction: aimDir,
                 speed: _projectileSpeed,
                 maxDistance: maxFlightDist,
-                returnTransform: _activeTarget.ObjectTransform != null ? _activeTarget.ObjectTransform : _playerTransform,
+                returnTransform: _playerTransform,
                 targetToIgnore: _activeTarget.ObjectTransform,
                 collisionFilter: _anchorFilter,
                 onHit: OnNeedleHitSurface,
                 onRewindComplete: OnNeedleRewindComplete,
-                playerTransform: _playerTransform
+                playerTransform: _playerTransform,
+                returnOffset: new Vector3(0f, 0.35f, 0f)
             );
 
             _activeTarget.UpdateInFlightNeedle(startPos);
+            SetReticleActive(false);
 
             CameraController2D.Instance?.Punch(aimDir, 0.03f);
             OnNeedleLaunched?.Invoke(aimDir);
@@ -1068,6 +1079,36 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (_playerController == null) _playerController = GetComponentInParent<PlayerController2D>();
                 if (_playerController == null) _playerController = GetComponentInChildren<PlayerController2D>();
             }
+            if (_playerVisuals == null)
+            {
+                _playerVisuals = GetComponent<PlayerVisuals>();
+                if (_playerVisuals == null) _playerVisuals = GetComponentInChildren<PlayerVisuals>();
+                if (_playerVisuals == null && _playerTransform != null) _playerVisuals = _playerTransform.GetComponentInChildren<PlayerVisuals>();
+            }
+        }
+
+        private bool TryGetNeedleTipPosition(out Vector2 tipPos)
+        {
+            EnsurePlayerComponents();
+            if (_playerVisuals != null && _playerVisuals.TryGetNeedleTipPosition(out tipPos))
+            {
+                return true;
+            }
+
+            tipPos = Vector2.zero;
+            return false;
+        }
+
+        private bool TryGetNeedleHandPosition(out Vector2 handPos)
+        {
+            EnsurePlayerComponents();
+            if (_playerVisuals != null && _playerVisuals.TryGetNeedleHandPosition(out handPos))
+            {
+                return true;
+            }
+
+            handPos = _playerTransform != null ? (Vector2)_playerTransform.position + new Vector2(0f, 0.35f) : Vector2.zero;
+            return false;
         }
 
         private bool IsAimingAtPlayer(Vector3 worldAimPos)
@@ -1129,6 +1170,13 @@ namespace ThailandHorrorJam.Systems.Needle
                 _playerController.SetAiming(true, _activeTarget.CurrentPosition, MaxAimLeashDistance);
             }
 
+            Vector2 playerHandPos;
+            if (!TryGetNeedleHandPosition(out playerHandPos))
+            {
+                playerHandPos = _playerTransform != null ? (Vector2)_playerTransform.position + new Vector2(0f, 0.35f) : _activeTarget.CurrentPosition;
+            }
+            _activeTarget.UpdateAimLeash(playerHandPos, MaxAimLeashDistance);
+
             Log($"[Needle] Aiming needle from {target.ObjectTransform.name}. Aim leash: {MaxAimLeashDistance:F1}m. Click a wall/surface to pin (Max points: {_maxWaypoints}).");
         }
 
@@ -1154,6 +1202,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void ResetPinningState()
         {
+            if (_activeTarget != null && _currentlyLoopingTarget != _activeTarget && _tetheredStitchable != _activeTarget)
+            {
+                _activeTarget.CutThread();
+            }
+
             _isPinning = false;
             _activeTarget = null;
             _pinnedWaypoints.Clear();
@@ -1174,6 +1227,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _previewLine.positionCount = 0;
             }
             SetReticleColor(s_ValidColor);
+            SetReticleActive(false);
             UpdateAnchorPointsFeedback(false, Vector2.zero, null);
         }
 
@@ -1263,6 +1317,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     _previewLine.positionCount = 0;
                 }
                 UpdateAnchorPointsFeedback(false, Vector2.zero, null);
+                SetReticleActive(false);
                 return;
             }
 
@@ -1271,17 +1326,23 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _previewLine.positionCount = 0;
                 UpdateAnchorPointsFeedback(false, Vector2.zero, null);
+                SetReticleActive(false);
                 return;
             }
 
             Vector2 launchOrigin = _pinnedWaypoints[0];
-            Vector2 aimVector = (Vector2)worldAimPos - launchOrigin;
+            Vector2 aimLineStart = launchOrigin;
+            if (TryGetNeedleTipPosition(out Vector2 tipPos))
+            {
+                aimLineStart = tipPos;
+            }
+
+            Vector2 aimVector = (Vector2)worldAimPos - aimLineStart;
             float aimDist = aimVector.magnitude;
             Vector2 aimDir = aimDist > 0.001f ? aimVector / aimDist : Vector2.right;
 
-            Vector2 rayOrigin = GetCastOrigin(launchOrigin, _activeTarget?.ObjectTransform, aimDir);
-            float startOffset = Vector2.Distance(launchOrigin, rayOrigin);
-            float maxCastDist = Mathf.Max(0.1f, _maxThreadLength - startOffset);
+            Vector2 rayOrigin = aimLineStart;
+            float maxCastDist = Mathf.Max(0.1f, _maxThreadLength);
 
             bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, maxCastDist, out RaycastHit2D hit, out NeedleAnchorPoint hitAnchor);
             Vector2 endPoint;
@@ -1303,14 +1364,100 @@ namespace ThailandHorrorJam.Systems.Needle
             }
             else
             {
-                endPoint = launchOrigin + aimDir * Mathf.Min(aimDist, _maxThreadLength);
+                endPoint = aimLineStart + aimDir * Mathf.Min(aimDist, _maxThreadLength);
             }
 
             UpdateAnchorPointsFeedback(true, launchOrigin, canPlace ? hitAnchor : null);
 
             Color activeColor = canPlace ? s_ValidColor : s_InvalidColor;
             SetReticleColor(activeColor);
-            DrawAimTrajectory(launchOrigin, endPoint, activeColor);
+            DrawAimTrajectory(aimLineStart, endPoint, activeColor);
+            UpdateAimReticleVisual(endPoint, canPlace, activeColor);
+        }
+
+        private void EnsureReticle()
+        {
+            if (_reticleTransform == null)
+            {
+                Transform found = transform.Find("AimReticle");
+                if (found == null && _playerTransform != null)
+                {
+                    found = _playerTransform.Find("AimReticle");
+                }
+
+                if (found != null)
+                {
+                    _reticleTransform = found;
+                }
+            }
+
+            if (_reticleTransform != null)
+            {
+                if (_reticleSprite == null) _reticleSprite = _reticleTransform.GetComponent<SpriteRenderer>();
+                if (_reticleRingSprite == null) _reticleRingSprite = _reticleTransform.Find("EyeletRing")?.GetComponent<SpriteRenderer>();
+                if (_reticleDotSprite == null) _reticleDotSprite = _reticleTransform.Find("PinDot")?.GetComponent<SpriteRenderer>();
+                _reticleBaseScale = _reticleTransform.localScale;
+            }
+        }
+
+        private void SetReticleActive(bool active)
+        {
+            if (_reticleTransform != null && _reticleTransform.gameObject.activeSelf != active)
+            {
+                _reticleTransform.gameObject.SetActive(active);
+            }
+        }
+
+        private void UpdateAimReticleVisual(Vector2 position, bool canPlace, Color activeColor)
+        {
+            EnsureReticle();
+            if (_reticleTransform == null) return;
+
+            SetReticleActive(true);
+            _reticleTransform.position = new Vector3(position.x, position.y, 0f);
+
+            if (_deniedFlashTimer > 0f)
+            {
+                activeColor = s_InvalidColor;
+                canPlace = false;
+            }
+
+            Color ringColor = canPlace ? activeColor : new Color(activeColor.r, activeColor.g, activeColor.b, 0.35f);
+            Color dotColor = canPlace ? activeColor : new Color(activeColor.r, activeColor.g, activeColor.b, 0.7f);
+
+            if (_reticleSprite != null)
+            {
+                _reticleSprite.color = activeColor;
+            }
+            if (_reticleRingSprite != null)
+            {
+                _reticleRingSprite.color = ringColor;
+            }
+            if (_reticleDotSprite != null)
+            {
+                _reticleDotSprite.color = dotColor;
+            }
+
+            if (_reticleRingSprite != null)
+            {
+                Transform ringTransform = _reticleRingSprite.transform;
+                if (canPlace)
+                {
+                    float pulse = 1f + Mathf.Sin(Time.time * _reticlePulseSpeed) * _reticlePulseScale;
+                    ringTransform.localScale = Vector3.one * pulse;
+                    ringTransform.localRotation = Quaternion.Euler(0f, 0f, Time.time * 45f);
+                }
+                else
+                {
+                    ringTransform.localScale = Vector3.one * 0.75f;
+                    ringTransform.localRotation = Quaternion.identity;
+                }
+            }
+            else if (_reticleTransform != null && canPlace)
+            {
+                float pulse = 1f + Mathf.Sin(Time.time * _reticlePulseSpeed) * _reticlePulseScale;
+                _reticleTransform.localScale = _reticleBaseScale * pulse;
+            }
         }
 
         private void UpdateAnchorPointsFeedback(bool isAiming, Vector2 launchOrigin, NeedleAnchorPoint hoveredAnchor)
@@ -1342,8 +1489,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_previewMaterial != null)
             {
                 _previewMaterial.SetColor(SutureVisualUtils.BaseColorId, color);
-                float lineLen = Vector2.Distance(start, end);
-                _previewMaterial.SetFloat(SutureVisualUtils.TilingId, Mathf.Max(1f, lineLen * 2.5f));
+                _previewMaterial.SetFloat(SutureVisualUtils.TilingId, 4.0f);
             }
         }
 
@@ -1368,6 +1514,14 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _reticleSprite.color = s_InvalidColor;
             }
+            if (_reticleRingSprite != null)
+            {
+                _reticleRingSprite.color = s_InvalidColor;
+            }
+            if (_reticleDotSprite != null)
+            {
+                _reticleDotSprite.color = s_InvalidColor;
+            }
         }
 
         private void OnDisable()
@@ -1382,6 +1536,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (_reticleTransform != null) _reticleTransform.DOKill();
             if (_reticleSprite != null) _reticleSprite.DOKill();
+            if (_reticleRingSprite != null) _reticleRingSprite.transform.DOKill();
             if (_previewMaterial != null)
             {
                 Destroy(_previewMaterial);
