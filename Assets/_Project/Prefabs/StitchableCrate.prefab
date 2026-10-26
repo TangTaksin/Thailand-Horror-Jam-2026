@@ -184,7 +184,7 @@ MonoBehaviour:
   _travelSpeed: 2
   _sutureThread: {fileID: 373652911262524282, guid: 7f7a91f1bf44e484fb2df67ebadd5747, type: 3}
   _minTetherDistance: 0.8
-  _maxTetherDistance: 1.5
+  _maxTetherDistance: 2.2
   _tetheredMassMultiplier: 0.1
   _freezePositionXWhenIdle: 1
   _tetherSlackTolerance: 0.05
