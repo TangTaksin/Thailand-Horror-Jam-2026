@@ -20,10 +20,37 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private LineRenderer _lineRenderer;
 
         [FormerlySerializedAs("threadColor")]
-        [SerializeField] private Color _threadColor = new Color(0.95f, 0.95f, 1f, 0.95f);
+        [SerializeField] private Color _threadColor = new Color(0.92f, 0.15f, 0.15f, 0.95f);
 
         [FormerlySerializedAs("threadWidth")]
-        [SerializeField] private float _threadWidth = 0.045f;
+        [Tooltip("ความกว้างของเส้นด้าย (3 พิกเซลที่ 32 PPU = 3f / 32f = 0.09375f)")]
+        [SerializeField] private float _threadWidth = 0.09375f;
+
+        [Header("Pixel Style & Outline Options")]
+        [Tooltip("เปิดใช้งานขอบดำบน-ล่าง สไตล์ Pixel Art ตามภาพอ้างอิง (ปิดเพื่อใช้สีแดงล้วนไม่มีขอบ)")]
+        [SerializeField] private bool _enableOutline = true;
+
+        [Tooltip("สีของขอบเส้นด้าย")]
+        [SerializeField] private Color _outlineColor = new Color(0.08f, 0.06f, 0.08f, 1f);
+
+        [Tooltip("สัดส่วนความหนาของขอบบนและล่าง (0.333 = 1 ใน 3 สำหรับเส้น 3 พิกเซล)")]
+        [Range(0.05f, 0.45f)]
+        [SerializeField] private float _outlineThickness = 0.333f;
+
+        [Header("Tension & Snap Visuals")]
+        [Tooltip("สีด้ายที่จะค่อยๆ เปลี่ยนไปเมื่อถูกยืดใกล้ขาด (แดงเลือดหมูเข้ม)")]
+        [SerializeField] private Color _strainedThreadColor = new Color(0.48f, 0.04f, 0.06f, 0.95f);
+
+        [Tooltip("ระดับความตึง (0..1) ที่เริ่มไล่เฉดสีอย่างนุ่มนวล")]
+        [Range(0.05f, 0.8f)]
+        [SerializeField] private float _tensionColorThreshold = 0.15f;
+
+        [Tooltip("ระดับความตึง (0..1) ที่เริ่มเกิดการสั่นสะบัดแบบกายภาพ (Quiver)")]
+        [Range(0.1f, 0.9f)]
+        [SerializeField] private float _quiverStrainThreshold = 0.35f;
+
+        [Tooltip("ระยะสั่นสะบัดสูงสุดของด้ายตอนตึงวิกฤต")]
+        [SerializeField] private float _maxVibrationAmplitude = 0.035f;
 
         [Tooltip("Optional custom sprite for anchor pin dots. If null, a default 2D dot is used.")]
         [SerializeField] private Sprite _pinSprite;
@@ -112,6 +139,46 @@ namespace ThailandHorrorJam.Systems.Needle
         private readonly List<Vector3> _renderBuffer = new List<Vector3>(128);
         private Vector3[] _linePositionsArray = new Vector3[128];
         private float _totalPathLength;
+        private float _currentStrain;
+
+        public void SetTensionStrain(float strain)
+        {
+            _currentStrain = Mathf.Clamp01(strain);
+        }
+
+        public void SetOutlineEnabled(bool enabled)
+        {
+            _enableOutline = enabled;
+            if (_threadMaterial != null)
+            {
+                _threadMaterial.SetFloat(SutureVisualUtils.EnableOutlineId, enabled ? 1f : 0f);
+            }
+        }
+
+        public void SetOutlineColor(Color color)
+        {
+            _outlineColor = color;
+            if (_threadMaterial != null)
+            {
+                _threadMaterial.SetColor(SutureVisualUtils.OutlineColorId, color);
+            }
+        }
+
+        private void ApplyThreadColor(Color color)
+        {
+            if (_lineRenderer != null)
+            {
+                _lineRenderer.startColor = color;
+                _lineRenderer.endColor = color;
+            }
+            if (_threadMaterial != null)
+            {
+                _threadMaterial.SetColor(SutureVisualUtils.BaseColorId, color);
+                _threadMaterial.SetFloat(SutureVisualUtils.EnableOutlineId, _enableOutline ? 1f : 0f);
+                _threadMaterial.SetColor(SutureVisualUtils.OutlineColorId, _outlineColor);
+                _threadMaterial.SetFloat(SutureVisualUtils.OutlineThicknessId, _outlineThickness);
+            }
+        }
         private bool _isSplineDirty;
         private bool _isTautMode;
         private bool _isInFlightMode;
@@ -152,12 +219,18 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void EnsureCollisionFilter()
         {
-            if (_collisionFilter.useLayerMask) return;
+            if (_collisionFilter.useLayerMask && _collisionMask.value != 0) return;
 
             if (_collisionMask.value == 0)
             {
                 int groundLayer = LayerMask.NameToLayer("Ground");
-                _collisionMask = groundLayer != -1 ? (1 << groundLayer) : LayerMask.GetMask("Ground", "Default");
+                int defaultLayer = LayerMask.NameToLayer("Default");
+                int stitchLayer = LayerMask.NameToLayer("Stitchable");
+                int mask = 0;
+                if (groundLayer != -1) mask |= (1 << groundLayer);
+                if (defaultLayer != -1) mask |= (1 << defaultLayer);
+                if (stitchLayer != -1) mask |= (1 << stitchLayer);
+                _collisionMask = mask != 0 ? mask : LayerMask.GetMask("Ground", "Default", "Stitchable");
             }
 
             _collisionFilter = new ContactFilter2D();
@@ -179,7 +252,14 @@ namespace ThailandHorrorJam.Systems.Needle
             _lineRenderer.startColor = _threadColor;
             _lineRenderer.endColor = _threadColor;
 
-            _threadMaterial = SutureVisualUtils.CreateSutureMaterial(_materialOverride, _threadColor, _scrollSpeed, _tilingFrequency);
+            _threadMaterial = SutureVisualUtils.CreateSutureMaterial(
+                _materialOverride,
+                _threadColor,
+                _scrollSpeed,
+                _tilingFrequency,
+                _enableOutline,
+                _outlineColor,
+                _outlineThickness);
             if (_threadMaterial != null)
             {
                 _lineRenderer.material = _threadMaterial;
@@ -293,6 +373,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
+            if (_enableGroundCollision)
+            {
+                SolveCollisions();
+            }
+
             RebuildSplineData();
             ApplySplineToLineRenderer();
             _isSplineDirty = true;
@@ -374,6 +459,11 @@ namespace ThailandHorrorJam.Systems.Needle
                     link.RestLength = linkRest;
                     _links[i] = link;
                 }
+            }
+
+            if (_enableGroundCollision)
+            {
+                SolveCollisions();
             }
 
             UpdatePinMarkersInFlight(origin);
@@ -470,6 +560,11 @@ namespace ThailandHorrorJam.Systems.Needle
                     link.RestLength = perLinkRest;
                     _links[i] = link;
                 }
+            }
+
+            if (_enableGroundCollision)
+            {
+                SolveCollisions();
             }
 
             RebuildSplineData();
@@ -630,10 +725,22 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
 
-                if (_enableGroundCollision && !_isTautMode)
+                for (int w = 0; w < _pinnedWaypointIndices.Count; w++)
                 {
-                    SolveCollisions();
+                    int nodeIdx = _pinnedWaypointIndices[w];
+                    Vector2 targetPos = _cachedWaypoints[w];
+                    VerletNode pinnedNode = _nodes[nodeIdx];
+                    pinnedNode.Position = targetPos;
+                    pinnedNode.OldPosition = targetPos;
+                    _nodes[nodeIdx] = pinnedNode;
                 }
+            }
+
+            // รัน SolveCollisions() เพียงครั้งเดียวหลังจบลูปการดึงข้อต่อทั้งหมด (Post-Constraint Pass)
+            // เพื่อไม่ให้การดึงระยะสายสลับกับการดันออกจากพื้นไปมาในแต่ละรอบจนเกิดแรงสั่น/กระตุกเด้ง
+            if (_enableGroundCollision)
+            {
+                SolveCollisions();
 
                 for (int w = 0; w < _pinnedWaypointIndices.Count; w++)
                 {
@@ -647,153 +754,91 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
+        private bool ShouldIgnoreCollider(Collider2D hit)
+        {
+            if (hit == null || hit.isTrigger) return true;
+
+            // กรอง collider ของวัตถุเจ้าของด้ายออก ไม่ให้ด้ายติดตัวเอง
+            if (_cachedOwner != null && _cachedOwner.ObjectTransform != null &&
+                hit.transform.IsChildOf(_cachedOwner.ObjectTransform))
+            {
+                return true;
+            }
+
+            // กรอง collider ของผู้เล่นออก เพื่อไม่ให้ด้ายติดขัดในตัวผู้เล่น
+            if (PlayerController2D.IsPlayer(hit))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         private void SolveCollisions()
         {
             EnsureCollisionFilter();
 
             int nodeCount = _nodes.Count;
+            float checkRadius = _surfaceOffset * 1.5f;
+
             for (int i = 0; i < nodeCount; i++)
             {
                 VerletNode node = _nodes[i];
                 if (node.IsPinned) continue;
 
-                int hitCount = Physics2D.OverlapPoint(node.Position, _collisionFilter, _pointHitBuffer);
+                // ตรวจจับการชนด้วยรัศมีสัมผัส (OverlapCircle) เพื่อป้องกันการตกทะลุแล้วดีดกลับไปมา (Anti-Bouncing)
+                int hitCount = Physics2D.OverlapCircle(node.Position, checkRadius, _collisionFilter, _pointHitBuffer);
                 if (hitCount > 0)
                 {
                     Collider2D hit = _pointHitBuffer[0];
-                    if (hit == null) continue;
+                    if (ShouldIgnoreCollider(hit)) continue;
 
-                    // กรอง collider ของวัตถุเจ้าของด้ายออก ไม่ให้ด้ายติดตัวเอง
-                    if (_cachedOwner != null && _cachedOwner.ObjectTransform != null &&
-                        hit.transform.IsChildOf(_cachedOwner.ObjectTransform))
+                    Vector2 closestPoint = hit.ClosestPoint(node.Position);
+                    Vector2 diff = node.Position - closestPoint;
+                    float dist = diff.magnitude;
+                    bool isInside = hit.OverlapPoint(node.Position);
+
+                    Vector2 normal;
+                    if (isInside || dist < 0.0001f)
+                    {
+                        if (diff.sqrMagnitude > 0.0001f)
+                        {
+                            normal = diff.normalized;
+                        }
+                        else
+                        {
+                            Vector2 fromCenter = node.Position - (Vector2)hit.bounds.center;
+                            normal = fromCenter.sqrMagnitude > 0.0001f ? fromCenter.normalized : Vector2.up;
+                        }
+                        node.Position = closestPoint + normal * _surfaceOffset;
+                    }
+                    else if (dist < _surfaceOffset)
+                    {
+                        normal = diff / dist;
+                        node.Position = closestPoint + normal * _surfaceOffset;
+                    }
+                    else
                     {
                         continue;
                     }
 
-                    // กรอง collider ของผู้เล่นออก เพื่อไม่ให้ด้ายติดขัดในตัวผู้เล่น
-                    if (PlayerController2D.IsPlayer(hit))
+                    // ตัดแรงเด้งในแนวตั้งฉากกับพื้นผิวทิ้งทั้งหมด (Zero Normal Bounce / Inelastic Contact)
+                    // เมื่อด้ายกระทบพื้น จะไม่สะสมพลังงานจลน์ดีดกระดอนขึ้นสู่อากาศ
+                    Vector2 vel = node.Position - node.OldPosition;
+                    float normalVel = Vector2.Dot(vel, normal);
+                    Vector2 tangentVel = vel - normal * normalVel;
+
+                    // ใส่แรงเสียดทานเฉพาะความเร็วในแนวขนานพื้นผิว (Tangential Friction) ให้ด้ายนอนนิ่งไม่ลื่นไถล
+                    tangentVel *= Mathf.Clamp01(1f - _groundFriction);
+                    if (tangentVel.sqrMagnitude < 0.000025f)
                     {
-                        continue;
+                        tangentVel = Vector2.zero;
                     }
 
-                    if (ResolvePenetration(hit, node.Position, node.OldPosition, out Vector2 surfacePoint, out Vector2 normal))
-                    {
-                        node.Position = surfacePoint + normal * _surfaceOffset;
-
-                        // ลบความเร็วในแนวพุ่งเข้าหาพื้นผิว (Inward velocity) ป้องกันการเด้งทะลุ
-                        Vector2 vel = node.Position - node.OldPosition;
-                        float inwardVel = Vector2.Dot(vel, -normal);
-                        if (inwardVel > 0f)
-                        {
-                            vel += normal * inwardVel;
-                        }
-
-                        // ใส่แรงเสียดทาน (Friction) เมื่อสัมผัสพื้นผิว เพื่อให้ด้ายกองนิ่ง ไม่ลื่นไถล
-                        vel *= (1f - _groundFriction);
-                        node.OldPosition = node.Position - vel;
-
-                        _nodes[i] = node;
-                    }
+                    node.OldPosition = node.Position - tangentVel;
+                    _nodes[i] = node;
                 }
             }
-        }
-
-        private bool ResolvePenetration(Collider2D hit, Vector2 pos, Vector2 oldPos, out Vector2 surfacePoint, out Vector2 normal)
-        {
-            surfacePoint = pos;
-            normal = Vector2.zero;
-
-            // 1. ถ้า oldPos อยู่นอก collider: ใช้ Linecast จาก oldPos มา pos จะได้จุดกระทบและ normal ที่แม่นยำที่สุด
-            if (!hit.OverlapPoint(oldPos))
-            {
-                RaycastHit2D lineHit = Physics2D.Linecast(oldPos, pos, _collisionMask);
-                if (lineHit.collider == hit)
-                {
-                    surfacePoint = lineHit.point;
-                    normal = lineHit.normal;
-                    return true;
-                }
-
-                Vector2 cp = hit.ClosestPoint(oldPos);
-                Vector2 diff = oldPos - cp;
-                if (diff.sqrMagnitude > 0.0001f)
-                {
-                    surfacePoint = cp;
-                    normal = diff.normalized;
-                    return true;
-                }
-            }
-
-            // 2. ถ้า oldPos อยู่ใน collider ด้วย (เช่น โหนดถูกลากทะลุเข้ามา หรือเริ่มต้นอยู่ใน collider)
-            // ให้ยิง ray ย้อนกลับเข้ามาจาก 4 ทิศทาง (บน, ล่าง, ซ้าย, ขวา) เพื่อหาขอบผิวที่ใกล้ที่สุด (ทางออกที่สั้นที่สุด)
-            // ทำให้กรณีเป็นเพดาน จะได้ทางออกด้านล่าง (normal ชี้ลง) เสมอ ไม่ดีดขึ้นหลังคา
-            float searchDist = Mathf.Max(3.0f, hit.bounds.extents.magnitude * 1.5f);
-            float bestDist = float.MaxValue;
-            Vector2 bestPoint = pos;
-            Vector2 bestNormal = Vector2.zero;
-            bool foundExit = false;
-
-            for (int d = 0; d < s_CardinalDirections.Length; d++)
-            {
-                Vector2 rayDir = s_CardinalDirections[d];
-                Vector2 origin = pos - rayDir * searchDist;
-
-                if (!hit.OverlapPoint(origin))
-                {
-                    RaycastHit2D rayHit = Physics2D.Raycast(origin, rayDir, searchDist + 0.1f, _collisionMask);
-                    if (rayHit.collider == hit)
-                    {
-                        float dist = Vector2.Distance(pos, rayHit.point);
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist;
-                            bestPoint = rayHit.point;
-                            bestNormal = rayHit.normal;
-                            foundExit = true;
-                        }
-                    }
-                }
-            }
-
-            if (foundExit)
-            {
-                surfacePoint = bestPoint;
-                normal = bestNormal;
-                return true;
-            }
-
-            // 3. Fallback: ดึงออกจากทิศทางของ Waypoint เริ่มต้น (ตำแหน่งกล่อง/ผู้เล่น) ซึ่งอยู่นอก collider
-            if (_cachedWaypoints.Count > 0)
-            {
-                for (int w = 0; w < _cachedWaypoints.Count; w++)
-                {
-                    Vector2 anchor = _cachedWaypoints[w];
-                    if (!hit.OverlapPoint(anchor))
-                    {
-                        RaycastHit2D anchorRay = Physics2D.Linecast(anchor, pos, _collisionMask);
-                        if (anchorRay.collider == hit)
-                        {
-                            surfacePoint = anchorRay.point;
-                            normal = anchorRay.normal;
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            // 4. Fallback สุดท้าย: ดันกลับไปหา oldPos หรือทิศทางลงล่าง (ถ้าเป็นเพดาน) ห้ามดันขึ้น Vector2.up เด็ดขาด
-            Vector2 fallbackDiff = oldPos - pos;
-            if (fallbackDiff.sqrMagnitude > 0.0001f)
-            {
-                normal = fallbackDiff.normalized;
-            }
-            else
-            {
-                normal = Vector2.down;
-            }
-
-            surfacePoint = pos;
-            return true;
         }
 
         private void RebuildSplineData()
@@ -849,9 +894,39 @@ namespace ThailandHorrorJam.Systems.Needle
                 _linePositionsArray = new Vector3[Mathf.NextPowerOfTwo(Mathf.Max(128, count))];
             }
 
+            // คำนวณสีและการสั่นเตือนเมื่อด้ายตึงตามแรงดึง (Smooth Transition ปราศจากการกะพริบ)
+            Color currentColor = _threadColor;
+            bool isStrained = _currentStrain > _tensionColorThreshold;
+
+            if (isStrained)
+            {
+                // ค่อยๆ ไล่เฉดสีอย่างนุ่มนวลจากสีปกติสู่สีแดงเลือดหมูเข้มตามอัตราความตึง (Smoothstep Lerp)
+                float t = Mathf.Clamp01((_currentStrain - _tensionColorThreshold) / (1f - _tensionColorThreshold));
+                float smoothT = Mathf.SmoothStep(0f, 1f, t);
+                currentColor = Color.Lerp(_threadColor, _strainedThreadColor, smoothT);
+            }
+
+            ApplyThreadColor(currentColor);
+
+            // ทิศทางตั้งฉากสำหรับใส่แรงสั่นสะบัด
+            Vector2 normal = Vector2.up;
+            if (count >= 2)
+            {
+                Vector2 dir = ((Vector2)_renderBuffer[count - 1] - (Vector2)_renderBuffer[0]).normalized;
+                normal = new Vector2(-dir.y, dir.x);
+            }
+
             for (int i = 0; i < count; i++)
             {
-                _linePositionsArray[i] = _renderBuffer[i];
+                Vector3 pos = _renderBuffer[i];
+                // ใส่แรงสั่นระรัวเฉพาะจุดตรงกลาง เมื่อด้ายเริ่มตึงวิกฤต (> _quiverStrainThreshold)
+                if (_currentStrain >= _quiverStrainThreshold && i > 0 && i < count - 1)
+                {
+                    float vibeT = Mathf.Clamp01((_currentStrain - _quiverStrainThreshold) / (1f - _quiverStrainThreshold));
+                    float vibe = Mathf.Sin(Time.time * 48f + i * 2.5f) * (_maxVibrationAmplitude * vibeT);
+                    pos += (Vector3)(normal * vibe);
+                }
+                _linePositionsArray[i] = pos;
             }
 
             _lineRenderer.positionCount = count;
@@ -996,6 +1071,8 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             _isInFlightMode = false;
             _isTautMode = false;
+            _currentStrain = 0f;
+            ApplyThreadColor(_threadColor);
             _cachedWaypoints.Clear();
             _pinnedWaypointIndices.Clear();
             _nodes.Clear();

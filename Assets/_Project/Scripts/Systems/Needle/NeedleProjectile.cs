@@ -140,11 +140,17 @@ namespace ThailandHorrorJam.Systems.Needle
         private void StepFlight(float dt)
         {
             float stepDistance = _velocity.magnitude * dt;
+            if (stepDistance <= 0.0001f) return;
+
             Vector2 currentPos = transform.position;
             Vector2 stepDir = _velocity.normalized;
 
+            // Clamp step distance to remaining distance so we never overshoot _maxDistance
+            float remainingDistance = Mathf.Max(0f, _maxDistance - _traveledDistance);
+            float actualStep = Mathf.Min(stepDistance, remainingDistance);
+
             // Swept circle cast to ensure thin colliders are never tunneled through
-            int hitCount = Physics2D.CircleCast(currentPos, _sweepRadius, stepDir, _collisionFilter, _hitBuffer, stepDistance);
+            int hitCount = Physics2D.CircleCast(currentPos, _sweepRadius, stepDir, _collisionFilter, _hitBuffer, actualStep);
 
             for (int i = 0; i < hitCount; i++)
             {
@@ -183,12 +189,12 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            // No obstacle hit in this step — move forward
-            Vector2 newPos = currentPos + _velocity * dt;
+            // No obstacle hit in this step — move forward clamped to actualStep
+            Vector2 newPos = currentPos + stepDir * actualStep;
             transform.position = newPos;
-            _traveledDistance += stepDistance;
+            _traveledDistance += actualStep;
 
-            if (_traveledDistance >= _maxDistance)
+            if (_traveledDistance >= _maxDistance - 0.0001f)
             {
                 // Reached max allowed thread distance without hitting — auto-rewind!
                 StartRewind();

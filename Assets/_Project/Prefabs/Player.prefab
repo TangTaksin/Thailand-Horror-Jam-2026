@@ -78,8 +78,8 @@ SpriteRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: -634628035
+  m_SortingLayer: 1
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 6417973203142015010, guid: 218d553e46976434c89fdccaccfd0619, type: 3}
@@ -378,6 +378,11 @@ MonoBehaviour:
   _lineMaterial: {fileID: 2100000, guid: b1d8f39a04a64ef88e7e17cb581f1b21, type: 2}
   _mainCamera: {fileID: 0}
   _reticleTransform: {fileID: 0}
+  _minSliceDistance: 0.04
+  _sliceTrailDuration: 0.18
+  _sliceTouchRadius: 0.2
+  _sliceTrailStartColor: {r: 1, g: 1, b: 1, a: 0.95}
+  _sliceTrailEndColor: {r: 0.9, g: 0.2, b: 0.2, a: 0}
 --- !u!1 &7277624855026356071
 GameObject:
   m_ObjectHideFlags: 0

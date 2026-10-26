@@ -215,7 +215,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             _previewLine.useWorldSpace = true;
             _previewLine.widthCurve = SutureVisualUtils.CreateWidthProfile();
-            _previewLine.widthMultiplier = 0.045f;
+            _previewLine.widthMultiplier = 0.09375f;
 
             _previewLine.startColor = s_ValidColor;
             _previewLine.endColor = s_ValidColor;
@@ -286,7 +286,19 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (_isPinning && _isNeedleInFlight && _activeTarget != null && _needleProjectile != null)
             {
+                Vector2 launchOrigin = _pinnedWaypoints.Count > 0 ? _pinnedWaypoints[0] : _activeTarget.CurrentPosition;
                 Vector2 needlePos = _needleProjectile.CurrentPosition;
+
+                Vector2 toNeedle = needlePos - launchOrigin;
+                float currentDist = toNeedle.magnitude;
+
+                // Enforce strict thread length limit: clamp position and rewind if needle drifted beyond max length
+                if (currentDist > _maxThreadLength)
+                {
+                    needlePos = launchOrigin + (toNeedle / currentDist) * _maxThreadLength;
+                    _needleProjectile.StartRewind();
+                }
+
                 if (_pinnedWaypoints.Count >= 2)
                 {
                     _pinnedWaypoints[1] = needlePos;
@@ -327,7 +339,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private bool IsWithinThreadBudget(float distance)
         {
-            return distance >= _minWaypointDistance && distance <= _maxThreadLength;
+            return distance >= _minWaypointDistance && distance <= (_maxThreadLength + 0.05f);
         }
 
         private static Vector2 GetCastOrigin(Vector2 fallbackOrigin, Transform targetTransform, Vector2 dir)
@@ -575,8 +587,9 @@ namespace ThailandHorrorJam.Systems.Needle
                 _pinnedWaypoints[1] = launchOrigin;
             }
 
-            float maxFlightDist = _maxThreadLength + 1.5f;
             Vector2 startPos = GetCastOrigin(launchOrigin, _activeTarget.ObjectTransform, aimDir);
+            float startOffset = Vector2.Distance(launchOrigin, startPos);
+            float maxFlightDist = Mathf.Max(0.2f, _maxThreadLength - startOffset);
 
             _needleProjectile.Launch(
                 origin: startPos,
@@ -627,6 +640,15 @@ namespace ThailandHorrorJam.Systems.Needle
             if (!IsWithinThreadBudget(segDist))
             {
                 LogWarning($"[Needle] Hit point is out of thread budget ({segDist:F1}m > {_maxThreadLength:F1}m). Rewinding!");
+                _needleProjectile.StartRewind();
+                NotifyActionDenied();
+                return;
+            }
+
+            // Check Line of Sight between Waypoint 0 (Box) and Hit Point (Anchor) to prevent stitching rails through solid geometry
+            if (!HasLineOfSight(boxPos, anchorPos, _activeTarget?.ObjectTransform, hasValidAnchorComp ? anchor : null))
+            {
+                LogWarning($"[Needle] Cannot complete rail: Wall or obstacle is blocking the path between {_activeTarget.ObjectTransform.name} and anchor at {anchorPos}. Rewinding!");
                 _needleProjectile.StartRewind();
                 NotifyActionDenied();
                 return;
@@ -1269,8 +1291,10 @@ namespace ThailandHorrorJam.Systems.Needle
             Vector2 aimDir = aimDist > 0.001f ? aimVector / aimDist : Vector2.right;
 
             Vector2 rayOrigin = GetCastOrigin(launchOrigin, _activeTarget?.ObjectTransform, aimDir);
+            float startOffset = Vector2.Distance(launchOrigin, rayOrigin);
+            float maxCastDist = Mathf.Max(0.1f, _maxThreadLength - startOffset);
 
-            bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, _maxThreadLength, out RaycastHit2D hit, out NeedleAnchorPoint hitAnchor);
+            bool hasValidHit = TryCastNeedleTrajectory(rayOrigin, aimDir, maxCastDist, out RaycastHit2D hit, out NeedleAnchorPoint hitAnchor);
             Vector2 endPoint;
             bool canPlace = false;
 
@@ -1284,7 +1308,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     endPoint = ResolveAnchorPosition(hit.point, hit.normal, hitAnchor);
                     float totalDist = Vector2.Distance(launchOrigin, endPoint);
-                    canPlace = IsWithinThreadBudget(totalDist);
+                    bool hasLOS = HasLineOfSight(launchOrigin, endPoint, _activeTarget?.ObjectTransform, hitAnchor);
+                    canPlace = IsWithinThreadBudget(totalDist) && hasLOS;
                 }
             }
             else

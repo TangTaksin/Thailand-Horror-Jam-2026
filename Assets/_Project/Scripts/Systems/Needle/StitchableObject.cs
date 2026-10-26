@@ -105,16 +105,38 @@ namespace ThailandHorrorJam.Systems.Needle
                 _tetherJoint.enabled = false;
             }
 
+            EnsureSutureThreadInstance();
+        }
+
+        private void EnsureSutureThreadInstance()
+        {
+            // 1. กรณีที่ _sutureThread ชี้ไปยัง Prefab Asset ใน Project Window (ไม่ใช่ Object ใน Scene)
+            if (_sutureThread != null && !_sutureThread.gameObject.scene.IsValid())
+            {
+                SutureThread sceneChild = GetComponentInChildren<SutureThread>(true);
+                if (sceneChild != null && sceneChild.gameObject.scene.IsValid())
+                {
+                    _sutureThread = sceneChild;
+                }
+                else
+                {
+                    SutureThread prefabAsset = _sutureThread;
+                    _sutureThread = Instantiate(prefabAsset, transform);
+                    _sutureThread.name = "SutureThread";
+                    _sutureThread.transform.localPosition = Vector3.zero;
+                }
+                return;
+            }
+
+            // 2. ถ้ายังเป็น null ให้ค้นหา Child ในตัวเอง
             if (_sutureThread == null)
             {
-                _sutureThread = GetComponentInChildren<SutureThread>();
-                if (_sutureThread == null)
-                {
-                    GameObject threadObj = new GameObject("SutureThread");
-                    threadObj.transform.SetParent(transform);
-                    threadObj.transform.localPosition = Vector3.zero;
-                    _sutureThread = threadObj.AddComponent<SutureThread>();
-                }
+                _sutureThread = GetComponentInChildren<SutureThread>(true);
+            }
+
+            if (_sutureThread == null)
+            {
+                Debug.LogWarning($"[StitchableObject] Missing SutureThread reference on '{name}'! Please assign SutureThread.prefab in the Inspector.", this);
             }
         }
 
@@ -199,11 +221,33 @@ namespace ThailandHorrorJam.Systems.Needle
             float currentDist = Vector2.Distance(anchorWorld, connectedWorld);
             bool isTaut = currentDist >= (joint.distance - _tetherSlackTolerance);
 
-            // เช็กว่าผู้ดึงกำลังเคลื่อนที่ "ออกห่าง" จากกล่อง (ดึง) ไม่ใช่เดินพุ่งเข้าหากล่อง (ดัน)
+            // เช็กว่าผู้ดึงกำลังเคลื่อนที่ "ออกห่าง" จากกล่อง (ดึง)
             float dirToPullerX = pullerRb.position.x - _rb.position.x;
             bool isMovingAway = (dirToPullerX * pullerRb.linearVelocity.x) > 0.01f;
+            bool isPulling = isTaut && isMovingAway;
 
-            bool shouldUnlock = isTaut && isMovingAway;
+            // เช็กว่าผู้เล่นกำลังเคลื่อนที่ "เข้าหากล่อง" เพื่อผลัก (ดัน)
+            bool isMovingTowards = (dirToPullerX * pullerRb.linearVelocity.x) < -0.01f;
+            bool isPushing = false;
+
+            if (isMovingTowards)
+            {
+                // ตรวจสอบว่าอยู่ชิดกล่องในระยะที่สามารถผลักได้
+                Collider2D pullerCol = pullerRb.GetComponent<Collider2D>();
+                if (pullerCol != null && _col != null)
+                {
+                    ColliderDistance2D colDist = _col.Distance(pullerCol);
+                    isPushing = colDist.isOverlapped || colDist.distance <= 0.2f;
+                }
+                else
+                {
+                    float centerDistX = Mathf.Abs(dirToPullerX);
+                    isPushing = centerDistX <= 1.25f;
+                }
+            }
+
+            // ปลดล็อคแกน X เมื่อ: กำลังดึง (สายตึงและเดินออกห่าง) หรือ กำลังผลัก (เดินชนเข้าหากล่อง)
+            bool shouldUnlock = isPulling || isPushing;
             SetHorizontalLock(!shouldUnlock);
         }
 
@@ -528,6 +572,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 SetHorizontalLock(true);
             }
 
+            if (_sutureThread != null)
+            {
+                _sutureThread.SetTensionStrain(0f);
+            }
+
             _tetheredPlayerTransform = null;
             _tetheredPlayerRb = null;
             _tetheredPlayerController = null;
@@ -563,9 +612,18 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
+            // คำนวณอัตราความตึง (Strain 0.0 -> 1.0) เมื่อด้ายถูกยืดเกินระยะปกติ
+            float strain = 0f;
+            if (dist > MaxTetherDistance)
+            {
+                float stretchBudget = MaxTetherDistance * 0.8f;
+                strain = Mathf.Clamp01((dist - MaxTetherDistance) / stretchBudget);
+            }
+
             // Snap if pulled beyond extreme distance (e.g. falling into pit)
             if (dist > MaxTetherDistance * 1.8f)
             {
+                CameraController2D.Instance?.Shake(0.07f, 0.14f);
                 ReleasePlayerTether();
                 return;
             }
@@ -574,6 +632,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_sutureThread != null)
             {
+                _sutureThread.SetTensionStrain(strain);
                 _sutureThread.UpdateDynamicEndpoints(objPos, playerPos, _activeTetherLeashLength);
             }
         }
