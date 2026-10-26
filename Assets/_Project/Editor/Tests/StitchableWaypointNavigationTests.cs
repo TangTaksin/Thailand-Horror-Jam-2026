@@ -175,6 +175,7 @@ namespace ThailandHorrorJam.Editor.Tests
 
                 // Simulate physics step (velocity integration)
                 playerRb.position += playerRb.linearVelocity * 0.02f;
+                playerObj.transform.position = playerRb.position;
                 Physics2D.SyncTransforms();
 
                 typeof(ThailandHorrorJam.Core.PlayerVisuals).GetMethod("UpdateVisualState", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(visuals, null);
@@ -184,6 +185,55 @@ namespace ThailandHorrorJam.Editor.Tests
             }
 
             Object.DestroyImmediate(playerObj);
+        }
+
+        [Test]
+        public void PlayerPushingAgainstVerticalWall_IsNotGrounded_AndFallsUnderGravity()
+        {
+            // 1. Setup vertical wall on Layer Ground
+            GameObject wallObj = new GameObject("TestVerticalWall");
+            wallObj.layer = LayerMask.NameToLayer("Ground");
+            var wallCol = wallObj.AddComponent<BoxCollider2D>();
+            wallCol.size = new Vector2(1f, 8f);
+            wallObj.transform.position = new Vector3(1f, 4f, 0f); // X from 0.5 to 1.5, Y from 0 to 8
+
+            // 2. Setup Player in mid-air pressing against the wall at Y = 4 (mid-height)
+            GameObject playerObj = new GameObject("TestPlayer");
+            var playerRb = playerObj.AddComponent<Rigidbody2D>();
+            playerRb.bodyType = RigidbodyType2D.Dynamic;
+            playerRb.gravityScale = 0f; // Controlled manually by PlayerController2D
+
+            var playerCol = playerObj.AddComponent<CapsuleCollider2D>();
+            playerCol.size = new Vector2(0.42f, 0.84f);
+
+            var pc = playerObj.AddComponent<ThailandHorrorJam.Core.PlayerController2D>();
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetField("_groundLayer", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pc, (LayerMask)(1 << LayerMask.NameToLayer("Ground")));
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+            // Position player at x = 0.28 (capsule right edge touches wall at x = 0.5) and y = 4 (mid-air)
+            playerObj.transform.position = new Vector3(0.28f, 4f, 0f);
+            Physics2D.SyncTransforms();
+
+            // Set player horizontal input moving towards wall
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetField("_horizontalInput", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pc, 1f);
+
+            // 3. Step physics and verify player is NOT grounded and falls with gravity
+            for (int i = 0; i < 5; i++)
+            {
+                typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+                Assert.IsFalse(pc.IsGrounded, $"Player must NOT be detected as grounded while pressing against vertical wall (frame {i}).");
+                Assert.IsTrue(playerRb.linearVelocity.y < 0f, $"Player vertical velocity must accelerate downward under gravity (frame {i}, vel={playerRb.linearVelocity.y}).");
+
+                playerRb.position += playerRb.linearVelocity * 0.02f;
+                playerObj.transform.position = playerRb.position;
+                Physics2D.SyncTransforms();
+            }
+
+            Assert.IsTrue(playerObj.transform.position.y < 4f, "Player must have fallen downward along the wall.");
+
+            Object.DestroyImmediate(playerObj);
+            Object.DestroyImmediate(wallObj);
         }
     }
 }

@@ -102,39 +102,32 @@ namespace ThailandHorrorJam.Editor.Tests
             thread.RenderPath(waypoints);
 
             // 3. Find pin markers in scene
-            var allObjects = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include);
-            var pinObjects = new List<GameObject>();
-            foreach (var t in allObjects)
-            {
-                if (t != null && t.gameObject.name == "NeedlePin_2D")
-                {
-                    pinObjects.Add(t.gameObject);
-                }
-            }
+            var container = GameObject.Find("[NeedlePins_Runtime]");
+            Assert.IsNotNull(container, "Pin container [NeedlePins_Runtime] must exist.");
 
-            Assert.IsTrue(pinObjects.Count > 0, "Pin markers should be spawned for path waypoints.");
+            var pinField = typeof(SutureThread).GetField("_pinMarkers", BindingFlags.NonPublic | BindingFlags.Instance);
+            var pinList = pinField?.GetValue(thread) as List<GameObject>;
+            Assert.IsNotNull(pinList, "_pinMarkers field must exist.");
+            Assert.IsTrue(pinList.Count > 0, "Pin markers should be spawned for path waypoints.");
 
             // Verify each pin has DontSave flag and parented to container
-            foreach (var pin in pinObjects)
+            foreach (var pin in pinList)
             {
+                Assert.IsNotNull(pin, "Pin marker must not be null.");
                 Assert.IsTrue((pin.hideFlags & HideFlags.DontSave) != 0, $"Pin marker {pin.name} must have HideFlags.DontSave set.");
                 Assert.IsNotNull(pin.transform.parent, "Pin marker should be organized under runtime container.");
                 Assert.AreEqual("[NeedlePins_Runtime]", pin.transform.parent.name, "Pin marker parent should be [NeedlePins_Runtime].");
             }
 
             // 4. Destroy SutureThread and verify pins are destroyed cleanly
+            var onDestroy = typeof(SutureThread).GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance);
+            onDestroy?.Invoke(thread, null);
             Object.DestroyImmediate(threadObj);
 
-            var pinsAfterDestroy = new List<GameObject>();
-            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            foreach (var pin in pinList)
             {
-                if (t != null && t.gameObject.name == "NeedlePin_2D")
-                {
-                    pinsAfterDestroy.Add(t.gameObject);
-                }
+                Assert.IsTrue(pin == null, "All pin markers belonging to this SutureThread must be destroyed without leaking.");
             }
-
-            Assert.AreEqual(0, pinsAfterDestroy.Count, "All pin markers must be destroyed without leaking when SutureThread is destroyed.");
         }
     }
 }

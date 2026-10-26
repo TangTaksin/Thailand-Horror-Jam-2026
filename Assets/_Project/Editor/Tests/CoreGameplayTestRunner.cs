@@ -67,6 +67,9 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t2.SetUp(); t2.PlayerStandingOnRisingLoopingBox_MaintainsGroundedAndDoesNotTriggerJumpVisualState(); t2.TearDown(); },
                 "WaypointNav: Player Standing On Rising Looping Box Maintains Grounded & Never Enters Jump");
 
+            RunTest(() => { t2.SetUp(); t2.PlayerPushingAgainstVerticalWall_IsNotGrounded_AndFallsUnderGravity(); t2.TearDown(); },
+                "WaypointNav: Player Pressing Against Vertical Wall Never Floats (Falls Under Gravity)");
+
             // 3. NeedleBudgetAndInteractionTests
             var t3 = new NeedleBudgetAndInteractionTests();
 

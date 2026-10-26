@@ -615,21 +615,22 @@ namespace ThailandHorrorJam.Core
             Collider2D detectedGround = null;
             float playerFeetY = _col != null ? _col.bounds.min.y : transform.position.y;
 
-            // ให้ความสำคัญกับ StitchableObject เฉพาะเมื่อผู้เล่นยืนอยู่บนหลังของมันจริงๆ
+            // คัดกรองเฉพาะ Collider ที่มีพื้นผิวรองรับฝ่าเท้าผู้เล่นจริงๆ (ปฏิเสธกำแพงแนวดิ่ง ป้องกันบั๊กลอยตัวไถติดข้างกำแพง)
             for (int i = 0; i < hitCount; i++)
             {
                 Collider2D groundCol = _groundHitBuffer[i];
-                if (groundCol == null || IsSelfCollider(groundCol)) continue;
+                if (groundCol == null || IsSelfCollider(groundCol) || groundCol.isTrigger) continue;
+
+                if (!IsValidGroundCollider(groundCol, checkPos, feetBottomY, colWidth, playerFeetY))
+                {
+                    continue;
+                }
 
                 StitchableObject so = groundCol.GetComponentInParent<StitchableObject>();
                 if (so != null)
                 {
-                    // รองรับกรณีพุ่งแลนดิ้งลงมาจากความเร็วสูงที่อาจทะลุเข้าไปในกล่องได้ชั่วขณะ
-                    if (playerFeetY >= groundCol.bounds.max.y - 0.35f)
-                    {
-                        detectedGround = groundCol;
-                        break;
-                    }
+                    detectedGround = groundCol;
+                    break;
                 }
                 else if (detectedGround == null)
                 {
@@ -647,7 +648,7 @@ namespace ThailandHorrorJam.Core
                 for (int s = 0; s < snapCount; s++)
                 {
                     RaycastHit2D snapHit = _snapHitBuffer[s];
-                    if (snapHit.collider != null && !IsSelfCollider(snapHit.collider) && !snapHit.collider.isTrigger)
+                    if (snapHit.collider != null && !IsSelfCollider(snapHit.collider) && !snapHit.collider.isTrigger && snapHit.normal.y >= 0.55f)
                     {
                         float snapGap = snapHit.point.y - feetBottomY;
                         if (snapGap <= 0.001f && Mathf.Abs(snapGap) <= _groundSnapDistance)
@@ -759,6 +760,59 @@ namespace ThailandHorrorJam.Core
             {
                 _currentStitchable.ReleasePlayerTether();
             }
+        }
+
+        private bool IsValidGroundCollider(Collider2D groundCol, Vector2 checkPos, float feetBottomY, float colWidth, float playerFeetY)
+        {
+            if (groundCol == null || IsSelfCollider(groundCol) || groundCol.isTrigger) return false;
+
+            StitchableObject so = groundCol.GetComponentInParent<StitchableObject>();
+            if (so != null)
+            {
+                // สำหรับกล่อง/แท่นเคลื่อนที่ เท้าต้องอยู่ที่ระดับหลังกล่องขึ้นไป (รองรับการแลนดิ้งด้วยความเร็วสูง)
+                return playerFeetY >= groundCol.bounds.max.y - 0.35f;
+            }
+
+            // สำหรับ BoxCollider2D ทั่วไป (เช่น กำแพง เสา บล็อก) ถ้าเท้าอยู่ต่ำกว่าขอบบนเกิน 0.25m แปลว่ากำลังเบียดกำแพงด้านข้างในอากาศ
+            bool isComposite = groundCol.transform.parent != null && groundCol.transform.parent.GetComponent<CompositeCollider2D>() != null;
+            if (groundCol is BoxCollider2D && !isComposite)
+            {
+                if (playerFeetY < groundCol.bounds.max.y - 0.25f)
+                {
+                    return false;
+                }
+            }
+
+            // ตรวจสอบผิวด้านล่างด้วย Raycast แนวดิ่ง เพื่อยืนยันว่ามีพื้นผิวระนาบหรือทางลาดที่เดินได้รองรับใต้เท้าจริง (Normal ชี้ขึ้น)
+            float rayDistance = 0.25f;
+            float sideOffset = colWidth * 0.35f;
+            Vector2 rayOrigin = new Vector2(checkPos.x, feetBottomY + 0.1f);
+
+            RaycastHit2D hitCenter = Physics2D.Raycast(rayOrigin, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidGroundHit(hitCenter, groundCol)) return true;
+
+            RaycastHit2D hitLeft = Physics2D.Raycast(rayOrigin + Vector2.left * sideOffset, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidGroundHit(hitLeft, groundCol)) return true;
+
+            RaycastHit2D hitRight = Physics2D.Raycast(rayOrigin + Vector2.right * sideOffset, Vector2.down, rayDistance, _groundLayer);
+            if (IsValidGroundHit(hitRight, groundCol)) return true;
+
+            // หากเท้าอยู่เหนือขอบบนของ Collider อิสระ ยอมรับเป็นพื้นได้
+            if (playerFeetY >= groundCol.bounds.max.y - 0.25f)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsValidGroundHit(RaycastHit2D hit, Collider2D targetCol)
+        {
+            if (hit.collider == null || IsSelfCollider(hit.collider) || hit.collider.isTrigger) return false;
+            if (targetCol != null && hit.collider != targetCol && hit.collider.attachedRigidbody != targetCol.attachedRigidbody) return false;
+
+            // พื้นผิวต้องชี้ขึ้นด้านบนในมุมที่ไม่ชันเกินกำหนด (ไม่เกิน _maxSlopeAngle เช่น 55 องศา)
+            return hit.normal.y >= 0.55f;
         }
 
         private void UpdateSlopeState(Vector2 feetCenter, float feetBottomY, float colWidth)
