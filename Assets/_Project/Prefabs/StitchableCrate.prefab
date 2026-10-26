@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 1033367783369544674}
   - component: {fileID: 6778026091914230912}
   m_Layer: 7
-  m_Name: Box
+  m_Name: StitchableCrate
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -180,15 +180,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c0a4c75b6ceeb340993338ee22e4898, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.StitchableObject
-  _freezePositionXWhenIdle: 1
-  _tetherSlackTolerance: 0.05
   _travelSpeed: 2
-  _groundLayer:
-    serializedVersion: 2
-    m_Bits: 64
-  _sutureThread: {fileID: 0}
+  _sutureThread: {fileID: 373652911262524282, guid: 7f7a91f1bf44e484fb2df67ebadd5747, type: 3}
   _minTetherDistance: 0.8
   _maxTetherDistance: 2.2
   _tetheredMassMultiplier: 0.1
+  _freezePositionXWhenIdle: 1
+  _tetherSlackTolerance: 0.05
   _landingPluckMultiplier: 1.4
   _jumpKickImpulse: 0
