@@ -121,6 +121,7 @@ namespace ThailandHorrorJam.Core
         private bool _isSubscribedToCheckpointManager;
 
         public VisualState CurrentState => _currentState;
+        public bool IsFacingRight => _isFacingRight;
 
         public void SetFacing(bool faceRight)
         {
