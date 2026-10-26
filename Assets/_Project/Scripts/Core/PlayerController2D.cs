@@ -368,6 +368,17 @@ namespace ThailandHorrorJam.Core
                 {
                     _rb.position = new Vector2(_rb.position.x, _rb.position.y + delta.y);
                 }
+
+                // หากยืนอยู่บนแท่นและไม่ได้กดกระโดด หากแท่นชะลอตัว หยุด หรือเริ่มเลื่อนลง (เช่น เมื่อถึงจุดยอด Apex)
+                // ต้องตัดความเร็วแนวดิ่งของผู้เล่นไม่ให้ลอยทะลักสูงกว่าแท่น ป้องกันแรงเฉื่อยดีดตัวลอยขึ้นฟ้า
+                if (!_jumpRequested)
+                {
+                    float platformVelY = _currentStitchable.CurrentVelocity.y;
+                    if (platformVelY <= 0.05f || _rb.linearVelocity.y > platformVelY)
+                    {
+                        _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, platformVelY);
+                    }
+                }
             }
         }
 
@@ -667,7 +678,9 @@ namespace ThailandHorrorJam.Core
 
             // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (และเฟรมก่อนอยู่บนพื้น)
             // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก และไม่ดูดติด Trigger colliders
-            if (_enableGroundSnapping && detectedGround == null && wasGrounded && !_jumpRequested && _rb.linearVelocity.y <= 0.2f)
+            float lastGroundVelY = _currentStitchable != null ? _currentStitchable.CurrentVelocity.y : 0f;
+            float relSnapVelY = _rb.linearVelocity.y - lastGroundVelY;
+            if (_enableGroundSnapping && detectedGround == null && wasGrounded && !_jumpRequested && (relSnapVelY <= 0.2f || _currentStitchable != null))
             {
                 Vector2 rayStart = new Vector2(checkPos.x, feetBottomY + 0.05f);
                 float snapDist = _groundSnapDistance + 0.05f;
@@ -726,7 +739,7 @@ namespace ThailandHorrorJam.Core
             {
                 // นับว่าอยู่บนพื้นเมื่อสัมผัส Collider พื้น และไม่ได้กำลังกระโดดพุ่งขึ้นหนีออกจากพื้นผิว
                 // ป้องกันกรณีแท่นกำลังเลื่อนลง (groundVelY < 0) หรือกำลังยกตัวขึ้น (groundVelY > 0) จนถูกปฏิเสธ Grounded
-                bool isAscendingAway = _jumpRequested || (relVertVelocity > 0.8f && _rb.linearVelocity.y > 0.8f);
+                bool isAscendingAway = _jumpRequested || (_currentStitchable == null && relVertVelocity > 0.8f && _rb.linearVelocity.y > 0.8f);
                 _isGrounded = detectedGround != null && !isAscendingAway;
             }
 
@@ -768,7 +781,7 @@ namespace ThailandHorrorJam.Core
                 HandleLandingImpact();
             }
 
-            if (_isGrounded && Mathf.Abs(_rb.linearVelocity.x) > 0.1f)
+            if (_isGrounded && Mathf.Abs(_horizontalInput) > 0.05f && Mathf.Abs(RelativeVelocity.x) > 0.1f)
             {
                 HandleWalkingVibration();
             }

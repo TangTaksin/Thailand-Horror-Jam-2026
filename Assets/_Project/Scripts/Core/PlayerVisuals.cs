@@ -375,8 +375,11 @@ namespace ThailandHorrorJam.Core
             }
             else
             {
-                // เช็คจากความเร็วสัมพัทธ์กับพื้นผิว เพื่อป้องกันอาการเดินเองเวลาแพลตฟอร์มเคลื่อนที่ และป้องกันซอยเท้าเวลาชนกำแพง
-                bool isMoving = Mathf.Abs(_controller.RelativeVelocity.x) > 0.05f;
+                // เช็คจากทั้ง Input ของผู้เล่นและความเร็วสัมพัทธ์กับพื้นผิว
+                // เพื่อไม่ให้เล่นอนิเมชันเดินถ้าไม่ได้กดปุ่มเดิน (เช่น ยืนอยู่บนแท่นเคลื่อนที่/กำลังถูกส่งแรงเฉื่อย)
+                // และป้องกันการซอยเท้าอยู่กับที่เวลาเดินชนกำแพง
+                bool hasInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.05f;
+                bool isMoving = hasInput && Mathf.Abs(_controller.RelativeVelocity.x) > 0.05f;
                 bool isPinning = _needleController != null && _needleController.IsPinning;
 
                 if (isPinning && _aimSprites != null && _aimSprites.Length > 0)

@@ -71,14 +71,15 @@ namespace ThailandHorrorJam.Editor.Tests
             var waypoints = new List<Vector2> { Vector2.zero, new Vector2(0.5f, 0f) };
             _stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
 
-            // Advance multiple steps until arrival at waypoint 1
-            for (int i = 0; i < 30; i++)
+            // Advance steps until arrival at waypoint 1 triggers reversing
+            for (int i = 0; i < 50; i++)
             {
                 _traverseMethod.Invoke(_stitchable, null);
+                if ((bool)_isReversingField.GetValue(_stitchable))
+                {
+                    break;
+                }
             }
-
-            // Once reached, the next traversal step should trigger reversing
-            _traverseMethod.Invoke(_stitchable, null);
 
             bool isReversing = (bool)_isReversingField.GetValue(_stitchable);
             Assert.IsTrue(isReversing, "PingPong loop must reverse direction upon reaching end of track.");
@@ -234,6 +235,68 @@ namespace ThailandHorrorJam.Editor.Tests
 
             Object.DestroyImmediate(playerObj);
             Object.DestroyImmediate(wallObj);
+        }
+
+        [Test]
+        public void PlayerStandingOnRisingLoopingBox_AtApexReversal_RemainsGroundedAndNeverEntersFallVisualState()
+        {
+            // 1. Setup upward looping box from 0 to 0.28m (arrives in ~4 steps)
+            _go.layer = LayerMask.NameToLayer("Stitchable");
+            var waypoints = new List<Vector2> { new Vector2(0f, 0f), new Vector2(0f, 0.28f) };
+            _stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
+
+            // 2. Setup grounded player with PlayerVisuals
+            GameObject playerObj = new GameObject("TestPlayer");
+            var playerRb = playerObj.AddComponent<Rigidbody2D>();
+            var playerCol = playerObj.AddComponent<CapsuleCollider2D>();
+            playerCol.size = new Vector2(0.4f, 0.8f);
+            var pc = playerObj.AddComponent<ThailandHorrorJam.Core.PlayerController2D>();
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+            var spriteHolder = new GameObject("VisualHolder");
+            spriteHolder.transform.SetParent(playerObj.transform, false);
+            var sr = spriteHolder.AddComponent<SpriteRenderer>();
+
+            var visuals = playerObj.AddComponent<ThailandHorrorJam.Core.PlayerVisuals>();
+            typeof(ThailandHorrorJam.Core.PlayerVisuals).GetField("_controller", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(visuals, pc);
+            typeof(ThailandHorrorJam.Core.PlayerVisuals).GetField("_spriteRenderer", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(visuals, sr);
+            typeof(ThailandHorrorJam.Core.PlayerVisuals).GetField("_visualHolder", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(visuals, spriteHolder.transform);
+
+            // Place player resting on box
+            float boxTopY = _col.bounds.max.y;
+            playerObj.transform.position = new Vector3(0f, boxTopY + 0.4f, 0f);
+            playerRb.linearVelocity = Vector2.zero;
+            Physics2D.SyncTransforms();
+
+            // Run initial check
+            typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("CheckGround", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+            typeof(ThailandHorrorJam.Core.PlayerVisuals).GetMethod("UpdateVisualState", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(visuals, null);
+
+            var visualStateField = typeof(ThailandHorrorJam.Core.PlayerVisuals).GetField("_currentState", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsTrue(pc.IsGrounded, "Player must be initially grounded on box.");
+
+            // Advance through rise, apex reversal, dwell, and descending
+            for (int i = 0; i < 25; i++)
+            {
+                _fixedUpdateMethod.Invoke(_stitchable, null);
+                typeof(ThailandHorrorJam.Core.PlayerController2D).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(pc, null);
+
+                // Simulate physics step (velocity integration)
+                playerRb.position += playerRb.linearVelocity * 0.02f;
+                playerObj.transform.position = playerRb.position;
+                Physics2D.SyncTransforms();
+
+                typeof(ThailandHorrorJam.Core.PlayerVisuals).GetMethod("UpdateVisualState", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(visuals, null);
+
+                string stateName = visualStateField?.GetValue(visuals)?.ToString();
+                Assert.IsTrue(pc.IsGrounded, $"Player must remain grounded during loop and apex reversal (frame {i}).");
+                Assert.AreEqual("Idle", stateName, $"Visual state must remain Idle when no movement input is given (frame {i}).");
+                Assert.AreNotEqual("Fall", stateName, $"Visual state must never be Fall at apex reversal (frame {i}).");
+                Assert.AreNotEqual("FallLoop", stateName, $"Visual state must never be FallLoop at apex reversal (frame {i}).");
+                Assert.AreNotEqual("Walk", stateName, $"Visual state must never be Walk when player is idle on platform (frame {i}).");
+            }
+
+            Object.DestroyImmediate(playerObj);
         }
     }
 }

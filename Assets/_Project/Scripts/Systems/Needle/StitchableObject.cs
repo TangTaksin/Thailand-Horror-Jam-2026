@@ -17,6 +17,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [FormerlySerializedAs("travelSpeed")]
         [SerializeField] private float _travelSpeed = 3.5f;
 
+        [Tooltip("ระยะเวลาหยุดพักชั่วคราว (วินาที) เมื่อเคลื่อนที่ถึงจุดหมายปลายทางของแต่ละรอบ ก่อนเริ่มเคลื่อนที่ย้อนกลับ")]
+        [SerializeField] private float _waypointDwellTime = 0.2f;
+
         [Header("Thread Component")]
         [FormerlySerializedAs("sutureThread")]
         [SerializeField] private SutureThread _sutureThread;
@@ -66,6 +69,7 @@ namespace ThailandHorrorJam.Systems.Needle
         private LoopPlaybackMode _activeLoopMode;
         private int _currentWaypointIndex;
         private bool _isReversing;
+        private float _dwellTimer;
         private Vector2 _previousPosition;
         private Vector2 _targetFramePosition;
         private Vector2 _currentVelocity;
@@ -74,6 +78,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public StitchState CurrentState => _currentState;
         public Transform ObjectTransform => transform;
+        public Collider2D Collider => _col;
         public Vector2 CurrentPosition => _hasRb ? _rb.position : (Vector2)transform.position;
         public Vector2 CurrentVelocity => _currentVelocity;
         public Vector2 FrameDelta { get; private set; }
@@ -398,6 +403,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _currentState = StitchState.Looping;
             _currentWaypointIndex = 0;
             _isReversing = false;
+            _dwellTimer = 0f;
 
             SetStaticState();
             _targetFramePosition = CurrentPosition;
@@ -432,6 +438,13 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (_waypoints.Count < 2) return;
 
+            if (_dwellTimer > 0f)
+            {
+                _dwellTimer -= Time.fixedDeltaTime;
+                MoveToPosition(CurrentPosition);
+                return;
+            }
+
             int targetIndex = _isReversing ? _currentWaypointIndex - 1 : _currentWaypointIndex + 1;
 
             if (!_isReversing && targetIndex >= _waypoints.Count)
@@ -440,11 +453,21 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     _isReversing = true;
                     targetIndex = _waypoints.Count - 2;
+                    if (_waypointDwellTime > 0f)
+                    {
+                        _dwellTimer = _waypointDwellTime;
+                        MoveToPosition(CurrentPosition);
+                        return;
+                    }
                 }
                 else
                 {
                     MoveToPosition(_waypoints[0]);
                     _currentWaypointIndex = 0;
+                    if (_waypointDwellTime > 0f)
+                    {
+                        _dwellTimer = _waypointDwellTime;
+                    }
                     return;
                 }
             }
@@ -452,6 +475,12 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _isReversing = false;
                 targetIndex = 1;
+                if (_waypointDwellTime > 0f)
+                {
+                    _dwellTimer = _waypointDwellTime;
+                    MoveToPosition(CurrentPosition);
+                    return;
+                }
             }
 
             Vector2 targetPos = _waypoints[targetIndex];
@@ -655,6 +684,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _currentState = StitchState.Idle;
             _waypoints.Clear();
             _isReversing = false;
+            _dwellTimer = 0f;
 
             RestoreOriginalBodyState();
 
