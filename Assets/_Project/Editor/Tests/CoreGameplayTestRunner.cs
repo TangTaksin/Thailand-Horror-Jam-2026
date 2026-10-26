@@ -1,0 +1,88 @@
+using UnityEditor;
+using UnityEngine;
+
+namespace ThailandHorrorJam.Editor.Tests
+{
+    public static class CoreGameplayTestRunner
+    {
+        [MenuItem("Tools/Tests/Run All Core Stitch & Loop Tests")]
+        public static void RunAllCoreTests()
+        {
+            int passed = 0;
+            int failed = 0;
+
+            void RunTest(System.Action testAction, string testName)
+            {
+                try
+                {
+                    testAction();
+                    passed++;
+                    Debug.Log($"<color=green>[PASS]</color> {testName}");
+                }
+                catch (System.Exception ex)
+                {
+                    failed++;
+                    Debug.LogError($"<color=red>[FAIL]</color> {testName}\n{ex}");
+                }
+            }
+
+            Debug.Log("=== Starting Core Stitch & Loop Unit Tests ===");
+
+            // 1. StitchableStateTransitionTests
+            var t1 = new StitchableStateTransitionTests();
+
+            RunTest(() => { t1.SetUp(); t1.InitialState_IsIdle_AndRigidbodyIsDynamic(); t1.TearDown(); },
+                "StitchableState: Initial State Is Idle & Rigidbody Is Dynamic");
+
+            RunTest(() => { t1.SetUp(); t1.StartLoopAlongWaypoints_SwitchesRigidbodyToStatic(); t1.TearDown(); },
+                "StitchableState: StartLoop Switches Rigidbody To Static");
+
+            RunTest(() => { t1.SetUp(); t1.CutThread_RestoresRigidbodyToDynamicAndPreservesGravity(); t1.TearDown(); },
+                "StitchableState: CutThread Restores Dynamic BodyType & Preserves Gravity");
+
+            RunTest(() => { t1.SetUp(); t1.StartLoopAlongWaypoints_WithLessThanTwoPoints_ImmediatelyCutsThread(); t1.TearDown(); },
+                "StitchableState: StartLoop With < 2 Points Immediately Cuts Thread");
+
+            RunTest(() => { t1.SetUp(); t1.StartLoopAlongWaypoints_WhenAlreadyStatic_DoesNotThrow(); t1.TearDown(); },
+                "StitchableState: StartLoop When Already Static Does Not Throw");
+
+            RunTest(() => { t1.SetUp(); t1.ResetToInitialState_RestoresTransformPositionAndClearsVelocities(); t1.TearDown(); },
+                "StitchableState: ResetToInitialState Restores Position & Velocity");
+
+            // 2. StitchableWaypointNavigationTests
+            var t2 = new StitchableWaypointNavigationTests();
+
+            RunTest(() => { t2.SetUp(); t2.TraverseWaypoints_MovesTowardsTarget(); t2.TearDown(); },
+                "WaypointNav: TraverseWaypoints Moves Towards Target");
+
+            RunTest(() => { t2.SetUp(); t2.PingPongNavigation_ReversesDirection_WhenReachingEnd(); t2.TearDown(); },
+                "WaypointNav: PingPong Loop Reverses At End Of Track");
+
+            RunTest(() => { t2.SetUp(); t2.FixedUpdate_CalculatesCurrentVelocityAndFrameDelta(); t2.TearDown(); },
+                "WaypointNav: FixedUpdate Calculates Velocity & FrameDelta");
+
+            RunTest(() => { t2.SetUp(); t2.PlayerLandingOnDescendingLoopingBox_IsDetectedAsGroundedImmediately(); t2.TearDown(); },
+                "WaypointNav: Player Landing On Descending Looping Box Is Detected As Grounded Immediately");
+
+            RunTest(() => { t2.SetUp(); t2.PlayerStandingOnRisingLoopingBox_MaintainsGroundedAndDoesNotTriggerJumpVisualState(); t2.TearDown(); },
+                "WaypointNav: Player Standing On Rising Looping Box Maintains Grounded & Never Enters Jump");
+
+            // 3. NeedleBudgetAndInteractionTests
+            var t3 = new NeedleBudgetAndInteractionTests();
+
+            RunTest(() => { t3.SetUp(); t3.ThreadBudget_AllowsDistancesWithinConfiguredRange(); t3.TearDown(); },
+                "NeedleBudget: Allows Distances Within Configured Range");
+
+            RunTest(() => { t3.SetUp(); t3.ThreadBudget_RejectsDistancesOutsideConfiguredRange(); t3.TearDown(); },
+                "NeedleBudget: Rejects Distances Outside Configured Range");
+
+            RunTest(() => { t3.SetUp(); t3.ClickingLoopingBox_IsIgnored_PreservesLoopingState(); t3.TearDown(); },
+                "NeedleInteraction: Clicking Looping Box Is Ignored (Preserves Looping State)");
+
+            RunTest(() => { t3.SetUp(); t3.NeedlePinMarkers_HaveDontSaveFlags_AndAreCleanedUpWithoutLeaking(); t3.TearDown(); },
+                "NeedlePinLifecycle: Pin Markers Have HideFlags.DontSave & Cleaned Up Without Leaks");
+
+            Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
+        }
+    }
+}

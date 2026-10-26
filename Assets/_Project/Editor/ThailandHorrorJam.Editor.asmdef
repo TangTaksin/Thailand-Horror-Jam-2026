@@ -11,6 +11,9 @@
         "Editor"
     ],
     "excludePlatforms": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
