@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1940156967648241030}
   - component: {fileID: 1033367783369544674}
   - component: {fileID: 6778026091914230912}
+  - component: {fileID: -4900243550758291539}
   m_Layer: 7
   m_Name: StitchableCrate
   m_TagString: Untagged
@@ -164,9 +165,9 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
+  m_Interpolate: 1
+  m_SleepingMode: 0
+  m_CollisionDetection: 1
   m_Constraints: 4
 --- !u!114 &6778026091914230912
 MonoBehaviour:
@@ -183,9 +184,41 @@ MonoBehaviour:
   _travelSpeed: 2
   _sutureThread: {fileID: 373652911262524282, guid: 7f7a91f1bf44e484fb2df67ebadd5747, type: 3}
   _minTetherDistance: 0.8
-  _maxTetherDistance: 2.2
+  _maxTetherDistance: 1.5
   _tetheredMassMultiplier: 0.1
   _freezePositionXWhenIdle: 1
   _tetherSlackTolerance: 0.05
   _landingPluckMultiplier: 1.4
   _jumpKickImpulse: 0
+--- !u!114 &-4900243550758291539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7031466110673207447}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48ee8e78663b9264493eee4b95b2a2fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleAnchorPoint
+  _isAnchorEnabled: 1
+  _snapMode: 1
+  _customSnapTransform: {fileID: 0}
+  _snapOffset: {x: 0, y: 0}
+  _surfaceOffset: 0.02
+  _visualRenderer: {fileID: 0}
+  _enableVisualFeedback: 1
+  _idleColor: {r: 1, g: 1, b: 1, a: 1}
+  _inRangeColor: {r: 0.75, g: 0.95, b: 1, a: 1}
+  _outOfRangeColor: {r: 1, g: 0.4, b: 0.4, a: 0.65}
+  _hoveredColor: {r: 0.45, g: 1, b: 0.65, a: 1}
+  _pinnedColor: {r: 1, g: 0.9, b: 0.45, a: 1}
+  _hoverScaleMultiplier: 1.18
+  _feedbackTransitionSpeed: 12
+  _onNeedlePinned:
+    m_PersistentCalls:
+      m_Calls: []
+  _onNeedleUnpinned:
+    m_PersistentCalls:
+      m_Calls: []
