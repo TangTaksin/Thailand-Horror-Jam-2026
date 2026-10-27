@@ -3,6 +3,8 @@
     "rootNamespace": "ThailandHorrorJam.Editor",
     "references": [
         "ThailandHorrorJam.Runtime",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Universal.Editor",
         "Unity.RenderPipelines.Universal.2D.Runtime"

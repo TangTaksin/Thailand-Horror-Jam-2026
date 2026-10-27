@@ -5,6 +5,7 @@
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Universal.2D.Runtime",
         "DOTween.Modules"
     ],
     "includePlatforms": [],
