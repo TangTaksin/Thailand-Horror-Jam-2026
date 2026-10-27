@@ -2328,6 +2328,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 6038937062244345014, guid: 0475748a48db60945afdf0ca7aa703a7, type: 3}
+      propertyPath: _cutAimPooledCoilCount
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038937062244345014, guid: 0475748a48db60945afdf0ca7aa703a7, type: 3}
+      propertyPath: _cutAimPooledPileHeight
+      value: 0.055
+      objectReference: {fileID: 0}
+    - target: {fileID: 6038937062244345014, guid: 0475748a48db60945afdf0ca7aa703a7, type: 3}
+      propertyPath: _cutAimPooledSpreadRadius
+      value: 0.4
+      objectReference: {fileID: 0}
     - target: {fileID: 6699114349496988853, guid: 0475748a48db60945afdf0ca7aa703a7, type: 3}
       propertyPath: m_LocalPosition.x
       value: -21.8

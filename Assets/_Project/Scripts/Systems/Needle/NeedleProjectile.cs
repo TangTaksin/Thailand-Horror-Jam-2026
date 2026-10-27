@@ -49,6 +49,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private Action<Vector2, Vector2, Collider2D> _onHitCallback;
         private Action _onRewindCompleteCallback;
+        private Func<Vector2, Vector2, bool> _onStepSegmentCallback;
 
         private SpriteRenderer _spriteRenderer;
         private Transform _targetToIgnore;
@@ -98,7 +99,8 @@ namespace ThailandHorrorJam.Systems.Needle
             Action<Vector2, Vector2, Collider2D> onHit,
             Action onRewindComplete,
             Transform playerTransform = null,
-            Vector3 returnOffset = default)
+            Vector3 returnOffset = default,
+            Func<Vector2, Vector2, bool> onStepSegment = null)
         {
             EnsureSpriteRenderer();
 
@@ -118,6 +120,7 @@ namespace ThailandHorrorJam.Systems.Needle
             _collisionFilter = collisionFilter;
             _onHitCallback = onHit;
             _onRewindCompleteCallback = onRewindComplete;
+            _onStepSegmentCallback = onStepSegment;
 
             _state = ProjectileState.Flying;
             gameObject.SetActive(true);
@@ -149,8 +152,12 @@ namespace ThailandHorrorJam.Systems.Needle
             float remainingDistance = Mathf.Max(0f, _maxDistance - _traveledDistance);
             float actualStep = Mathf.Min(stepDistance, remainingDistance);
 
+            Vector2 stepTarget = currentPos + stepDir * actualStep;
+
             // Swept circle cast to ensure thin colliders are never tunneled through
             int hitCount = Physics2D.CircleCast(currentPos, _sweepRadius, stepDir, _collisionFilter, _hitBuffer, actualStep);
+            RaycastHit2D validHit = default;
+            bool hasValidHit = false;
 
             for (int i = 0; i < hitCount; i++)
             {
@@ -182,16 +189,31 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
 
-                // Hit a solid surface or valid anchor trigger!
-                transform.position = hit.point;
+                validHit = hit;
+                hasValidHit = true;
+                stepTarget = hit.point;
+                break;
+            }
+
+            // ถ้ามี callback ตรวจการตัดเส้นด้าย ให้เช็คบนช่วงที่เคลื่อนที่จริงในเฟรมนี้ก่อนเสมอ (แก้ปัญหาด้ายหน้ากำแพง)
+            if (_onStepSegmentCallback != null && _onStepSegmentCallback.Invoke(currentPos, stepTarget))
+            {
+                transform.position = stepTarget;
+                _traveledDistance += Vector2.Distance(currentPos, stepTarget);
+                StartRewind();
+                return;
+            }
+
+            if (hasValidHit)
+            {
+                transform.position = validHit.point;
                 _state = ProjectileState.Embedded;
-                _onHitCallback?.Invoke(hit.point, hit.normal, hitCol);
+                _onHitCallback?.Invoke(validHit.point, validHit.normal, validHit.collider);
                 return;
             }
 
             // No obstacle hit in this step — move forward clamped to actualStep
-            Vector2 newPos = currentPos + stepDir * actualStep;
-            transform.position = newPos;
+            transform.position = stepTarget;
             _traveledDistance += actualStep;
 
             if (_traveledDistance >= _maxDistance - 0.0001f)
@@ -246,6 +268,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public void Cancel()
         {
             _state = ProjectileState.Idle;
+            _onStepSegmentCallback = null;
             if (_playerTransform != null)
             {
                 transform.SetParent(_playerTransform);

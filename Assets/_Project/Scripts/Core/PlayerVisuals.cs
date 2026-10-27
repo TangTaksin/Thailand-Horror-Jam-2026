@@ -122,6 +122,7 @@ namespace ThailandHorrorJam.Core
 
         public VisualState CurrentState => _currentState;
         public bool IsFacingRight => _isFacingRight;
+        public SpriteRenderer MainRenderer => _spriteRenderer;
 
         public void SetFacing(bool faceRight)
         {
@@ -309,7 +310,7 @@ namespace ThailandHorrorJam.Core
             if (_controller != null && _controller.IsInputLocked) return;
 
             // 1. If aiming needle, face towards aim cursor
-            if (_faceAimWhenPinning && _needleController != null && _needleController.IsPinning)
+            if (_faceAimWhenPinning && _needleController != null && _needleController.IsAiming)
             {
                 Vector3 aimPos = _needleController.GetAimWorldPosition();
                 float diffX = aimPos.x - transform.position.x;
@@ -381,9 +382,9 @@ namespace ThailandHorrorJam.Core
                 // และป้องกันการซอยเท้าอยู่กับที่เวลาเดินชนกำแพง
                 bool hasInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.05f;
                 bool isMoving = hasInput && Mathf.Abs(_controller.RelativeVelocity.x) > 0.05f;
-                bool isPinning = _needleController != null && _needleController.IsPinning;
+                bool isAiming = _needleController != null && _needleController.IsAiming;
 
-                if (isPinning && _aimSprites != null && _aimSprites.Length > 0)
+                if (isAiming && _aimSprites != null && _aimSprites.Length > 0)
                 {
                     SetState(VisualState.Aim);
                 }
@@ -597,7 +598,7 @@ namespace ThailandHorrorJam.Core
                 }
             }
             // 2. Aim pitch lean when aiming needle (if not hauling)
-            else if (_enableAimLean && _needleController != null && _needleController.IsPinning)
+            else if (_enableAimLean && _needleController != null && _needleController.IsAiming)
             {
                 Vector3 aimPos = _needleController.GetAimWorldPosition();
                 Vector2 aimDir = (aimPos - transform.position);
@@ -695,8 +696,8 @@ namespace ThailandHorrorJam.Core
                               && _currentState == VisualState.Aim
                               && _throwTimer <= 0f
                               && _needleController != null
-                              && _needleController.IsPinning
-                              && !_needleController.IsNeedleInFlight;
+                              && _needleController.IsAiming
+                              && !_needleController.IsAnyNeedleInFlight;
 
             if (_aimNeedleObj.activeSelf != shouldShow)
             {
@@ -734,7 +735,7 @@ namespace ThailandHorrorJam.Core
 
         public bool TryGetNeedleTipPosition(out Vector2 tipPosition)
         {
-            if (_aimNeedleObj != null && (_aimNeedleObj.activeSelf || (_needleController != null && _needleController.IsPinning && !_needleController.IsNeedleInFlight)))
+            if (_aimNeedleObj != null && (_aimNeedleObj.activeSelf || (_needleController != null && _needleController.IsAiming && !_needleController.IsAnyNeedleInFlight)))
             {
                 Vector3 handWorldPos = _visualHolder != null
                     ? _visualHolder.TransformPoint(_aimNeedleHandOffset)
