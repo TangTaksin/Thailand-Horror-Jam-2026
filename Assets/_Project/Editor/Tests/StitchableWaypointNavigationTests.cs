@@ -47,6 +47,15 @@ namespace ThailandHorrorJam.Editor.Tests
             {
                 Object.DestroyImmediate(_go);
             }
+
+            var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+            foreach (var go in allGos)
+            {
+                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall")))
+                {
+                    Object.DestroyImmediate(go);
+                }
+            }
         }
 
         [Test]

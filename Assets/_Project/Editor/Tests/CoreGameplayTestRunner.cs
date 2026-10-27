@@ -8,6 +8,8 @@ namespace ThailandHorrorJam.Editor.Tests
         [MenuItem("Tools/Tests/Run All Core Stitch & Loop Tests")]
         public static void RunAllCoreTests()
         {
+            CleanupLeftoverTestObjects();
+
             int passed = 0;
             int failed = 0;
 
@@ -23,6 +25,10 @@ namespace ThailandHorrorJam.Editor.Tests
                 {
                     failed++;
                     Debug.LogError($"<color=red>[FAIL]</color> {testName}\n{ex}");
+                }
+                finally
+                {
+                    CleanupLeftoverTestObjects();
                 }
             }
 
@@ -92,6 +98,19 @@ namespace ThailandHorrorJam.Editor.Tests
                 "NeedlePinLifecycle: Pin Markers Have HideFlags.DontSave & Cleaned Up Without Leaks");
 
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
+            CleanupLeftoverTestObjects();
+        }
+
+        public static void CleanupLeftoverTestObjects()
+        {
+            var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
+            foreach (var go in allGos)
+            {
+                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate")))
+                {
+                    Object.DestroyImmediate(go);
+                }
+            }
         }
     }
 }
