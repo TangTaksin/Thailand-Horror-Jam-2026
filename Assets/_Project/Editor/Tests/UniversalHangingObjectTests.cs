@@ -93,6 +93,58 @@ namespace ThailandHorrorJam.Editor.Tests
             Object.DestroyImmediate(playerObj);
         }
 
+        [Test]
+        public void TetherHangingObject_WhileSuspended_RemainsStaticAndSuspended()
+        {
+            SetPrivateField(_hanging, "_mode", HangingMode.FreeFall);
+            StitchableObject stitchable = _hangingObj.AddComponent<StitchableObject>();
+            InvokePrivateMethod(_hanging, "Awake");
+
+            GameObject playerObj = new GameObject("TestPlayer");
+            Rigidbody2D playerRb = playerObj.AddComponent<Rigidbody2D>();
+
+            // Tether while suspended
+            _hanging.StartPlayerTether(playerObj.transform, playerRb);
+
+            Assert.IsTrue(_hanging.IsSuspended, "Hanging object must still be suspended from ceiling.");
+            Assert.AreEqual(RigidbodyType2D.Static, _rb.bodyType, "Hanging object must remain Static while suspended so it doesn't fall before being cut.");
+            Assert.IsTrue(stitchable.IsTetheredToPlayer, "StitchableObject must register as tethered to player.");
+            Assert.AreEqual(StitchState.PlayerHarness, _hanging.CurrentState, "CurrentState must report PlayerHarness while tethered.");
+
+            // Release tether while still suspended
+            _hanging.ReleasePlayerTether();
+            Assert.IsFalse(stitchable.IsTetheredToPlayer);
+            Assert.IsTrue(_hanging.IsSuspended);
+            Assert.AreEqual(RigidbodyType2D.Static, _rb.bodyType, "Releasing tether must keep hanging object Static.");
+
+            Object.DestroyImmediate(playerObj);
+        }
+
+        [Test]
+        public void SeverHangingThread_WhileAlreadyTethered_DropsAsDynamicAndMaintainsTether()
+        {
+            SetPrivateField(_hanging, "_mode", HangingMode.FreeFall);
+            StitchableObject stitchable = _hangingObj.AddComponent<StitchableObject>();
+            InvokePrivateMethod(_hanging, "Awake");
+
+            GameObject playerObj = new GameObject("TestPlayer");
+            Rigidbody2D playerRb = playerObj.AddComponent<Rigidbody2D>();
+
+            // Tether while suspended
+            _hanging.StartPlayerTether(playerObj.transform, playerRb);
+            Assert.IsTrue(stitchable.IsTetheredToPlayer);
+            Assert.AreEqual(RigidbodyType2D.Static, _rb.bodyType);
+
+            // Cut the hanging thread while tethered
+            _hanging.CutThread();
+
+            Assert.IsFalse(_hanging.IsSuspended, "Must no longer be suspended after cutting ceiling thread.");
+            Assert.AreEqual(RigidbodyType2D.Dynamic, _rb.bodyType, "Must transition to Dynamic to fall under gravity.");
+            Assert.IsTrue(stitchable.IsTetheredToPlayer, "Tether to player must be preserved after cutting ceiling thread.");
+
+            Object.DestroyImmediate(playerObj);
+        }
+
         private static void SetPrivateField(object target, string fieldName, object value)
         {
             FieldInfo fi = target.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);

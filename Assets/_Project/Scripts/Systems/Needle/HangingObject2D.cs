@@ -172,6 +172,10 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             get
             {
+                if (_stitchableTarget != null && _stitchableTarget.IsTetheredToPlayer)
+                {
+                    return _stitchableTarget.CurrentState;
+                }
                 if (_isSuspended) return StitchState.Tethered;
                 if (_stitchableTarget != null) return _stitchableTarget.CurrentState;
                 return StitchState.Idle;
@@ -231,7 +235,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb)
         {
-            if (!_isSuspended && _stitchableTarget != null)
+            if (_stitchableTarget != null)
             {
                 _stitchableTarget.StartPlayerTether(playerTransform, playerRb);
             }
@@ -239,7 +243,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void ReleasePlayerTether()
         {
-            if (!_isSuspended && _stitchableTarget != null)
+            if (_stitchableTarget != null)
             {
                 _stitchableTarget.ReleasePlayerTether();
             }
@@ -341,23 +345,47 @@ namespace ThailandHorrorJam.Systems.Needle
                 else if (_stitchableTarget != null && _rb != null)
                 {
                     // Restore original dynamic state for stitchable object hauling
-                    _rb.bodyType = _originalBodyType;
+                    if (!_stitchableTarget.IsTetheredToPlayer)
+                    {
+                        _rb.bodyType = _originalBodyType;
+                    }
                 }
             }
         }
 
         private void EnsureSutureThread()
         {
+            if (_sutureThread != null && !_sutureThread.gameObject.scene.IsValid())
+            {
+                _sutureThread = null;
+            }
+
             if (_sutureThread == null)
             {
-                _sutureThread = GetComponentInChildren<SutureThread>(true);
+                Transform ceilingChild = transform.Find("CeilingSutureThread");
+                if (ceilingChild != null)
+                {
+                    _sutureThread = ceilingChild.GetComponent<SutureThread>();
+                }
             }
 
             if (_sutureThread == null && _sutureThreadPrefab != null)
             {
                 _sutureThread = Instantiate(_sutureThreadPrefab, transform);
-                _sutureThread.name = "HangingSutureThread";
+                _sutureThread.name = "CeilingSutureThread";
                 _sutureThread.transform.localPosition = Vector3.zero;
+            }
+
+            if (_sutureThread == null)
+            {
+                var stitchable = GetComponent<StitchableObject>();
+                foreach (var st in GetComponentsInChildren<SutureThread>(true))
+                {
+                    if (stitchable != null && st == stitchable.SutureThread) continue;
+                    if (st.name == "TetherSutureThread") continue;
+                    _sutureThread = st;
+                    break;
+                }
             }
 
             if (_sutureThread != null)
@@ -405,6 +433,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     _rb.bodyType = RigidbodyType2D.Dynamic;
                     _rb.gravityScale = _freeFallGravityScale;
+                    if (_stitchableTarget != null && _stitchableTarget.IsTetheredToPlayer)
+                    {
+                        _rb.mass = Mathf.Max(0.1f, _stitchableTarget.OriginalMass * _stitchableTarget.TetheredMassMultiplier);
+                        _stitchableTarget.SetHorizontalLock(true);
+                    }
                     _rb.WakeUp();
                 }
             }
@@ -465,6 +498,10 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_stitchableTarget != null)
             {
                 _stitchableTarget.RestoreOriginalBodyState();
+                if (_rb != null)
+                {
+                    _rb.bodyType = RigidbodyType2D.Static;
+                }
             }
 
             InitializeThreadVisual();

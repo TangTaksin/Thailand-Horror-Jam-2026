@@ -92,6 +92,9 @@ namespace ThailandHorrorJam.Systems.Needle
         public Vector2 FrameDelta { get; private set; }
         public bool IsTetheredToPlayer => _currentState == StitchState.PlayerHarness;
         public float MaxTetherDistance => Mathf.Max(_maxTetherDistance, _minTetherDistance);
+        public SutureThread SutureThread => _sutureThread;
+        public float OriginalMass => _originalMass;
+        public float TetheredMassMultiplier => _tetheredMassMultiplier;
 
         private void Awake()
         {
@@ -126,25 +129,40 @@ namespace ThailandHorrorJam.Systems.Needle
             // 1. กรณีที่ _sutureThread ชี้ไปยัง Prefab Asset ใน Project Window (ไม่ใช่ Object ใน Scene)
             if (_sutureThread != null && !_sutureThread.gameObject.scene.IsValid())
             {
-                SutureThread sceneChild = GetComponentInChildren<SutureThread>(true);
+                Transform sceneChild = transform.Find("TetherSutureThread");
                 if (sceneChild != null && sceneChild.gameObject.scene.IsValid())
                 {
-                    _sutureThread = sceneChild;
+                    _sutureThread = sceneChild.GetComponent<SutureThread>();
                 }
                 else
                 {
                     SutureThread prefabAsset = _sutureThread;
                     _sutureThread = Instantiate(prefabAsset, transform);
-                    _sutureThread.name = "SutureThread";
+                    _sutureThread.name = "TetherSutureThread";
                     _sutureThread.transform.localPosition = Vector3.zero;
                 }
                 return;
             }
 
-            // 2. ถ้ายังเป็น null ให้ค้นหา Child ในตัวเอง
+            // 2. ถ้ายังเป็น null ให้ค้นหา Child เฉพาะที่ไม่ใช่ของ HangingObject2D
             if (_sutureThread == null)
             {
-                _sutureThread = GetComponentInChildren<SutureThread>(true);
+                Transform sceneChild = transform.Find("TetherSutureThread");
+                if (sceneChild != null)
+                {
+                    _sutureThread = sceneChild.GetComponent<SutureThread>();
+                }
+                else
+                {
+                    var hanging = GetComponent<HangingObject2D>();
+                    foreach (var st in GetComponentsInChildren<SutureThread>(true))
+                    {
+                        if (hanging != null && st == hanging.SutureThread) continue;
+                        if (st.name == "CeilingSutureThread") continue;
+                        _sutureThread = st;
+                        break;
+                    }
+                }
             }
 
             if (_sutureThread == null && Application.isPlaying)
@@ -199,7 +217,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private void SetHorizontalLock(bool locked)
+        public void SetHorizontalLock(bool locked)
         {
             if (!_hasRb || !_freezePositionXWhenIdle || _rb.bodyType == RigidbodyType2D.Static) return;
 
@@ -334,6 +352,16 @@ namespace ThailandHorrorJam.Systems.Needle
         public void RestoreOriginalBodyState()
         {
             if (!_hasRb) return;
+
+            var hanging = GetComponent<HangingObject2D>();
+            if (hanging != null && hanging.IsSuspended)
+            {
+                _rb.bodyType = RigidbodyType2D.Static;
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
+                return;
+            }
+
             _rb.bodyType = _originalBodyType;
             _rb.gravityScale = _originalGravityScale;
             _rb.mass = _originalMass;
@@ -582,10 +610,20 @@ namespace ThailandHorrorJam.Systems.Needle
 
             if (_hasRb)
             {
-                _rb.bodyType = _originalBodyType;
-                _rb.gravityScale = _originalGravityScale;
-                _rb.mass = Mathf.Max(0.1f, _originalMass * _tetheredMassMultiplier);
-                SetHorizontalLock(true);
+                var hanging = GetComponent<HangingObject2D>();
+                bool isHangingSuspended = hanging != null && hanging.IsSuspended;
+
+                if (!isHangingSuspended)
+                {
+                    _rb.bodyType = _originalBodyType;
+                    _rb.gravityScale = _originalGravityScale;
+                    _rb.mass = Mathf.Max(0.1f, _originalMass * _tetheredMassMultiplier);
+                    SetHorizontalLock(true);
+                }
+                else
+                {
+                    _rb.bodyType = RigidbodyType2D.Static;
+                }
             }
 
             if (_tetherJoint == null && !TryGetComponent(out _tetherJoint))
@@ -633,7 +671,18 @@ namespace ThailandHorrorJam.Systems.Needle
             _currentState = StitchState.Idle;
             _waypoints.Clear();
 
-            RestoreOriginalBodyState();
+            var hanging = GetComponent<HangingObject2D>();
+            if (hanging != null && hanging.IsSuspended)
+            {
+                if (_hasRb)
+                {
+                    _rb.bodyType = RigidbodyType2D.Static;
+                }
+            }
+            else
+            {
+                RestoreOriginalBodyState();
+            }
 
             if (_sutureThread != null)
             {
@@ -719,10 +768,14 @@ namespace ThailandHorrorJam.Systems.Needle
 
             // ตรวจสอบกรณีกล่องถูกผลักหรือร่วงตกจากแท่น (Ledge / Cliff / Pit Drop)
             // ถ้ากล่องไม่มีพื้นรองรับและร่วงลงต่ำกว่าระดับตัวผู้เล่น ให้ตัดสายด้ายขาดทันที กล่องจะได้ร่วงลงไปอย่างเป็นธรรมชาติ
+            // แต่หากกล่องยังแขวนอยู่กับเพดาน ให้ยกเว้นการตัดสายด้ายขาด
+            var hanging = GetComponent<HangingObject2D>();
+            bool isHangingSuspended = hanging != null && hanging.IsSuspended;
+
             float verticalDrop = playerPos.y - objPos.y;
             bool isBoxAirborne = !IsBoxGrounded();
 
-            if (isBoxAirborne)
+            if (isBoxAirborne && !isHangingSuspended)
             {
                 _tetherAirborneTimer += Time.fixedDeltaTime;
 

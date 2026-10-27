@@ -116,6 +116,10 @@ namespace ThailandHorrorJam.Editor.Tests
                 "UniversalHanging: Severing FreeFall Thread Becomes Dynamic Gravity Drop");
             RunTest(() => { t5.SetUp(); t5.SeverHangingThread_WithStitchableObject_DelegatesToStitchableAfterDrop(); t5.TearDown(); },
                 "UniversalHanging: Severing Thread Delegates To Stitchable After Drop");
+            RunTest(() => { t5.SetUp(); t5.TetherHangingObject_WhileSuspended_RemainsStaticAndSuspended(); t5.TearDown(); },
+                "UniversalHanging: Tether While Suspended Remains Static And Suspended");
+            RunTest(() => { t5.SetUp(); t5.SeverHangingThread_WhileAlreadyTethered_DropsAsDynamicAndMaintainsTether(); t5.TearDown(); },
+                "UniversalHanging: Severing Thread While Already Tethered Drops As Dynamic And Maintains Tether");
 
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();
