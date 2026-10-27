@@ -190,7 +190,7 @@ namespace ThailandHorrorJam.Systems.Interaction
                 // ลอยตาม Mouse Cursor ในโหมดเล็ง
                 Vector2 mousePos = UnityEngine.InputSystem.Mouse.current != null
                     ? UnityEngine.InputSystem.Mouse.current.position.ReadValue()
-                    : (Vector2)Input.mousePosition;
+                    : Vector2.zero;
                 _promptRoot.position = new Vector3(mousePos.x, mousePos.y + 45f, 0f);
                 return;
             }

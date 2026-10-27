@@ -84,14 +84,19 @@ namespace ThailandHorrorJam.Systems.Interaction
                 return;
             }
 
-            // ถ้ากำลังเล็งเข็ม (IsPinning): แสดง AimingPrompt (คลิกซ้ายยิง / คลิกขวายกเลิก)
-            if (_needleController != null && _needleController.IsPinning)
+            // ถ้ากำลังเล็งเข็ม (IsAiming): แสดง AimingPrompt (คลิกซ้ายยิง / คลิกขวายกเลิก)
+            if (_needleController != null && _needleController.IsAiming)
             {
                 if (_currentStage != PromptStage.AimingPrompt)
                 {
                     ApplyFocusState(_currentTarget, PromptStage.AimingPrompt);
                 }
                 return;
+            }
+
+            if (_currentStage == PromptStage.AimingPrompt)
+            {
+                _scanTimer = 0f;
             }
 
             if (_needleController != null && _needleController.IsTetheredToPlayer)
