@@ -129,5 +129,112 @@ namespace ThailandHorrorJam.Editor.Tests
                 Assert.IsTrue(pin == null, "All pin markers belonging to this SutureThread must be destroyed without leaking.");
             }
         }
+
+        [Test]
+        public void EmptySpaceRightClick_TogglesCutAimMode_AndSecondRightClickCancels()
+        {
+            var secondaryClick = typeof(NeedleController).GetMethod("OnSecondaryClick", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(secondaryClick, "OnSecondaryClick must exist on NeedleController.");
+
+            // 1. Right click on empty space toggles Cut Aim ON
+            secondaryClick.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+
+            Assert.IsTrue(_needle.IsCutAiming, "Right clicking empty space must toggle Cut Aim mode ON.");
+            Assert.IsTrue(_needle.IsAiming, "IsAiming must be true while in Cut Aim.");
+            Assert.IsFalse(_needle.IsPinning, "IsPinning must remain false in Cut Aim.");
+
+            // 2. Right click again toggles Cut Aim OFF
+            secondaryClick.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+
+            Assert.IsFalse(_needle.IsCutAiming, "Right click while in Cut Aim must toggle it OFF.");
+            Assert.IsFalse(_needle.IsAiming, "IsAiming must be false after toggling off.");
+        }
+
+        [Test]
+        public void CutAim_PuddlesThreadAtFeet_WhileAiming()
+        {
+            var secondaryClick = typeof(NeedleController).GetMethod("OnSecondaryClick", BindingFlags.NonPublic | BindingFlags.Instance);
+            secondaryClick?.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+
+            Assert.IsTrue(_needle.IsCutAiming, "Must be in Cut Aim mode.");
+
+            var updateThreadMethod = typeof(NeedleController).GetMethod("UpdateCutNeedleThread", BindingFlags.NonPublic | BindingFlags.Instance);
+            updateThreadMethod?.Invoke(_needle, new object[] { new Vector3(10f, 0f, 0f) });
+
+            var threadField = typeof(NeedleController).GetField("_cutNeedleThread", BindingFlags.NonPublic | BindingFlags.Instance);
+            var thread = threadField?.GetValue(_needle) as SutureThread;
+
+            Assert.IsNotNull(thread, "Cut needle must create SutureThread while aiming.");
+            Assert.IsFalse(thread.IsCuttable, "Thread pooled at feet must not be cuttable.");
+
+            // Verify FixedUpdate does not throw ArgumentOutOfRangeException while in pooled mode
+            var fixedUpdateMethod = typeof(SutureThread).GetMethod("FixedUpdate", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.DoesNotThrow(() => fixedUpdateMethod?.Invoke(thread, null), "FixedUpdate must not throw ArgumentOutOfRangeException while thread is pooled.");
+
+            // Cancel aim
+            secondaryClick?.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+            Assert.IsFalse(_needle.IsCutAiming, "Must exit Cut Aim mode.");
+        }
+
+        [Test]
+        public void CutNeedle_TrailingThread_ExistsAndIsNotCuttable()
+        {
+            var secondaryClick = typeof(NeedleController).GetMethod("OnSecondaryClick", BindingFlags.NonPublic | BindingFlags.Instance);
+            secondaryClick?.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+
+            // Fire cut needle
+            _primaryDownMethod.Invoke(_needle, new object[] { new Vector3(10f, 0f, 0f) });
+
+            var threadField = typeof(NeedleController).GetField("_cutNeedleThread", BindingFlags.NonPublic | BindingFlags.Instance);
+            var thread = threadField?.GetValue(_needle) as SutureThread;
+
+            Assert.IsNotNull(thread, "Cut needle must spawn a trailing SutureThread dragging from the player.");
+            Assert.IsFalse(thread.IsCuttable, "Cut needle's own trailing thread must not be cuttable.");
+            Assert.IsFalse(thread.HideAllPins, "Cut needle thread should show pin at player.");
+
+            _needle.ResetAllNeedleStates();
+        }
+
+        [Test]
+        public void CutAim_TrySeverAlongSegment_CutsThreadAndClearsLoop()
+        {
+            // 1. Create looping box with SutureThread
+            GameObject boxObj = new GameObject("LoopingBox_CutTest");
+            boxObj.transform.position = new Vector3(0f, 0f, 0f);
+            var rb = boxObj.AddComponent<Rigidbody2D>();
+            var col = boxObj.AddComponent<BoxCollider2D>();
+
+            // Attach SutureThread as child to emulate the box prefab hierarchy
+            GameObject threadObj = new GameObject("Thread");
+            threadObj.transform.SetParent(boxObj.transform);
+            var sutureThread = threadObj.AddComponent<SutureThread>();
+            typeof(SutureThread).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(sutureThread, null);
+            typeof(SutureThread).GetMethod("OnEnable", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(sutureThread, null);
+
+            var stitchable = boxObj.AddComponent<StitchableObject>();
+            typeof(StitchableObject).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(stitchable, null);
+
+            var waypoints = new List<Vector2> { new Vector2(0f, 0f), new Vector2(4f, 0f) };
+            stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
+            Assert.AreEqual(StitchState.Looping, stitchable.CurrentState);
+
+            // 2. Test TrySeverAlongSegment crossing the thread (from (2, 2) to (2, -2))
+            var trySeverMethod = typeof(NeedleController).GetMethod("TrySeverAlongSegment", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(trySeverMethod, "TrySeverAlongSegment method should exist on NeedleController.");
+
+            bool severed = (bool)trySeverMethod.Invoke(_needle, new object[] { new Vector2(2f, 2f), new Vector2(2f, -2f) });
+            Assert.IsTrue(severed, "Segment crossing the suture thread must sever it.");
+            Assert.AreEqual(StitchState.Idle, stitchable.CurrentState, "Box must return to Idle state after thread is severed.");
+
+            Object.DestroyImmediate(boxObj);
+        }
+
+        [Test]
+        public void CutAim_TrySeverAlongSegment_MissReturnsFalse()
+        {
+            var trySeverMethod = typeof(NeedleController).GetMethod("TrySeverAlongSegment", BindingFlags.NonPublic | BindingFlags.Instance);
+            bool severed = (bool)trySeverMethod.Invoke(_needle, new object[] { new Vector2(100f, 100f), new Vector2(100f, 110f) });
+            Assert.IsFalse(severed, "Segment far from threads must return false.");
+        }
     }
 }
