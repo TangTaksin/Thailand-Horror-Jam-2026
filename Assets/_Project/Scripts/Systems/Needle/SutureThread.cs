@@ -154,6 +154,8 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("When true, this thread can be severed by blades or cut needles. If false, it cannot be cut.")]
         [SerializeField] private bool _isCuttable = true;
 
+        public event System.Action OnSevered;
+
         public bool IsCuttable
         {
             get => _isCuttable;
@@ -766,6 +768,8 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void Sever()
         {
+            OnSevered?.Invoke();
+
             IStitchable owner = GetOwner();
             if (owner != null)
             {
