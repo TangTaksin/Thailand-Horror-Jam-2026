@@ -214,7 +214,6 @@ namespace ThailandHorrorJam.Systems.Interaction
         {
             if (candidate == null || !candidate.gameObject.activeInHierarchy) return false;
             if (candidate.CurrentState != StitchState.Idle) return false;
-            if (_playerController != null && _playerController.IsStandingOn(candidate)) return false;
             return true;
         }
 

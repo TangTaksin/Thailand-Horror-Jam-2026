@@ -331,7 +331,7 @@ namespace ThailandHorrorJam.Systems.Needle
             }
         }
 
-        private void RestoreOriginalBodyState()
+        public void RestoreOriginalBodyState()
         {
             if (!_hasRb) return;
             _rb.bodyType = _originalBodyType;
@@ -599,7 +599,9 @@ namespace ThailandHorrorJam.Systems.Needle
             _activeTetherLeashLength = Mathf.Clamp(currentDist, _minTetherDistance, MaxTetherDistance);
             _tetherAirborneTimer = 0f;
 
-            _tetherJoint.enabled = true;
+            bool isStandingOnThis = _tetheredPlayerController != null && _tetheredPlayerController.IsStandingOn(this);
+
+            _tetherJoint.enabled = !isStandingOnThis;
             _tetherJoint.connectedBody = playerRb;
             _tetherJoint.autoConfigureDistance = false;
             _tetherJoint.maxDistanceOnly = true;
@@ -685,16 +687,35 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            // ปลดสายจูงทันทีหากผู้เล่นก้าวขึ้นมายืนอยู่บนวัตถุชิ้นนี้ ป้องกันแรงดึง Joint ฟิสิกส์ลากวัตถุใต้เท้า
-            if (_tetheredPlayerController != null && _tetheredPlayerController.IsStandingOn(this))
-            {
-                ReleasePlayerTether();
-                return;
-            }
-
             Vector2 objPos = CurrentPosition;
             Vector2 playerPos = _tetheredPlayerRb != null ? _tetheredPlayerRb.position : (Vector2)_tetheredPlayerTransform.position;
             float dist = Vector2.Distance(objPos, playerPos);
+
+            // หากผู้เล่นยืนอยู่บนวัตถุชิ้นนี้ ให้พักการทำงานของ Joint ฟิสิกส์ชั่วคราวและล็อคแกน X
+            // เพื่อป้องกันแรงดึง Joint ลากวัตถุใต้เท้า (hoverboard exploit) แต่ยังคงสถานะ Tether และวาดเส้นด้ายไว้
+            if (_tetheredPlayerController != null && _tetheredPlayerController.IsStandingOn(this))
+            {
+                if (_tetherJoint != null && _tetherJoint.enabled)
+                {
+                    _tetherJoint.enabled = false;
+                }
+                SetHorizontalLock(true);
+
+                if (_sutureThread != null)
+                {
+                    _sutureThread.SetTensionStrain(0f);
+                    _sutureThread.UpdateDynamicEndpoints(objPos, playerPos, _activeTetherLeashLength);
+                }
+                return;
+            }
+
+            // เมื่อผู้เล่นก้าวหรือกระโดดลงจากวัตถุแล้ว ให้เปิด Joint ฟิสิกส์กลับมาทำงานตามปกติ
+            if (_tetherJoint != null && !_tetherJoint.enabled)
+            {
+                _tetherJoint.enabled = true;
+                _activeTetherLeashLength = Mathf.Clamp(dist, _minTetherDistance, MaxTetherDistance);
+                _tetherJoint.distance = _activeTetherLeashLength;
+            }
 
             // ตรวจสอบกรณีกล่องถูกผลักหรือร่วงตกจากแท่น (Ledge / Cliff / Pit Drop)
             // ถ้ากล่องไม่มีพื้นรองรับและร่วงลงต่ำกว่าระดับตัวผู้เล่น ให้ตัดสายด้ายขาดทันที กล่องจะได้ร่วงลงไปอย่างเป็นธรรมชาติ

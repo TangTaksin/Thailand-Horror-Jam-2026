@@ -526,7 +526,9 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (stitchable == null || stitchable.ObjectTransform == null) return false;
 
-            if (_playerController != null && _playerController.IsStandingOn(stitchable.ObjectTransform))
+            // อนุญาตให้ Tether ขณะยืนอยู่บนวัตถุได้ โดยระบบฟิสิกส์จะพักแรง Joint ชั่วคราวเพื่อป้องกัน hoverboard
+            bool allowWhileStanding = actionDesc == "tether";
+            if (!allowWhileStanding && _playerController != null && _playerController.IsStandingOn(stitchable.ObjectTransform))
             {
                 LogWarning($"[Needle] Cannot {actionDesc} {stitchable.ObjectTransform.name} while standing on it!");
                 CameraController2D.Instance?.Shake(0.025f, 0.08f);
@@ -795,6 +797,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void OnSecondaryClick(Vector3 worldAimPos)
         {
+            // 1. ถ้ามีการผูกสายจูงลาก (Player Tether) อยู่ -> คลิกขวาเพื่อปลดสายจูงทันที (Release Tether)
             if (_tetheredStitchable != null)
             {
                 ReleasePlayerTether();
@@ -802,26 +805,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
-            // คลิกขวาที่ StitchableObject เพื่อผูกลากทันที (Instant Haul Tether) 1-Click
-            IStitchable stitchable = FindStitchableAt(worldAimPos);
-            if (stitchable != null)
-            {
-                if (_isPinning)
-                {
-                    CancelStitching();
-                }
-                if (_isCutAiming)
-                {
-                    ResetCutAimState();
-                }
-
-                if (CanInteractWithStitchable(stitchable, "tether"))
-                {
-                    StartPlayerTether(stitchable);
-                }
-                return;
-            }
-
+            // 2. ถ้าอยู่ในโหมด Pinning อยู่แล้ว -> คลิกขวาเพื่อยกเลิกการเย็บ (Cancel Pinning)
             if (_isPinning)
             {
                 CancelStitching();
@@ -829,14 +813,25 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
+            // 3. ถ้าอยู่ในโหมด Cut Aim อยู่แล้ว -> คลิกขวาเพื่อยกเลิก / ปิดโหมดเล็ง (Toggle OFF)
             if (_isCutAiming)
             {
-                // ถ้าอยู่ในโหมด Cut Aim อยู่แล้ว การคลิกขวาจะยกเลิก / ปิดโหมดเล็ง (Toggle OFF)
                 ResetCutAimState();
                 return;
             }
 
-            // ถ้าไม่ได้เล็งอะไรอยู่ และคลิกขวาบนพื้นที่ว่าง/ด้าย -> เปิดโหมดเล็งยิงเข็มตัดด้าย (Toggle ON)
+            // 4. คลิกขวาที่ StitchableObject เพื่อผูกลากทันที (Instant Haul Tether) 1-Click (รวมถึงขณะยืนอยู่บนวัตถุ)
+            IStitchable stitchable = FindStitchableAt(worldAimPos);
+            if (stitchable != null)
+            {
+                if (CanInteractWithStitchable(stitchable, "tether"))
+                {
+                    StartPlayerTether(stitchable);
+                }
+                return;
+            }
+
+            // 5. ถ้าไม่ได้เล็งอะไรอยู่ และคลิกขวาบนพื้นที่ว่าง/ด้าย -> เปิดโหมดเล็งยิงเข็มตัดด้าย (Toggle ON)
             StartCutAiming();
         }
 

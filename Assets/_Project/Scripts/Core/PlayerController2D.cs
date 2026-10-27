@@ -555,9 +555,16 @@ namespace ThailandHorrorJam.Core
             if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isAiming)
             {
                 // ขณะกำลังลากวัตถุ (Hauling) หากผู้เล่นกดกระโดด จะปลดเชือกหลุดอัตโนมัติแล้วกระโดดได้อย่างคล่องตัว
+                // ยกเว้นกรณีที่ยืนอยู่บนวัตถุที่ผูกเชือกอยู่ (เช่น ยืนบนกล่องแล้วกระโดดลงมาลาก) จะไม่ปลดเชือก
                 if (_isHauling)
                 {
-                    ReleaseHaulingTether();
+                    bool standingOnTethered = (_currentStitchable != null && _currentStitchable.IsTetheredToPlayer && IsStandingOn(_currentStitchable))
+                        || (_needleController != null && _needleController.IsTetheredToPlayer && _needleController.TetheredStitchable != null && IsStandingOn(_needleController.TetheredStitchable.ObjectTransform));
+
+                    if (!standingOnTethered)
+                    {
+                        ReleaseHaulingTether();
+                    }
                 }
 
                 _jumpRequested = true;
@@ -886,12 +893,8 @@ namespace ThailandHorrorJam.Core
             _currentGroundCollider = newGround;
             _currentStitchable = newGround != null ? newGround.GetComponentInParent<StitchableObject>() : null;
 
-            // ปลดการลาก (Tether/Harness) ทันทีหากผู้เล่นก้าวขึ้นมายืนบนวัตถุที่ตัวเองกำลังผูกเชือกอยู่จริงๆ
-            // เพื่อป้องกันแรงฟิสิกส์ดึงวัตถุใต้เท้าจนเกิดบั๊กเลื่อนไหลตามตัว (Self-propulsion hoverboard exploit)
-            if (_isHauling && _currentStitchable != null && _currentStitchable.IsTetheredToPlayer && IsStandingOn(_currentStitchable))
-            {
-                _currentStitchable.ReleasePlayerTether();
-            }
+            // การป้องกัน hoverboard exploit เมื่อยืนบนกล่องที่ Tether ไว้ ถูกจัดการผ่านการ suspend Joint ฟิสิกส์
+            // ใน StitchableObject.UpdatePlayerHarness แล้ว จึงคงสถานะ Tether ต่อไปได้โดยไม่ต้องตัดสายด้ายทิ้ง
         }
 
         private bool IsValidGroundCollider(Collider2D groundCol, Vector2 checkPos, float feetBottomY, float colWidth, float playerFeetY)
