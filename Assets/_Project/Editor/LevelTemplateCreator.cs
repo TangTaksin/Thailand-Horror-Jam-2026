@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
 using TMPro;
@@ -17,6 +18,7 @@ namespace ThailandHorrorJam.Editor
     {
         private const string k_PrefabsOutputDir = "Assets/_Project/Prefabs/LevelDesign";
         private const string k_SceneOutputPath = "Assets/_Project/Scenes/LevelTemplate.unity";
+        private const string k_GameplayScenePath = "Assets/_Project/Scenes/Gameplay.unity";
 
         // Asset paths
         private const string k_SquareSpriteGuid = "311925a002f4447b3a28927169b83ea6";
@@ -33,6 +35,8 @@ namespace ThailandHorrorJam.Editor
         private const string k_SutureThreadPrefabPath = "Assets/_Project/Prefabs/SutureThread.prefab";
         private const string k_NeedleAnchorPrefabPath = "Assets/_Project/Prefabs/NeedleAnchor.prefab";
         private const string k_StitchableCratePrefabPath = "Assets/_Project/Prefabs/StitchableCrate.prefab";
+        private const string k_HangingBridgePrefabPath = "Assets/_Project/Prefabs/HangingBridge.prefab";
+        private const string k_InputTilesheetPath = "Assets/_Project/Art/Sprites/UI/tilemap_white_packed.png";
 
         [MenuItem("Tools/Horror Jam/Generate Graybox Prefab Library", false, 10)]
         public static void GenerateGrayboxPrefabs()
@@ -212,7 +216,7 @@ namespace ThailandHorrorJam.Editor
             // Start platform: X from -14 to -6 (top surface at Y = 0)
             CreatePlatform(sector1Root.transform, "Wall_Left_Boundary", new Vector3(-14.5f, 3.5f, 0f), new Vector2(1f, 8f), wallColor, squareSprite, onFrictionMat, groundLayer);
             CreatePlatform(sector1Root.transform, "Floor_Movement_Start", new Vector3(-10f, -1f, 0f), new Vector2(8f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
-            CreateWorldHint(sector1Root.transform, "Hint_Movement", new Vector3(-10f, 1.8f, 0f), "[A]   [D]\nMove", fontAsset);
+            CreateMovementHintTrigger(sector1Root.transform, new Vector3(-10f, 1.2f, 0f), new Vector2(6f, 3.5f), fontAsset);
 
             // Checkpoint 1 (Start)
             GameObject cpPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_CheckpointPrefabPath);
@@ -230,7 +234,7 @@ namespace ThailandHorrorJam.Editor
             // Slope from (-6, 0) up to (-1.5, 2.0) (Angle: 23.96°, Length: ~4.92)
             CreateSlope(sector1Root.transform, "Slope_Ramp", new Vector2(-6f, 0f), new Vector2(-1.5f, 2f), 1f, floorColor, squareSprite, onFrictionMat, groundLayer);
             CreatePlatform(sector1Root.transform, "Slope_Support", new Vector3(-3.75f, 0.5f, 0f), new Vector2(4.5f, 1f), wallColor, squareSprite, onFrictionMat, groundLayer);
-            CreateWorldHint(sector1Root.transform, "Hint_Slope", new Vector3(-3.75f, 2.3f, 0f), "Walk up Slope", fontAsset);
+            CreateWorldHintTrigger(sector1Root.transform, "Hint_Slope", new Vector3(-4.5f, 1.5f, 0f), new Vector2(4f, 3f), new Vector3(0.75f, 0.8f, 0f), "Walk up Slope", fontAsset);
 
             // ZONE 3: Mid Platform & Ground 1x1 Stepping Stone (Short Jump)
             // Mid ledge: X from -1.5 to 1.0 (top at Y = 2.0)
@@ -238,12 +242,12 @@ namespace ThailandHorrorJam.Editor
             
             // Ground 1x1 block at X = 2.5 (top at Y = 2.0, gap = 1.0 unit on each side)
             CreatePlatform(sector1Root.transform, "Ground_Block_1x1", new Vector3(2.5f, 1.5f, 0f), new Vector2(1f, 1f), floorColor, squareSprite, onFrictionMat, groundLayer);
-            CreateWorldHint(sector1Root.transform, "Hint_Jump", new Vector3(2.5f, 3.2f, 0f), "[Space]\nTap Jump", fontAsset);
+            CreateSpacebarHintTrigger(sector1Root.transform, "Hint_Jump", new Vector3(0.5f, 2.5f, 0f), new Vector2(3.5f, 3f), new Vector3(2.0f, 0.7f, 0f), "Space", "Tap Jump", fontAsset);
 
             // ZONE 4: Launch Runway & The Large Gap (Hold Jump required)
             // Launch runway: X from 4.0 to 8.0 (length 4.0, top at Y = 2.0)
             CreatePlatform(sector1Root.transform, "Floor_LaunchRunway", new Vector3(6f, 1f, 0f), new Vector2(4f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
-            CreateWorldHint(sector1Root.transform, "Hint_HoldJump", new Vector3(6.5f, 3.6f, 0f), "[Hold Space]\nLong Jump", fontAsset);
+            CreateSpacebarHintTrigger(sector1Root.transform, "Hint_HoldJump", new Vector3(6f, 2.5f, 0f), new Vector2(4f, 3f), new Vector3(0.5f, 1.1f, 0f), "Hold Space", "Long Jump", fontAsset);
 
             // CALIBRATED GAP: from X = 8.0 to X = 10.8 (Width = 2.8 units)
             // Tap jump reach = 2.03m (fails and drops into pit)
@@ -257,7 +261,7 @@ namespace ThailandHorrorJam.Editor
 
             // Return Step: 1x1 block at X = 8.8, Y = 0.5 (top at Y = 1.0)
             CreatePlatform(sector1Root.transform, "Pit_ReturnStep_1x1", new Vector3(8.8f, 0.5f, 0f), new Vector2(1f, 1f), floorColor, squareSprite, onFrictionMat, groundLayer);
-            CreateWorldHint(sector1Root.transform, "Hint_Retry", new Vector3(9.5f, 2.2f, 0f), "Fell down?\nJump up <--", fontAsset);
+            CreateWorldHintTrigger(sector1Root.transform, "Hint_Retry", new Vector3(9.5f, 0.8f, 0f), new Vector2(3.5f, 2.5f), new Vector3(0f, 1.4f, 0f), "Fell down?\nJump up <--", fontAsset);
 
             // SECTOR BOUNDARY TRIGGER (Bidirectional)
             GameObject triggerGo = new GameObject("Trigger_Sector1_to_Sector2");
@@ -274,9 +278,8 @@ namespace ThailandHorrorJam.Editor
             GameObject sector2Root = new GameObject("Sector_02 (Courtyard)");
             sector2Root.transform.SetParent(envRoot.transform, false);
 
-            // Floor from X = 18 to X = 36 (length 18, center at 27, top at Y = 2.0)
-            CreatePlatform(sector2Root.transform, "Floor_Sector2", new Vector3(27f, 1f, 0f), new Vector2(18f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
-            CreatePlatform(sector2Root.transform, "Wall_Right_Boundary", new Vector3(36.5f, 6f, 0f), new Vector2(1f, 10f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            // Floor from X = 18 to X = 54 (length 36, center at 36, top at Y = 2.0)
+            CreatePlatform(sector2Root.transform, "Floor_Sector2", new Vector3(36f, 1f, 0f), new Vector2(36f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
 
             // Checkpoint 2 (At Altar)
             Checkpoint cp2 = null;
@@ -285,14 +288,14 @@ namespace ThailandHorrorJam.Editor
                 var cpGo2 = (GameObject)PrefabUtility.InstantiatePrefab(cpPrefab, scene);
                 cpGo2.name = "Checkpoint_Sector2";
                 cpGo2.transform.SetParent(sector2Root.transform, false);
-                cpGo2.transform.position = new Vector3(22.5f, 2.5f, 0f);
+                cpGo2.transform.position = new Vector3(40.5f, 2.5f, 0f);
                 cp2 = cpGo2.GetComponent<Checkpoint>();
             }
 
             // --- DEAD FISH PILE ALTAR ---
             GameObject altarRoot = new GameObject("DeadFishAltar");
             altarRoot.transform.SetParent(sector2Root.transform, false);
-            altarRoot.transform.position = new Vector3(24.5f, 2.0f, 0f);
+            altarRoot.transform.position = new Vector3(44.0f, 2.0f, 0f);
 
             // 1. Organic Mound
             GameObject fishMound = new GameObject("FishMound");
@@ -416,6 +419,25 @@ namespace ThailandHorrorJam.Editor
             sbtSerialized.FindProperty("_targetSectorObject").objectReferenceValue = sector2Root;
             sbtSerialized.ApplyModifiedProperties();
 
+            // =============================================================
+            // SECTOR 3: NEEDLE CUTTING & HANGING DRAWBRIDGE PUZZLE
+            // =============================================================
+            Checkpoint cp3;
+            SectorBoundaryTrigger sbt2to3;
+            GameObject sector3Root = BuildSector3Hierarchy(
+                scene,
+                envRoot.transform,
+                sector2Root,
+                squareSprite,
+                onFrictionMat,
+                fontAsset,
+                groundLayer,
+                floorColor,
+                wallColor,
+                out cp3,
+                out sbt2to3
+            );
+
             // GLOBAL KILL ZONE (Far below at Y = -15)
             GameObject killZonePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_KillZonePrefabPath);
             if (killZonePrefab != null)
@@ -455,6 +477,13 @@ namespace ThailandHorrorJam.Editor
             entry1.FindPropertyRelative("name").stringValue = "Sector 2 (Courtyard)";
             entry1.FindPropertyRelative("rootObject").objectReferenceValue = sector2Root;
             entry1.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp2;
+
+            // Entry 2
+            sectorsProp.InsertArrayElementAtIndex(2);
+            var entry2 = sectorsProp.GetArrayElementAtIndex(2);
+            entry2.FindPropertyRelative("name").stringValue = "Sector 3 (Bridge & Needle Cutting)";
+            entry2.FindPropertyRelative("rootObject").objectReferenceValue = sector3Root;
+            entry2.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp3;
 
             lmSerialized.FindProperty("_activeRadius").intValue = 1;
             lmSerialized.FindProperty("_initialSectorIndex").intValue = 0;
@@ -538,13 +567,176 @@ namespace ThailandHorrorJam.Editor
             return go;
         }
 
-        private static GameObject CreateWorldHint(Transform parent, string name, Vector3 pos, string text, TMP_FontAsset font)
+        private static GameObject CreateMovementHintTrigger(
+            Transform parent,
+            Vector3 triggerPos,
+            Vector2 triggerSize,
+            TMP_FontAsset font)
         {
-            GameObject go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.transform.position = pos;
+            GameObject triggerGo = new GameObject("Trigger_Hint_Movement");
+            triggerGo.transform.SetParent(parent, false);
+            triggerGo.transform.position = triggerPos;
 
-            var tmp = go.AddComponent<TextMeshPro>();
+            var col = triggerGo.AddComponent<BoxCollider2D>();
+            col.isTrigger = true;
+            col.size = triggerSize;
+
+            GameObject visualGo = new GameObject("Hint_Movement");
+            visualGo.transform.SetParent(triggerGo.transform, false);
+            visualGo.transform.localPosition = new Vector3(0f, 0.6f, 0f);
+
+            var sprites = AssetDatabase.LoadAllAssetsAtPath(k_InputTilesheetPath).OfType<Sprite>().ToList();
+            var spriteA = sprites.FirstOrDefault(s => s.name == "tilemap_white_packed_95");
+            var spriteD = sprites.FirstOrDefault(s => s.name == "tilemap_white_packed_97");
+            var baseColor = new Color(0.82f, 0.82f, 0.88f, 0.75f);
+
+            if (spriteA != null)
+            {
+                GameObject iconA = new GameObject("Icon_A");
+                iconA.transform.SetParent(visualGo.transform, false);
+                iconA.transform.localPosition = new Vector3(-0.32f, 0.32f, 0f);
+                var srA = iconA.AddComponent<SpriteRenderer>();
+                srA.sprite = spriteA;
+                srA.color = baseColor;
+                srA.sortingLayerName = "Default";
+                srA.sortingOrder = 5;
+            }
+
+            if (spriteD != null)
+            {
+                GameObject iconD = new GameObject("Icon_D");
+                iconD.transform.SetParent(visualGo.transform, false);
+                iconD.transform.localPosition = new Vector3(0.32f, 0.32f, 0f);
+                var srD = iconD.AddComponent<SpriteRenderer>();
+                srD.sprite = spriteD;
+                srD.color = baseColor;
+                srD.sortingLayerName = "Default";
+                srD.sortingOrder = 5;
+            }
+
+            GameObject textGo = new GameObject("Text_Move");
+            textGo.transform.SetParent(visualGo.transform, false);
+            textGo.transform.localPosition = new Vector3(0f, -0.22f, 0f);
+
+            var tmp = textGo.AddComponent<TextMeshPro>();
+            if (font != null) tmp.font = font;
+            tmp.fontSize = 4f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = baseColor;
+            tmp.text = "Move";
+            tmp.sortingLayerID = SortingLayer.NameToID("Default");
+            tmp.sortingOrder = 5;
+
+            var hintTrigger = triggerGo.AddComponent<WorldHintTrigger2D>();
+            var triggerSerialized = new SerializedObject(hintTrigger);
+            triggerSerialized.FindProperty("_hintRoot").objectReferenceValue = visualGo;
+            triggerSerialized.FindProperty("_prerequisite").intValue = (int)HintPrerequisite.None;
+            triggerSerialized.FindProperty("_dismissMode").intValue = (int)HintDismissMode.RepeatableOnProximity;
+            triggerSerialized.FindProperty("_fadeDuration").floatValue = 0.35f;
+            triggerSerialized.ApplyModifiedProperties();
+
+            return triggerGo;
+        }
+
+        private static GameObject CreateSpacebarHintTrigger(
+            Transform parent,
+            string name,
+            Vector3 triggerPos,
+            Vector2 triggerSize,
+            Vector3 visualOffset,
+            string keyText,
+            string actionText,
+            TMP_FontAsset font)
+        {
+            GameObject triggerGo = new GameObject($"Trigger_{name}");
+            triggerGo.transform.SetParent(parent, false);
+            triggerGo.transform.position = triggerPos;
+
+            var col = triggerGo.AddComponent<BoxCollider2D>();
+            col.isTrigger = true;
+            col.size = triggerSize;
+
+            GameObject visualGo = new GameObject(name);
+            visualGo.transform.SetParent(triggerGo.transform, false);
+            visualGo.transform.localPosition = visualOffset;
+
+            var sprites = AssetDatabase.LoadAllAssetsAtPath(k_InputTilesheetPath).OfType<Sprite>().ToList();
+            var spriteSpace = sprites.FirstOrDefault(s => s.name == "tilemap_white_packed_376");
+            var baseColor = new Color(0.82f, 0.82f, 0.88f, 0.75f);
+
+            if (spriteSpace != null)
+            {
+                GameObject iconGo = new GameObject("Icon_Spacebar");
+                iconGo.transform.SetParent(visualGo.transform, false);
+                iconGo.transform.localPosition = new Vector3(0f, 0.18f, 0f);
+                var sr = iconGo.AddComponent<SpriteRenderer>();
+                sr.sprite = spriteSpace;
+                sr.color = baseColor;
+                sr.sortingLayerName = "Default";
+                sr.sortingOrder = 5;
+
+                GameObject keyTextGo = new GameObject("Text_SpaceKey");
+                keyTextGo.transform.SetParent(iconGo.transform, false);
+                keyTextGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+                var keyTmp = keyTextGo.AddComponent<TextMeshPro>();
+                if (font != null) keyTmp.font = font;
+                keyTmp.fontSize = keyText.Length > 6 ? 2.9f : 3.2f;
+                keyTmp.alignment = TextAlignmentOptions.Center;
+                keyTmp.color = baseColor;
+                keyTmp.text = keyText;
+                keyTmp.sortingLayerID = SortingLayer.NameToID("Default");
+                keyTmp.sortingOrder = 6;
+            }
+
+            GameObject actionTextGo = new GameObject("Text_Action");
+            actionTextGo.transform.SetParent(visualGo.transform, false);
+            actionTextGo.transform.localPosition = new Vector3(0f, -0.22f, 0f);
+
+            var actionTmp = actionTextGo.AddComponent<TextMeshPro>();
+            if (font != null) actionTmp.font = font;
+            actionTmp.fontSize = 4f;
+            actionTmp.alignment = TextAlignmentOptions.Center;
+            actionTmp.color = baseColor;
+            actionTmp.text = actionText;
+            actionTmp.sortingLayerID = SortingLayer.NameToID("Default");
+            actionTmp.sortingOrder = 5;
+
+            var hintTrigger = triggerGo.AddComponent<WorldHintTrigger2D>();
+            var triggerSerialized = new SerializedObject(hintTrigger);
+            triggerSerialized.FindProperty("_hintRoot").objectReferenceValue = visualGo;
+            triggerSerialized.FindProperty("_prerequisite").intValue = (int)HintPrerequisite.None;
+            triggerSerialized.FindProperty("_dismissMode").intValue = (int)HintDismissMode.RepeatableOnProximity;
+            triggerSerialized.FindProperty("_fadeDuration").floatValue = 0.35f;
+            triggerSerialized.ApplyModifiedProperties();
+
+            return triggerGo;
+        }
+
+        private static GameObject CreateWorldHintTrigger(
+            Transform parent,
+            string name,
+            Vector3 triggerPos,
+            Vector2 triggerSize,
+            Vector3 visualOffset,
+            string text,
+            TMP_FontAsset font,
+            HintPrerequisite prerequisite = HintPrerequisite.None,
+            HintDismissMode dismissMode = HintDismissMode.RepeatableOnProximity,
+            MonoBehaviour dismissConditionTarget = null)
+        {
+            GameObject triggerGo = new GameObject($"Trigger_{name}");
+            triggerGo.transform.SetParent(parent, false);
+            triggerGo.transform.position = triggerPos;
+
+            var col = triggerGo.AddComponent<BoxCollider2D>();
+            col.isTrigger = true;
+            col.size = triggerSize;
+
+            GameObject visualGo = new GameObject(name);
+            visualGo.transform.SetParent(triggerGo.transform, false);
+            visualGo.transform.localPosition = visualOffset;
+
+            var tmp = visualGo.AddComponent<TextMeshPro>();
             if (font != null)
             {
                 tmp.font = font;
@@ -556,7 +748,411 @@ namespace ThailandHorrorJam.Editor
             tmp.sortingLayerID = SortingLayer.NameToID("Default");
             tmp.sortingOrder = 5;
 
-            return go;
+            var hintTrigger = triggerGo.AddComponent<WorldHintTrigger2D>();
+            var triggerSerialized = new SerializedObject(hintTrigger);
+            triggerSerialized.FindProperty("_hintRoot").objectReferenceValue = visualGo;
+            triggerSerialized.FindProperty("_prerequisite").intValue = (int)prerequisite;
+            triggerSerialized.FindProperty("_dismissMode").intValue = (int)dismissMode;
+            triggerSerialized.FindProperty("_fadeDuration").floatValue = 0.35f;
+            if (dismissConditionTarget != null)
+            {
+                triggerSerialized.FindProperty("_dismissConditionTarget").objectReferenceValue = dismissConditionTarget;
+            }
+            triggerSerialized.ApplyModifiedProperties();
+
+            return triggerGo;
+        }
+
+        [MenuItem("GameObject/2D Object/Thailand Horror Jam/World Hint Trigger", false, 10)]
+        public static void CreateWorldHintTriggerMenuItem(MenuCommand menuCommand)
+        {
+            GameObject go = new GameObject("Trigger_WorldHint");
+            GameObjectUtility.SetParentAndAlign(go, menuCommand.context as GameObject);
+
+            var col = go.AddComponent<BoxCollider2D>();
+            col.isTrigger = true;
+            col.size = new Vector2(3f, 3f);
+
+            var hintTrigger = go.AddComponent<WorldHintTrigger2D>();
+
+            GameObject visualGo = new GameObject("Visual_Hint");
+            visualGo.transform.SetParent(go.transform, false);
+            visualGo.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+
+            var tmp = visualGo.AddComponent<TextMeshPro>();
+            var fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(k_FontAssetPath);
+            if (fontAsset != null)
+            {
+                tmp.font = fontAsset;
+            }
+            tmp.fontSize = 4f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.text = "Hint Text";
+            tmp.color = new Color(0.82f, 0.82f, 0.88f, 0.75f);
+            tmp.sortingLayerID = SortingLayer.NameToID("Default");
+            tmp.sortingOrder = 5;
+
+            var triggerSerialized = new SerializedObject(hintTrigger);
+            triggerSerialized.FindProperty("_hintRoot").objectReferenceValue = visualGo;
+            triggerSerialized.FindProperty("_prerequisite").intValue = (int)HintPrerequisite.None;
+            triggerSerialized.FindProperty("_dismissMode").intValue = (int)HintDismissMode.RepeatableOnProximity;
+            triggerSerialized.FindProperty("_fadeDuration").floatValue = 0.35f;
+            triggerSerialized.ApplyModifiedProperties();
+
+            Undo.RegisterCreatedObjectUndo(go, "Create World Hint Trigger");
+            Selection.activeObject = go;
+        }
+
+        public static GameObject BuildSector3Hierarchy(
+            Scene scene,
+            Transform envRoot,
+            GameObject sector2Root,
+            Sprite squareSprite,
+            PhysicsMaterial2D onFrictionMat,
+            TMP_FontAsset fontAsset,
+            int groundLayer,
+            Color floorColor,
+            Color wallColor,
+            out Checkpoint cp3,
+            out SectorBoundaryTrigger boundaryTrigger)
+        {
+            // SECTOR BOUNDARY TRIGGER 2 -> 3 (Bidirectional)
+            GameObject trigger2to3Go = new GameObject("Trigger_Sector2_to_Sector3");
+            trigger2to3Go.transform.SetParent(envRoot, false);
+            trigger2to3Go.transform.position = new Vector3(54f, 3.5f, 0f);
+
+            var trigger2to3Col = trigger2to3Go.AddComponent<BoxCollider2D>();
+            trigger2to3Col.isTrigger = true;
+            trigger2to3Col.size = new Vector2(2f, 6f);
+
+            GameObject sector3Root = new GameObject("Sector_03 (Bridge & Needle Cutting)");
+            sector3Root.transform.SetParent(envRoot, false);
+
+            // ZONE 1: Approach Runway (X: 54 ~ 60, surface at Y = 2.0)
+            CreatePlatform(sector3Root.transform, "Floor_Sector3_Approach", new Vector3(57f, 1f, 0f), new Vector2(6f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Checkpoint 3 (Before Bridge)
+            cp3 = null;
+            GameObject cpPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_CheckpointPrefabPath);
+            if (cpPrefab != null)
+            {
+                var cpGo3 = (GameObject)PrefabUtility.InstantiatePrefab(cpPrefab, scene);
+                cpGo3.name = "Checkpoint_Sector3";
+                cpGo3.transform.SetParent(sector3Root.transform, false);
+                cpGo3.transform.position = new Vector3(55.5f, 2.5f, 0f);
+                cp3 = cpGo3.GetComponent<Checkpoint>();
+            }
+
+            // ZONE 2: The Chasm & Deadly Spikes (X: 60.0 ~ 64.25, width: 4.25m)
+            CreatePlatform(sector3Root.transform, "Floor_Sector3_Pit", new Vector3(62.125f, -2.5f, 0f), new Vector2(5.5f, 1f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector3Root.transform, "Wall_Pit_Left", new Vector3(59.75f, -0.25f, 0f), new Vector2(0.5f, 3.5f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector3Root.transform, "Wall_Pit_Right", new Vector3(64.5f, -0.25f, 0f), new Vector2(0.5f, 3.5f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Spikes Visuals (7 decorative dark silhouette spikes)
+            Color spikeColor = new Color(0.12f, 0.12f, 0.14f, 1f);
+            for (int s = 0; s < 7; s++)
+            {
+                float spikeX = 60.5f + s * 0.55f;
+                GameObject spikeGo = new GameObject($"Spike_Visual_{s}");
+                spikeGo.transform.SetParent(sector3Root.transform, false);
+                spikeGo.transform.position = new Vector3(spikeX, -1.95f, 0f);
+                spikeGo.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
+                spikeGo.transform.localScale = new Vector3(0.35f, 0.35f, 1f);
+                var spikeSr = spikeGo.AddComponent<SpriteRenderer>();
+                spikeSr.sprite = squareSprite;
+                spikeSr.color = spikeColor;
+                spikeSr.sortingLayerName = "Default";
+                spikeSr.sortingOrder = 2;
+            }
+
+            // Spikes Hazard KillZone
+            GameObject killZonePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_KillZonePrefabPath);
+            if (killZonePrefab != null)
+            {
+                var kzSector3 = (GameObject)PrefabUtility.InstantiatePrefab(killZonePrefab, scene);
+                kzSector3.name = "KillZone_Sector3_Spikes";
+                kzSector3.transform.SetParent(sector3Root.transform, false);
+                kzSector3.transform.position = new Vector3(62.125f, -1.8f, 0f);
+                var kzCol = kzSector3.GetComponent<BoxCollider2D>();
+                if (kzCol != null)
+                {
+                    kzCol.size = new Vector2(4.25f, 0.8f);
+                }
+                var kzComp = kzSector3.GetComponent<KillZone>();
+                if (kzComp != null)
+                {
+                    var kzSerialized = new SerializedObject(kzComp);
+                    kzSerialized.FindProperty("_hazardType").intValue = (int)HazardType.Spikes;
+                    kzSerialized.FindProperty("_cameraShakeIntensity").floatValue = 0.25f;
+                    kzSerialized.ApplyModifiedProperties();
+                }
+            }
+
+            // ZONE 3: Overhead Ceiling Beam (X: 58 ~ 68, Y: 6.75)
+            CreatePlatform(sector3Root.transform, "Ceiling_Sector3", new Vector3(62.5f, 6.75f, 0f), new Vector2(10f, 1f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // ZONE 4: Hanging Drawbridge (Hinge on Far Ledge at X = 64.25, Y = 2.0)
+            HangingObject2D hangingBridge = null;
+            GameObject bridgePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_HangingBridgePrefabPath);
+            if (bridgePrefab != null)
+            {
+                var bridgeGo = (GameObject)PrefabUtility.InstantiatePrefab(bridgePrefab, scene);
+                bridgeGo.name = "HangingBridge";
+                bridgeGo.transform.SetParent(sector3Root.transform, false);
+                bridgeGo.transform.position = new Vector3(64.25f, 2.0f, 0f);
+                hangingBridge = bridgeGo.GetComponentInChildren<HangingObject2D>();
+            }
+
+            // Minimalist Tutorial Hint: Trigger + RMB Sprite + Aim text
+            Sprite rmbSprite = AssetDatabase.LoadAllAssetsAtPath(k_InputTilesheetPath)
+                .OfType<Sprite>()
+                .FirstOrDefault(s => s.name == "tilemap_white_packed_64");
+
+            GameObject hintRoot = new GameObject("Hint_NeedleAim");
+            hintRoot.transform.SetParent(sector3Root.transform, false);
+            hintRoot.transform.position = new Vector3(58.0f, 4.0f, 0f);
+
+            // 1. Aim Hint: Icon Sprite (tilemap_white_packed_64 = Right Click mouse) + "Aim"
+            if (rmbSprite != null)
+            {
+                GameObject iconGo = new GameObject("Icon_RMB");
+                iconGo.transform.SetParent(hintRoot.transform, false);
+                iconGo.transform.localPosition = new Vector3(-0.45f, 0f, 0f);
+                iconGo.transform.localScale = new Vector3(0.75f, 0.75f, 1f);
+                var iconSr = iconGo.AddComponent<SpriteRenderer>();
+                iconSr.sprite = rmbSprite;
+                iconSr.color = new Color(0.82f, 0.82f, 0.88f, 0.65f);
+                iconSr.sortingLayerName = "Default";
+                iconSr.sortingOrder = 5;
+            }
+
+            GameObject textGo = new GameObject("Text_Aim");
+            textGo.transform.SetParent(hintRoot.transform, false);
+            textGo.transform.localPosition = new Vector3(0.15f, 0f, 0f);
+            var tmp = textGo.AddComponent<TextMeshPro>();
+            if (fontAsset != null)
+            {
+                tmp.font = fontAsset;
+            }
+            tmp.fontSize = 4f;
+            tmp.alignment = TextAlignmentOptions.Left;
+            tmp.color = new Color(0.82f, 0.82f, 0.88f, 0.65f);
+            tmp.text = "Aim";
+            tmp.sortingLayerID = SortingLayer.NameToID("Default");
+            tmp.sortingOrder = 5;
+
+            // Trigger Zone before the pit
+            GameObject triggerGo = new GameObject("Trigger_Hint_NeedleAim");
+            triggerGo.transform.SetParent(sector3Root.transform, false);
+            triggerGo.transform.position = new Vector3(58.0f, 2.75f, 0f);
+            var triggerCol = triggerGo.AddComponent<BoxCollider2D>();
+            triggerCol.size = new Vector2(4.0f, 2.5f);
+            triggerCol.isTrigger = true;
+
+            var hintTrigger = triggerGo.AddComponent<WorldHintTrigger2D>();
+            var triggerSerialized = new SerializedObject(hintTrigger);
+            triggerSerialized.FindProperty("_hintRoot").objectReferenceValue = hintRoot;
+            triggerSerialized.FindProperty("_prerequisite").intValue = (int)HintPrerequisite.RequireNeedle;
+            triggerSerialized.FindProperty("_dismissMode").intValue = (int)HintDismissMode.OnConditionMet;
+            triggerSerialized.FindProperty("_fadeDuration").floatValue = 0.35f;
+            if (hangingBridge != null)
+            {
+                triggerSerialized.FindProperty("_dismissConditionTarget").objectReferenceValue = hangingBridge;
+            }
+            triggerSerialized.ApplyModifiedProperties();
+
+            // ZONE 5: Landing Platform (X: 64.25 ~ 76.25, surface at Y = 2.0)
+            CreatePlatform(sector3Root.transform, "Floor_Sector3_Landing", new Vector3(70.25f, 1f, 0f), new Vector2(12f, 2f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector3Root.transform, "Wall_Sector3_End", new Vector3(76.5f, 6f, 0f), new Vector2(1f, 10f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Hook up Trigger Sector 2 -> Sector 3
+            boundaryTrigger = trigger2to3Go.AddComponent<SectorBoundaryTrigger>();
+            var sbt2to3Serialized = new SerializedObject(boundaryTrigger);
+            sbt2to3Serialized.FindProperty("_isBidirectional").boolValue = true;
+            sbt2to3Serialized.FindProperty("_sectorA").objectReferenceValue = sector2Root;
+            sbt2to3Serialized.FindProperty("_sectorB").objectReferenceValue = sector3Root;
+            sbt2to3Serialized.FindProperty("_expectedDirection").vector2Value = Vector2.right;
+            sbt2to3Serialized.FindProperty("_targetSectorIndex").intValue = 2;
+            sbt2to3Serialized.FindProperty("_targetSectorObject").objectReferenceValue = sector3Root;
+            sbt2to3Serialized.ApplyModifiedProperties();
+
+            return sector3Root;
+        }
+
+        public static GameObject BuildSector4Hierarchy(
+            Scene scene,
+            Transform envRoot,
+            GameObject sector3Root,
+            Sprite squareSprite,
+            PhysicsMaterial2D onFrictionMat,
+            TMP_FontAsset fontAsset,
+            int groundLayer,
+            Color floorColor,
+            Color wallColor,
+            out Checkpoint cp4,
+            out SectorBoundaryTrigger boundaryTrigger)
+        {
+            GameObject sector4Root = new GameObject("Sector_04 (Bloated Carcass & Drag Tether)");
+            sector4Root.transform.SetParent(envRoot, false);
+
+            // 1. Approach Runway (from X=76.25 to 84.0, surface at Y=2.0)
+            CreatePlatform(sector4Root.transform, "Floor_Sector4_Approach", new Vector3(80.125f, 1.0f, 0f), new Vector2(7.75f, 2.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Checkpoint 4
+            cp4 = null;
+            GameObject cpPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_CheckpointPrefabPath);
+            if (cpPrefab != null)
+            {
+                var cpGo = (GameObject)PrefabUtility.InstantiatePrefab(cpPrefab, scene);
+                cpGo.name = "Checkpoint_Sector4";
+                cpGo.transform.SetParent(sector4Root.transform, false);
+                cpGo.transform.position = new Vector3(78.0f, 2.5f, 0f);
+                cp4 = cpGo.GetComponent<Checkpoint>();
+            }
+
+            // 2. Yellow Stitchable Crate
+            GameObject cratePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_StitchableCratePrefabPath);
+            if (cratePrefab != null)
+            {
+                var crateGo = (GameObject)PrefabUtility.InstantiatePrefab(cratePrefab, scene);
+                crateGo.name = "StitchableCrate_Sector4";
+                crateGo.transform.SetParent(sector4Root.transform, false);
+                crateGo.transform.position = new Vector3(83.0f, 2.5f, 0f);
+
+                var crateSr = crateGo.GetComponentInChildren<SpriteRenderer>();
+                if (crateSr != null)
+                {
+                    crateSr.color = new Color(0.85f, 0.65f, 0.22f, 1f);
+                    crateSr.sortingLayerName = "Default";
+                    crateSr.sortingOrder = 3;
+                }
+            }
+
+            // 3. Hint: RMB Tether
+            Sprite rmbSprite = AssetDatabase.LoadAllAssetsAtPath(k_InputTilesheetPath)
+                .OfType<Sprite>()
+                .FirstOrDefault(s => s.name == "tilemap_white_packed_64");
+
+            GameObject triggerHintGo = new GameObject("Trigger_Hint_Tether");
+            triggerHintGo.transform.SetParent(sector4Root.transform, false);
+            triggerHintGo.transform.position = new Vector3(81.5f, 2.75f, 0f);
+            var triggerCol = triggerHintGo.AddComponent<BoxCollider2D>();
+            triggerCol.size = new Vector2(3.5f, 3.0f);
+            triggerCol.isTrigger = true;
+
+            GameObject hintRoot = new GameObject("Hint_Tether");
+            hintRoot.transform.SetParent(triggerHintGo.transform, false);
+            hintRoot.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+
+            if (rmbSprite != null)
+            {
+                var iconGo = new GameObject("Icon_RMB");
+                iconGo.transform.SetParent(hintRoot.transform, false);
+                iconGo.transform.localPosition = new Vector3(-0.55f, 0f, 0f);
+                iconGo.transform.localScale = new Vector3(0.75f, 0.75f, 1f);
+                var sr = iconGo.AddComponent<SpriteRenderer>();
+                sr.sprite = rmbSprite;
+                sr.color = new Color(0.82f, 0.82f, 0.88f, 0.75f);
+                sr.sortingLayerName = "Default";
+                sr.sortingOrder = 5;
+            }
+
+            GameObject textGo = new GameObject("Text_Tether");
+            textGo.transform.SetParent(hintRoot.transform, false);
+            textGo.transform.localPosition = new Vector3(0.15f, 0f, 0f);
+            var tmp = textGo.AddComponent<TextMeshPro>();
+            if (fontAsset != null) tmp.font = fontAsset;
+            tmp.fontSize = 4f;
+            tmp.alignment = TextAlignmentOptions.Left;
+            tmp.text = "Tether";
+            tmp.color = new Color(0.82f, 0.82f, 0.88f, 0.75f);
+            tmp.sortingLayerID = SortingLayer.NameToID("Default");
+            tmp.sortingOrder = 5;
+
+            var hintTrigger = triggerHintGo.AddComponent<WorldHintTrigger2D>();
+            hintTrigger.HintRoot = hintRoot;
+            hintTrigger.Prerequisite = HintPrerequisite.RequireNeedle;
+            hintTrigger.DismissMode = HintDismissMode.RepeatableOnProximity;
+            hintTrigger.FadeDuration = 0.35f;
+
+            // 4. Sunken Pit (X: 84.0 ~ 90.0, floor surface at Y=0.0)
+            CreatePlatform(sector4Root.transform, "Floor_Sector4_Pit", new Vector3(87.0f, -1.0f, 0f), new Vector2(6.0f, 2.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector4Root.transform, "Wall_Pit_Left", new Vector3(83.75f, 1.0f, 0f), new Vector2(0.5f, 2.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Anti-Softlock Return Step (1x1 block at X=84.5, Y=0.5, top at Y=1.0)
+            CreatePlatform(sector4Root.transform, "Pit_ReturnStep_1x1", new Vector3(84.5f, 0.5f, 0f), new Vector2(1.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 5. Giant Fish Carcass & Gas Vent
+            GameObject carcassGo = new GameObject("GiantFishCarcass");
+            carcassGo.transform.SetParent(sector4Root.transform, false);
+            carcassGo.transform.position = new Vector3(87.2f, 0.0f, 0f);
+
+            CreateSpriteRendererObject(carcassGo.transform, "Carcass_Base", new Vector3(0f, 0.35f, 0f), new Vector2(3.2f, 0.7f), new Color(0.20f, 0.16f, 0.19f, 1f), squareSprite);
+            CreateSpriteRendererObject(carcassGo.transform, "Carcass_Belly", new Vector3(0.15f, 0.65f, 0f), new Vector2(2.2f, 0.55f), new Color(0.28f, 0.16f, 0.20f, 1f), squareSprite);
+            CreateSpriteRendererObject(carcassGo.transform, "Carcass_Gore", new Vector3(-0.1f, 0.45f, 0f), new Vector2(1.4f, 0.35f), new Color(0.40f, 0.11f, 0.14f, 1f), squareSprite);
+
+            // Rupture Vent & CorpseGasVent2D
+            GameObject ventGo = new GameObject("CorpseGasVent");
+            ventGo.transform.SetParent(carcassGo.transform, false);
+            ventGo.transform.localPosition = new Vector3(0.3f, 1.25f, 0f);
+
+            var ventCol = ventGo.AddComponent<BoxCollider2D>();
+            ventCol.size = new Vector2(1.6f, 2.5f);
+            ventCol.isTrigger = true;
+
+            var telegraphGo = CreateSpriteRendererObject(ventGo.transform, "Visual_Telegraph", new Vector3(0f, -0.7f, 0f), new Vector2(0.8f, 0.4f), new Color(0.35f, 0.75f, 0.45f, 0.35f), squareSprite);
+            telegraphGo.SetActive(false);
+
+            var eruptionGo = CreateSpriteRendererObject(ventGo.transform, "Visual_Eruption", new Vector3(0f, 0f, 0f), new Vector2(1.2f, 2.4f), new Color(0.35f, 0.75f, 0.45f, 0.55f), squareSprite);
+            eruptionGo.SetActive(false);
+
+            GameObject lightGo = new GameObject("GasVent_Light");
+            lightGo.transform.SetParent(ventGo.transform, false);
+            lightGo.transform.localPosition = new Vector3(0f, -0.6f, 0f);
+            var light2D = lightGo.AddComponent<Light2D>();
+            light2D.lightType = Light2D.LightType.Point;
+            light2D.color = new Color(0.25f, 0.75f, 0.35f, 1f);
+            light2D.pointLightOuterRadius = 3.5f;
+            light2D.intensity = 0.35f;
+
+            var gasVent = ventGo.AddComponent<CorpseGasVent2D>();
+            var ventSo = new SerializedObject(gasVent);
+            ventSo.FindProperty("_dormantDuration").floatValue = 2.5f;
+            ventSo.FindProperty("_telegraphDuration").floatValue = 0.85f;
+            ventSo.FindProperty("_eruptionDuration").floatValue = 2.2f;
+            ventSo.FindProperty("_upwardForce").floatValue = 34f;
+            ventSo.FindProperty("_maxUpwardVelocity").floatValue = 5.5f;
+            ventSo.FindProperty("_telegraphVisual").objectReferenceValue = telegraphGo;
+            ventSo.FindProperty("_eruptionVisual").objectReferenceValue = eruptionGo;
+            ventSo.FindProperty("_ventLight").objectReferenceValue = light2D;
+            ventSo.ApplyModifiedProperties();
+
+            // 6. Obstacle Wall: 2.4m High
+            CreatePlatform(sector4Root.transform, "Wall_Obstacle_2_4m", new Vector3(90.0f, 1.2f, 0f), new Vector2(1.0f, 2.4f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 7. Landing Platform
+            CreatePlatform(sector4Root.transform, "Floor_Sector4_Landing", new Vector3(94.25f, 1.0f, 0f), new Vector2(7.5f, 2.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector4Root.transform, "Wall_Sector4_End", new Vector3(98.5f, 6.0f, 0f), new Vector2(1.0f, 10.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 8. Sector Boundary Trigger 3 -> 4
+            GameObject trigger3to4Go = new GameObject("Trigger_Sector3_to_Sector4");
+            trigger3to4Go.transform.SetParent(sector4Root.transform, false);
+            trigger3to4Go.transform.position = new Vector3(76.0f, 3.5f, 0f);
+            var sbtCol = trigger3to4Go.AddComponent<BoxCollider2D>();
+            sbtCol.isTrigger = true;
+            sbtCol.size = new Vector2(2.0f, 6.0f);
+
+            boundaryTrigger = trigger3to4Go.AddComponent<SectorBoundaryTrigger>();
+            var sbtSo = new SerializedObject(boundaryTrigger);
+            sbtSo.FindProperty("_isBidirectional").boolValue = true;
+            sbtSo.FindProperty("_sectorA").objectReferenceValue = sector3Root;
+            sbtSo.FindProperty("_sectorB").objectReferenceValue = sector4Root;
+            sbtSo.FindProperty("_expectedDirection").vector2Value = Vector2.right;
+            sbtSo.FindProperty("_targetSectorIndex").intValue = 3;
+            sbtSo.FindProperty("_targetSectorObject").objectReferenceValue = sector4Root;
+            sbtSo.ApplyModifiedProperties();
+
+            return sector4Root;
         }
     }
 }

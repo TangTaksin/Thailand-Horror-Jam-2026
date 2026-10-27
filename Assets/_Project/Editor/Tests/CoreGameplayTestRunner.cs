@@ -97,6 +97,26 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t3.SetUp(); t3.NeedlePinMarkers_HaveDontSaveFlags_AndAreCleanedUpWithoutLeaking(); t3.TearDown(); },
                 "NeedlePinLifecycle: Pin Markers Have HideFlags.DontSave & Cleaned Up Without Leaks");
 
+            // 4. CorpseGasVentTests
+            var t4 = new CorpseGasVentTests();
+            RunTest(() => { t4.SetUp(); t4.FindBlockingCrate_DetectsCrateOverNozzle(); t4.TearDown(); },
+                "CorpseGasVent: Detects Crate Over Nozzle");
+            RunTest(() => { t4.SetUp(); t4.VisualHeight_ClampedToZero_WhenCrateRestingOnNozzle(); t4.TearDown(); },
+                "CorpseGasVent: Clamps Visual Height To Zero When Resting On Nozzle");
+            RunTest(() => { t4.SetUp(); t4.VisualHeight_ExpandsUnderneath_WhenCrateIsLifted(); t4.TearDown(); },
+                "CorpseGasVent: Expands Visual Height Underneath Lifted Crate");
+
+            // 5. UniversalHangingObjectTests
+            var t5 = new UniversalHangingObjectTests();
+            RunTest(() => { t5.SetUp(); t5.HangingObject_StartsSuspendedAndStatic(); t5.TearDown(); },
+                "UniversalHanging: Starts Suspended And Static");
+            RunTest(() => { t5.SetUp(); t5.SeverHangingThread_DrawbridgeMode_BecomesKinematicRotation(); t5.TearDown(); },
+                "UniversalHanging: Severing Drawbridge Thread Becomes Kinematic Rotation");
+            RunTest(() => { t5.SetUp(); t5.SeverHangingThread_FreeFallMode_BecomesDynamicGravityDrop(); t5.TearDown(); },
+                "UniversalHanging: Severing FreeFall Thread Becomes Dynamic Gravity Drop");
+            RunTest(() => { t5.SetUp(); t5.SeverHangingThread_WithStitchableObject_DelegatesToStitchableAfterDrop(); t5.TearDown(); },
+                "UniversalHanging: Severing Thread Delegates To Stitchable After Drop");
+
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();
         }
@@ -106,7 +126,7 @@ namespace ThailandHorrorJam.Editor.Tests
             var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
             foreach (var go in allGos)
             {
-                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate")))
+                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate") || go.name.StartsWith("TestCorpseGasVent") || go.name.StartsWith("TestCrate") || go.name.StartsWith("TestHangingObject")))
                 {
                     Object.DestroyImmediate(go);
                 }
