@@ -196,6 +196,10 @@ MonoBehaviour:
   _maxFallStretchY: 1.3
   _enableSnapFx: 1
   _snapFlashColor: {r: 2, g: 2, b: 2, a: 1}
+  _enableGameStartWakeUp: 1
+  _startLieDownDuration: 4
+  _hintMovement: {fileID: 0}
+  _hintFadeInDuration: 0.6
 --- !u!1 &5250503033083714245
 GameObject:
   m_ObjectHideFlags: 0

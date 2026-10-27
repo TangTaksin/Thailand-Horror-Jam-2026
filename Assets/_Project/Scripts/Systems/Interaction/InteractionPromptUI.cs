@@ -42,15 +42,65 @@ namespace ThailandHorrorJam.Systems.Interaction
         private void Awake()
         {
             _mainCamera = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
+            ResetDefaultLayout();
             ApplySpritesFromSet();
             ApplyCurrentVisuals();
         }
 
         private void OnEnable()
         {
+            ResetDefaultLayout();
             if (_interactionChannel == null) return;
             _interactionChannel.FocusChanged += HandleFocusChanged;
             HandleFocusChanged(_interactionChannel.LastFocusData);
+        }
+
+        public void ResetDefaultLayout()
+        {
+            if (_dotImage != null)
+            {
+                _dotImage.gameObject.SetActive(true);
+                RectTransform rt = _dotImage.rectTransform;
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(16f, 16f);
+            }
+
+            if (_leftClickImage != null)
+            {
+                _leftClickImage.gameObject.SetActive(true);
+                RectTransform rt = _leftClickImage.rectTransform;
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(-28f, 10f);
+                rt.sizeDelta = new Vector2(34f, 34f);
+            }
+
+            if (_rightClickImage != null)
+            {
+                _rightClickImage.gameObject.SetActive(true);
+                RectTransform rt = _rightClickImage.rectTransform;
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(28f, 10f);
+                rt.sizeDelta = new Vector2(34f, 34f);
+            }
+
+            if (_actionHintText != null)
+            {
+                _actionHintText.gameObject.SetActive(true);
+                RectTransform rt = _actionHintText.rectTransform;
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0f, -14f);
+                rt.sizeDelta = new Vector2(140f, 20f);
+                _actionHintText.alignment = TextAlignmentOptions.Center;
+            }
         }
 
         private void OnDisable()
@@ -148,6 +198,7 @@ namespace ThailandHorrorJam.Systems.Interaction
 
             if (_dotImage != null)
             {
+                if (!_dotImage.gameObject.activeSelf) _dotImage.gameObject.SetActive(true);
                 Color c = _dotImage.color;
                 c.a = 1f - _currentIconBlend;
                 _dotImage.color = c;
@@ -155,6 +206,7 @@ namespace ThailandHorrorJam.Systems.Interaction
 
             if (_leftClickImage != null)
             {
+                if (!_leftClickImage.gameObject.activeSelf) _leftClickImage.gameObject.SetActive(true);
                 Color c = _leftClickImage.color;
                 c.a = _currentIconBlend;
                 _leftClickImage.color = c;
@@ -162,6 +214,7 @@ namespace ThailandHorrorJam.Systems.Interaction
 
             if (_rightClickImage != null)
             {
+                if (!_rightClickImage.gameObject.activeSelf) _rightClickImage.gameObject.SetActive(true);
                 Color c = _rightClickImage.color;
                 c.a = _currentIconBlend;
                 _rightClickImage.color = c;
@@ -169,6 +222,7 @@ namespace ThailandHorrorJam.Systems.Interaction
 
             if (_actionHintText != null)
             {
+                if (!_actionHintText.gameObject.activeSelf) _actionHintText.gameObject.SetActive(true);
                 Color c = _actionHintText.color;
                 c.a = _currentIconBlend * 0.9f;
                 _actionHintText.color = c;

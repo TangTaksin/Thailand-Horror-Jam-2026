@@ -1,5 +1,6 @@
 using UnityEngine;
 using DG.Tweening;
+using TMPro;
 using ThailandHorrorJam.Systems.Needle;
 using ThailandHorrorJam.Systems.Gameplay;
 
@@ -110,6 +111,16 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private bool _enableSnapFx = true;
         [SerializeField] private Color _snapFlashColor = new Color(1.5f, 1.5f, 1.5f, 1f);
 
+        [Header("Game Start Intro")]
+        [Tooltip("If true, player starts lying on the floor, wakes up, then unlocks input and reveals the movement hint.")]
+        [SerializeField] private bool _enableGameStartWakeUp = true;
+        [Tooltip("How long to stay lying still on the floor before starting to stand up (seconds).")]
+        [SerializeField] private float _startLieDownDuration = 4.0f;
+        [Tooltip("Optional reference to the Hint_Movement object in scene. If null, auto-finds in scene.")]
+        [SerializeField] private GameObject _hintMovement;
+        [Tooltip("Duration to smoothly fade in the movement hint text once standing up.")]
+        [SerializeField] private float _hintFadeInDuration = 0.6f;
+
         private VisualState _currentState = VisualState.Idle;
         private Sprite[] _currentClip;
         private int _currentFrame;
@@ -122,11 +133,17 @@ namespace ThailandHorrorJam.Core
         private float _throwTimer;
         private bool _isDead;
         private bool _isWakingUp;
+        private float _wakeUpHoldTimer;
+        private System.Action _onWakeUpCompletedCallback;
+        private Color _hintMovementTargetColor = Color.white;
+        private bool _hasCachedHintColor;
         private bool _isSubscribedToCheckpointManager;
 
         public VisualState CurrentState => _currentState;
         public bool IsFacingRight => _isFacingRight;
+        public bool IsWakingUp => _isWakingUp;
         public SpriteRenderer MainRenderer => _spriteRenderer;
+        public event System.Action OnWakeUpCompleted;
 
         public void SetFacing(bool faceRight)
         {
@@ -195,6 +212,11 @@ namespace ThailandHorrorJam.Core
 
             _isFacingRight = _startFacingRight;
             EnsureAimNeedleVisual();
+
+            if (_enableGameStartWakeUp)
+            {
+                CacheAndHideHintMovement();
+            }
         }
 
         private void OnEnable()
@@ -248,7 +270,22 @@ namespace ThailandHorrorJam.Core
                 _visualHolder.localRotation = Quaternion.identity;
                 _visualHolder.localPosition = Vector3.zero;
             }
-            SetState(VisualState.Idle, forceRestart: true);
+
+            if (_enableGameStartWakeUp && GetSpritesForState(VisualState.WakeUp)?.Length > 0)
+            {
+                if (_controller != null)
+                {
+                    _controller.TeleportTo(transform.position, _isFacingRight, snapToGround: true);
+                    _controller.SetInputLocked(true);
+                }
+
+                CacheAndHideHintMovement();
+                StartWakeUpSequence(_startLieDownDuration, OnGameStartWakeUpCompleted);
+            }
+            else
+            {
+                SetState(VisualState.Idle, forceRestart: true);
+            }
         }
 
         private void SubscribeToCheckpointManager()
@@ -277,6 +314,8 @@ namespace ThailandHorrorJam.Core
         {
             _isDead = true;
             _isWakingUp = false;
+            _wakeUpHoldTimer = 0f;
+            _onWakeUpCompletedCallback = null;
             _throwTimer = 0f;
             if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
             if (_controller != null)
@@ -288,31 +327,7 @@ namespace ThailandHorrorJam.Core
 
         private void HandlePlayerRespawned()
         {
-            _isDead = false;
-            _throwTimer = 0f;
-            _scaleModifier = Vector3.one;
-            _recoilOffset = Vector3.zero;
-            _currentTiltAngle = 0f;
-            if (_visualHolder != null)
-            {
-                float dirX = _isFacingRight ? 1f : -1f;
-                _visualHolder.localScale = new Vector3(dirX * _baseScale.x, _baseScale.y, 1f);
-                _visualHolder.localRotation = Quaternion.identity;
-                _visualHolder.localPosition = Vector3.zero;
-            }
-            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
-
-            Sprite[] wakeClip = GetSpritesForState(VisualState.WakeUp);
-            if (wakeClip != null && wakeClip.Length > 0)
-            {
-                _isWakingUp = true;
-                SetState(VisualState.WakeUp, forceRestart: true);
-            }
-            else
-            {
-                _isWakingUp = false;
-                SetState(VisualState.Idle, forceRestart: true);
-            }
+            StartWakeUpSequence(0f, null);
         }
 
         private void LateUpdate()
@@ -383,9 +398,11 @@ namespace ThailandHorrorJam.Core
             {
                 bool hasMoveInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.05f;
                 bool isAimingNow = _needleController != null && _needleController.IsAiming;
-                if (!_controller.IsGrounded || hasMoveInput || isAimingNow)
+                bool canCancel = _wakeUpHoldTimer <= 0f && (!_controller.IsGrounded || hasMoveInput || isAimingNow);
+                if (canCancel)
                 {
                     _isWakingUp = false;
+                    TriggerWakeUpCompleted();
                 }
                 else
                 {
@@ -504,6 +521,18 @@ namespace ThailandHorrorJam.Core
             float fps = GetFpsForState(_currentState);
             if (fps <= 0.01f) return;
 
+            // Hold lying down on the ground during intro sequence before starting the stand-up animation
+            if (_currentState == VisualState.WakeUp && _wakeUpHoldTimer > 0f)
+            {
+                _wakeUpHoldTimer -= Time.deltaTime;
+                _currentFrame = 0;
+                if (_spriteRenderer != null && _currentClip.Length > 0)
+                {
+                    _spriteRenderer.sprite = _currentClip[0];
+                }
+                return;
+            }
+
             _frameTimer += Time.deltaTime;
             float frameDuration = 1f / fps;
 
@@ -536,6 +565,7 @@ namespace ThailandHorrorJam.Core
                     {
                         _isWakingUp = false;
                         SetState(VisualState.Idle, forceRestart: true);
+                        TriggerWakeUpCompleted();
                         return;
                     }
                 }
@@ -936,6 +966,135 @@ namespace ThailandHorrorJam.Core
                 _baseScale.y * _scaleModifier.y,
                 1f
             );
+        }
+
+        #endregion
+
+        #region Game Start & Wake-Up Sequence
+
+        public void StartWakeUpSequence(float holdLyingDuration = 0f, System.Action onComplete = null)
+        {
+            _onWakeUpCompletedCallback = onComplete;
+            _wakeUpHoldTimer = holdLyingDuration;
+            _isWakingUp = true;
+            _isDead = false;
+            _throwTimer = 0f;
+            _scaleModifier = Vector3.one;
+            _recoilOffset = Vector3.zero;
+            _currentTiltAngle = 0f;
+
+            if (_visualHolder != null)
+            {
+                float dirX = _isFacingRight ? 1f : -1f;
+                _visualHolder.localScale = new Vector3(dirX * _baseScale.x, _baseScale.y, 1f);
+                _visualHolder.localRotation = Quaternion.identity;
+                _visualHolder.localPosition = Vector3.zero;
+            }
+            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
+
+            Sprite[] wakeClip = GetSpritesForState(VisualState.WakeUp);
+            if (wakeClip != null && wakeClip.Length > 0)
+            {
+                SetState(VisualState.WakeUp, forceRestart: true);
+                if (_spriteRenderer != null)
+                {
+                    _spriteRenderer.sprite = wakeClip[0];
+                }
+            }
+            else
+            {
+                _isWakingUp = false;
+                SetState(VisualState.Idle, forceRestart: true);
+                TriggerWakeUpCompleted();
+            }
+        }
+
+        private void TriggerWakeUpCompleted()
+        {
+            var callback = _onWakeUpCompletedCallback;
+            _onWakeUpCompletedCallback = null;
+            callback?.Invoke();
+            OnWakeUpCompleted?.Invoke();
+        }
+
+        private void EnsureHintMovementReference()
+        {
+            if (_hintMovement != null) return;
+
+            GameObject tut = GameObject.Find("Tutorials Text");
+            if (tut != null)
+            {
+                Transform child = tut.transform.Find("Hint_Movement");
+                if (child != null)
+                {
+                    _hintMovement = child.gameObject;
+                    return;
+                }
+            }
+
+            var allTmps = Resources.FindObjectsOfTypeAll<TextMeshPro>();
+            for (int i = 0; i < allTmps.Length; i++)
+            {
+                if (allTmps[i] != null && allTmps[i].gameObject != null && allTmps[i].gameObject.scene == gameObject.scene)
+                {
+                    if (allTmps[i].gameObject.name == "Hint_Movement")
+                    {
+                        _hintMovement = allTmps[i].gameObject;
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void CacheAndHideHintMovement()
+        {
+            EnsureHintMovementReference();
+            if (_hintMovement != null)
+            {
+                if (!_hasCachedHintColor && _hintMovement.TryGetComponent<TextMeshPro>(out var tmp))
+                {
+                    _hintMovementTargetColor = tmp.color;
+                    _hasCachedHintColor = true;
+                    Color hidden = _hintMovementTargetColor;
+                    hidden.a = 0f;
+                    tmp.color = hidden;
+                }
+                _hintMovement.SetActive(false);
+            }
+        }
+
+        private void OnGameStartWakeUpCompleted()
+        {
+            if (_controller != null)
+            {
+                _controller.SetInputLocked(false);
+            }
+
+            EnsureHintMovementReference();
+            if (_hintMovement != null)
+            {
+                _hintMovement.SetActive(true);
+                if (_hintMovement.TryGetComponent<TextMeshPro>(out var tmp))
+                {
+                    float targetAlpha = _hasCachedHintColor ? _hintMovementTargetColor.a : tmp.color.a;
+                    if (targetAlpha <= 0.01f) targetAlpha = 0.65f;
+
+                    if (_hintFadeInDuration > 0f)
+                    {
+                        Color c = tmp.color;
+                        c.a = 0f;
+                        tmp.color = c;
+                        tmp.DOKill();
+                        tmp.DOFade(targetAlpha, _hintFadeInDuration).SetEase(Ease.OutQuad);
+                    }
+                    else
+                    {
+                        Color c = tmp.color;
+                        c.a = targetAlpha;
+                        tmp.color = c;
+                    }
+                }
+            }
         }
 
         #endregion

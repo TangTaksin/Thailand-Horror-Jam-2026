@@ -518,6 +518,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
 
             _isClaimed = true;
+            RestorePromptCanvas();
 
             if (_altarCheckpoint != null && CheckpointManager.Instance != null)
             {
@@ -550,13 +551,27 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 }
                 _needleInPile.gameObject.SetActive(false);
             }
-            if (_promptCanvasGo != null)
-            {
-                _promptCanvasGo.SetActive(false);
-            }
+            RestorePromptCanvas();
             if (_logoSpriteRenderer != null)
             {
                 _logoSpriteRenderer.gameObject.SetActive(false);
+            }
+        }
+
+        private void RestorePromptCanvas()
+        {
+            if (_promptCanvasGo == null) return;
+
+            var promptUI = _promptCanvasGo.GetComponentInChildren<ThailandHorrorJam.Systems.Interaction.InteractionPromptUI>(true);
+            if (promptUI != null)
+            {
+                _promptCanvasGo.SetActive(true);
+                promptUI.enabled = true;
+                promptUI.ResetDefaultLayout();
+            }
+            else
+            {
+                _promptCanvasGo.SetActive(false);
             }
         }
 
