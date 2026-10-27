@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -166,6 +167,12 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             get => _hideAllPins;
             set => _hideAllPins = value;
+        }
+
+        public bool EnablePixelSnapping
+        {
+            get => _enablePixelSnapping;
+            set => _enablePixelSnapping = value;
         }
 
         public int PooledCoilCount
@@ -764,6 +771,86 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             HidePinMarkers();
+        }
+
+        public int NodesPerSegment
+        {
+            get => _nodesPerSegment;
+            set => _nodesPerSegment = Mathf.Max(3, value);
+        }
+
+        public float SlackFactor
+        {
+            get => _slackFactor;
+            set => _slackFactor = Mathf.Max(1.0f, value);
+        }
+
+        public float BendingStiffness
+        {
+            get => _bendingStiffness;
+            set => _bendingStiffness = Mathf.Clamp01(value);
+        }
+
+        public float Gravity
+        {
+            get => _gravity;
+            set => _gravity = value;
+        }
+
+        public float AirDamping
+        {
+            get => _airDamping;
+            set => _airDamping = Mathf.Max(0f, value);
+        }
+
+        /// <summary>
+        /// Rapidly contracts all verlet particles towards a target position and dissolves the thread.
+        /// Perfect for cutscene snap & reel-in effects.
+        /// </summary>
+        public void ReelInTo(Vector2 targetPos, float duration, System.Action onComplete = null)
+        {
+            StartCoroutine(RoutineReelInTo(targetPos, duration, onComplete));
+        }
+
+        private IEnumerator RoutineReelInTo(Vector2 targetPos, float duration, System.Action onComplete)
+        {
+            _isInFlightMode = true; // suppress normal verlet constraints
+            float elapsed = 0f;
+            int count = _nodes.Count;
+            Vector2[] startPositions = new Vector2[count];
+            for (int i = 0; i < count; i++)
+            {
+                startPositions[i] = _nodes[i].Position;
+            }
+
+            Color initialColor = _threadColor;
+            float initialWidth = _threadWidth;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float easeT = t * t; // InQuad
+
+                for (int i = 0; i < count; i++)
+                {
+                    VerletNode node = _nodes[i];
+                    node.Position = Vector2.Lerp(startPositions[i], targetPos, easeT);
+                    node.OldPosition = node.Position;
+                    _nodes[i] = node;
+                }
+
+                Color c = initialColor;
+                c.a = Mathf.Lerp(initialColor.a, 0f, t);
+                ApplyThreadColor(c, true);
+
+                _isSplineDirty = true;
+                _isVisualDirty = true;
+                yield return null;
+            }
+
+            Clear();
+            onComplete?.Invoke();
         }
 
         public void Sever()
