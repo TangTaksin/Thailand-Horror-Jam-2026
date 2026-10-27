@@ -63,6 +63,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 if (CheckpointManager.Instance != null && !CheckpointManager.Instance.IsRespawning)
                 {
+                    Debug.Log($"[KillZone] Player triggered KillZone '{gameObject.name}' (HazardType: {_hazardType}).");
                     CheckpointManager.Instance.TriggerPlayerDeath(this);
                 }
                 return;
@@ -74,6 +75,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 StitchableObject stitchable = other.GetComponentInParent<StitchableObject>();
                 if (stitchable != null)
                 {
+                    Debug.Log($"[KillZone] Resetting dropped StitchableObject '{stitchable.name}' back to initial state.");
                     stitchable.ResetToInitialState();
                 }
             }

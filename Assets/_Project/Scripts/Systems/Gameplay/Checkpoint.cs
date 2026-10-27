@@ -26,6 +26,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("When true, this checkpoint only activates once and disables its trigger.")]
         [SerializeField] private bool _isOneShot = false;
 
+        private static readonly RaycastHit2D[] s_GizmoHitBuffer = new RaycastHit2D[6];
+
         private Collider2D _collider;
         private bool _isActivated;
 
@@ -83,6 +85,32 @@ namespace ThailandHorrorJam.Systems.Gameplay
             Vector2 forward = _respawnFacingRight ? Vector2.right : Vector2.left;
             Gizmos.color = Color.green;
             Gizmos.DrawRay(spawnPos, forward * 0.5f);
+
+            // Preview automatic ground-snap point below SpawnPosition for Level Designers
+            ContactFilter2D filter = new ContactFilter2D
+            {
+                useTriggers = false,
+                useLayerMask = true
+            };
+            filter.SetLayerMask(LayerMask.GetMask("Ground", "Stitchable", "Default"));
+            int count = Physics2D.Raycast(spawnPos + Vector2.up * 0.35f, Vector2.down, filter, s_GizmoHitBuffer, 15.35f);
+            float bestDist = float.MaxValue;
+            Vector2? groundPoint = null;
+            for (int i = 0; i < count; i++)
+            {
+                if (s_GizmoHitBuffer[i].collider != null && !s_GizmoHitBuffer[i].collider.isTrigger && s_GizmoHitBuffer[i].distance > 0.0001f && s_GizmoHitBuffer[i].normal.y >= 0.5f && s_GizmoHitBuffer[i].distance < bestDist)
+                {
+                    bestDist = s_GizmoHitBuffer[i].distance;
+                    groundPoint = s_GizmoHitBuffer[i].point;
+                }
+            }
+
+            if (groundPoint.HasValue)
+            {
+                Gizmos.color = new Color(0.2f, 1f, 0.4f, 0.85f);
+                Gizmos.DrawLine(spawnPos, groundPoint.Value);
+                Gizmos.DrawWireCube(groundPoint.Value + Vector2.up * 0.03f, new Vector3(0.45f, 0.06f, 0.05f));
+            }
 
             // Draw lines to associated puzzle boxes
             if (_associatedStitchables != null)

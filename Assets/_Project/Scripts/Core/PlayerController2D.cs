@@ -79,15 +79,22 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private bool _enableCrushDeath = true;
         [Tooltip("ระยะเวลาถูกบีบอัดต่อเนื่องก่อนตาย (วินาที)")]
         [SerializeField] private float _crushDeathDelay = 0.08f;
-        [Tooltip("ระยะตรวจสอบสิ่งกีดขวางเหนือศีรษะ")]
-        [SerializeField] private float _ceilingCheckDistance = 0.18f;
         [Tooltip("ความเร็วตกขั้นต่ำของวัตถุที่ร่วงกระแทกศีรษะแล้วทำให้ตายทันที (m/s)")]
-        [SerializeField] private float _crushImpactVelocityThreshold = 2.5f;
+        [SerializeField] private float _crushImpactVelocityThreshold = 2.0f;
+        [Tooltip("ระยะตรวจสอบเพดานเหนือศีรษะ (เมตร)")]
+        [SerializeField] private float _ceilingCheckDistance = 0.5f;
+
+        [Header("Respawn Ground Snap")]
+        [Tooltip("ดูดตำแหน่งเท้าผู้เล่นลงแตะพื้นด้านล่างอัตโนมัติเมื่อเกิดใหม่ (ป้องกันอาการเกิดลอยกลางอากาศแล้วร่วงลงมาจากฟ้า)")]
+        [SerializeField] private bool _snapToGroundOnTeleport = true;
+        [Tooltip("ระยะค้นหาพื้นด้านล่างสูงสุดเมื่อเกิดใหม่ (เมตร)")]
+        [SerializeField] private float _maxRespawnGroundSnapDistance = 15f;
 
         private PlayerVisuals _playerVisuals;
         private NeedleController _needleController;
         private readonly Collider2D[] _groundHitBuffer = new Collider2D[6]; // เผื่อกรอง Collider ตัวเองและรองรับวัตถุซ้อนทับกันหลายชิ้น
-        private readonly RaycastHit2D[] _snapHitBuffer = new RaycastHit2D[4];
+        private readonly RaycastHit2D[] _snapHitBuffer = new RaycastHit2D[8];
+        private readonly System.Collections.Generic.List<Collider2D> _ignoredCrushColliders = new System.Collections.Generic.List<Collider2D>(4);
         private ContactFilter2D _groundFilter;
 
         private Collider2D _currentGroundCollider;
@@ -109,6 +116,7 @@ namespace ThailandHorrorJam.Core
         private Vector2? _aimLeashAnchor;
         private float _aimLeashDistance;
         private float _crushTimer;
+        private float _respawnImmunityTimer;
         private float _throwSlowdownTimer;
         private float _throwSlowdownMultiplier = 1f;
 
@@ -190,15 +198,47 @@ namespace ThailandHorrorJam.Core
             }
         }
 
-        public void TeleportTo(Vector2 position, bool faceRight)
+        public void TeleportTo(Vector2 position, bool faceRight, bool snapToGround = true)
         {
+            RestoreIgnoredCrushColliders();
+
+            Vector2 finalPosition = position;
+            Collider2D snappedGround = null;
+            Vector2 snappedNormal = Vector2.up;
+
+            if (snapToGround && _snapToGroundOnTeleport && TryResolveGroundSnapPosition(position, out Vector2 groundPos, out Collider2D hitCol, out Vector2 hitNormal))
+            {
+                finalPosition = groundPos;
+                snappedGround = hitCol;
+                snappedNormal = hitNormal;
+            }
+
             if (_rb != null)
             {
-                _rb.position = position;
+                _rb.position = finalPosition;
                 _rb.linearVelocity = Vector2.zero;
             }
-            transform.position = new Vector3(position.x, position.y, transform.position.z);
+            transform.position = new Vector3(finalPosition.x, finalPosition.y, transform.position.z);
+            Physics2D.SyncTransforms();
+
             _lastVerticalVelocity = 0f;
+            _respawnImmunityTimer = 2.0f;
+            _crushTimer = 0f;
+            _jumpRequested = false;
+            _jumpBufferCounter = 0f;
+
+            if (snappedGround != null)
+            {
+                _isGrounded = true;
+                _coyoteTimeCounter = _coyoteTime;
+                _currentGroundCollider = snappedGround;
+                _currentStitchable = snappedGround.GetComponentInParent<StitchableObject>();
+                float slopeAngle = Vector2.Angle(snappedNormal, Vector2.up);
+                _isOnSlope = slopeAngle > 0.5f && slopeAngle <= _maxSlopeAngle;
+                _slopeNormal = snappedNormal;
+                _slopeAngle = slopeAngle;
+                _slopeParallel = new Vector2(snappedNormal.y, -snappedNormal.x).normalized;
+            }
 
             if (_playerVisuals == null)
             {
@@ -209,6 +249,52 @@ namespace ThailandHorrorJam.Core
             {
                 _playerVisuals.SetFacing(faceRight);
             }
+        }
+
+        private bool TryResolveGroundSnapPosition(Vector2 spawnPos, out Vector2 snappedPos, out Collider2D groundCollider, out Vector2 groundNormal)
+        {
+            snappedPos = spawnPos;
+            groundCollider = null;
+            groundNormal = Vector2.up;
+
+            Physics2D.SyncTransforms();
+            float feetOffsetY = _col != null ? (transform.position.y - _col.bounds.min.y) : 0.44f;
+            float minSlopeNormalY = Mathf.Cos(_maxSlopeAngle * Mathf.Deg2Rad);
+
+            const float startLift = 0.35f;
+            Vector2 rayOrigin = new Vector2(spawnPos.x, spawnPos.y + startLift);
+            float maxRayDist = Mathf.Max(1f, _maxRespawnGroundSnapDistance) + startLift;
+
+            int hitCount = Physics2D.Raycast(rayOrigin, Vector2.down, _groundFilter, _snapHitBuffer, maxRayDist);
+            float bestDist = float.MaxValue;
+            RaycastHit2D bestHit = default;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit2D hit = _snapHitBuffer[i];
+                if (hit.collider == null || IsSelfCollider(hit.collider) || hit.collider.isTrigger) continue;
+                if (hit.distance <= 0.0001f) continue;
+                if (hit.normal.y < minSlopeNormalY) continue;
+
+                if (hit.distance < bestDist)
+                {
+                    bestDist = hit.distance;
+                    bestHit = hit;
+                }
+            }
+
+            if (bestHit.collider == null) return false;
+
+            snappedPos = new Vector2(spawnPos.x, bestHit.point.y + feetOffsetY);
+            groundCollider = bestHit.collider;
+            groundNormal = bestHit.normal;
+            return true;
+        }
+
+        public void ResetRespawnImmunity(float duration = 2.0f)
+        {
+            _respawnImmunityTimer = Mathf.Max(_respawnImmunityTimer, duration);
+            _crushTimer = 0f;
         }
 
         public void SetHauling(bool isHauling)
@@ -315,6 +401,11 @@ namespace ThailandHorrorJam.Core
 
         private void FixedUpdate()
         {
+            if (_respawnImmunityTimer > 0f)
+            {
+                _respawnImmunityTimer -= Time.fixedDeltaTime;
+            }
+
             ApplyPlatformMovement();
             CheckGround();
             CheckCrushHazard();
@@ -680,6 +771,7 @@ namespace ThailandHorrorJam.Core
             // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก และไม่ดูดติด Trigger colliders
             float lastGroundVelY = _currentStitchable != null ? _currentStitchable.CurrentVelocity.y : 0f;
             float relSnapVelY = _rb.linearVelocity.y - lastGroundVelY;
+            float minSlopeNormalY = Mathf.Cos(_maxSlopeAngle * Mathf.Deg2Rad);
             if (_enableGroundSnapping && detectedGround == null && wasGrounded && !_jumpRequested && (relSnapVelY <= 0.2f || _currentStitchable != null))
             {
                 Vector2 rayStart = new Vector2(checkPos.x, feetBottomY + 0.05f);
@@ -688,7 +780,7 @@ namespace ThailandHorrorJam.Core
                 for (int s = 0; s < snapCount; s++)
                 {
                     RaycastHit2D snapHit = _snapHitBuffer[s];
-                    if (snapHit.collider != null && !IsSelfCollider(snapHit.collider) && !snapHit.collider.isTrigger && snapHit.normal.y >= 0.55f)
+                    if (snapHit.collider != null && !IsSelfCollider(snapHit.collider) && !snapHit.collider.isTrigger && snapHit.normal.y >= minSlopeNormalY)
                     {
                         float snapGap = snapHit.point.y - feetBottomY;
                         if (snapGap <= 0.001f && Mathf.Abs(snapGap) <= _groundSnapDistance)
@@ -828,9 +920,10 @@ namespace ThailandHorrorJam.Core
                 }
             }
 
-            // สำหรับ BoxCollider2D ทั่วไป (เช่น กำแพง เสา บล็อก) ถ้าเท้าอยู่ต่ำกว่าขอบบนเกิน 0.25m แปลว่ากำลังเบียดกำแพงด้านข้างในอากาศ
+            // สำหรับ BoxCollider2D ทั่วไปที่ไม่ได้เอียง (เช่น กำแพง เสา บล็อก) ถ้าเท้าอยู่ต่ำกว่าขอบบนเกิน 0.25m แปลว่ากำลังเบียดกำแพงด้านข้างในอากาศ
             bool isComposite = groundCol.transform.parent != null && groundCol.transform.parent.GetComponent<CompositeCollider2D>() != null;
-            if (groundCol is BoxCollider2D && !isComposite)
+            bool isRotated = Mathf.Abs(Mathf.DeltaAngle(groundCol.transform.eulerAngles.z, 0f)) > 1f;
+            if (groundCol is BoxCollider2D && !isComposite && !isRotated)
             {
                 if (playerFeetY < groundCol.bounds.max.y - 0.25f)
                 {
@@ -839,7 +932,7 @@ namespace ThailandHorrorJam.Core
             }
 
             // ตรวจสอบผิวด้านล่างด้วย Raycast แนวดิ่ง เพื่อยืนยันว่ามีพื้นผิวระนาบหรือทางลาดที่เดินได้รองรับใต้เท้าจริง (Normal ชี้ขึ้น)
-            float rayDistance = 0.25f;
+            float rayDistance = 0.25f + _slopeCheckDistance;
             float sideOffset = colWidth * 0.35f;
             Vector2 rayOrigin = new Vector2(checkPos.x, feetBottomY + 0.1f);
 
@@ -867,7 +960,8 @@ namespace ThailandHorrorJam.Core
             if (targetCol != null && hit.collider != targetCol && hit.collider.attachedRigidbody != targetCol.attachedRigidbody) return false;
 
             // พื้นผิวต้องชี้ขึ้นด้านบนในมุมที่ไม่ชันเกินกำหนด (ไม่เกิน _maxSlopeAngle เช่น 55 องศา)
-            return hit.normal.y >= 0.55f;
+            float minNormalY = Mathf.Cos(_maxSlopeAngle * Mathf.Deg2Rad);
+            return hit.normal.y >= minNormalY;
         }
 
         private void UpdateSlopeState(Vector2 feetCenter, float feetBottomY, float colWidth)
@@ -954,93 +1048,79 @@ namespace ThailandHorrorJam.Core
 
         private void CheckCrushHazard()
         {
-            if (!_enableCrushDeath || !_isGrounded || _isInputLocked)
+            if (!_enableCrushDeath || !_isGrounded || _isInputLocked || _respawnImmunityTimer > 0f || (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning))
             {
                 _crushTimer = 0f;
                 return;
             }
 
-            // ความเร็วของพื้นใต้เท้า
-            float platformUpwardSpeed = _currentStitchable != null
-                ? _currentStitchable.CurrentVelocity.y
-                : (_currentGroundCollider != null && _currentGroundCollider.attachedRigidbody != null
-                    ? _currentGroundCollider.attachedRigidbody.linearVelocity.y
-                    : 0f);
+            // 1. ตรวจสอบความสูงและตำแหน่งของผู้เล่น
+            float feetBottomY = _col != null ? _col.bounds.min.y : transform.position.y - 0.5f;
+            float playerHeight = _col != null ? _col.bounds.size.y : 1.0f;
+            Vector2 headCenter = _col != null
+                ? new Vector2(_col.bounds.center.x, _col.bounds.center.y)
+                : (Vector2)transform.position;
 
-            // ตรวจสอบสิ่งกีดขวางเหนือศีรษะ (เพดาน หรือ วัตถุที่อยู่ข้างบน)
-            float colWidth = _col != null ? _col.bounds.size.x : 0.5f;
-            float checkWidth = colWidth * 0.75f;
-            Vector2 headTop = _col != null
-                ? new Vector2(_col.bounds.center.x, _col.bounds.max.y - 0.02f)
-                : (Vector2)transform.position + Vector2.up * 0.9f;
+            // ยิง Raycast ตรงขึ้นด้านบนจากกึ่งกลางลำตัวผู้เล่น เพื่อวัดระยะเพดานเหนือศีรษะ
+            // (ใช้แกน X กึ่งกลางลำตัว เพื่อไม่ให้โดนขอบกำแพงหรือกล่องที่ยืนชิดด้านข้างหลอกเป็น False Positive)
+            float maxCheckDistance = playerHeight + 0.5f;
+            RaycastHit2D ceilingHit = Physics2D.Raycast(headCenter, Vector2.up, maxCheckDistance, _groundLayer);
 
-            // ป้องกันกรณี _ceilingCheckDistance ถูกตั้งค่าเป็นลบหรือศูนย์ใน Inspector
-            float checkDist = Mathf.Max(0.15f, Mathf.Abs(_ceilingCheckDistance));
-            RaycastHit2D hit = Physics2D.BoxCast(headTop, new Vector2(checkWidth, 0.06f), 0f, Vector2.up, checkDist, _groundLayer);
-
-            bool isCrushing = false;
-            bool isSameAsGround = false;
-
-            if (hit.collider != null && !IsSelfCollider(hit.collider) && !hit.collider.isTrigger)
+            if (ceilingHit.collider != null && !IsSelfCollider(ceilingHit.collider) && !ceilingHit.collider.isTrigger)
             {
-                // ตรวจสอบว่าไม่ใช่ตัววัตถุที่ยืนอยู่เอง
-                Transform currentGroundTransform = _currentGroundCollider != null ? _currentGroundCollider.transform : null;
-                Transform stitchableTransform = _currentStitchable != null ? _currentStitchable.transform : null;
-
-                isSameAsGround = (currentGroundTransform != null && (hit.collider.transform == currentGroundTransform || hit.collider.transform.IsChildOf(currentGroundTransform)))
-                    || (stitchableTransform != null && (hit.collider.transform == stitchableTransform || hit.collider.transform.IsChildOf(stitchableTransform)));
-
-                if (!isSameAsGround)
+                // ตรวจสอบว่าพื้นผิวเหนือศีรษะหันหน้าลงล่างจริง (เป็นเพดาน ไม่ใช่กำแพงแนวตั้ง)
+                if (ceilingHit.normal.y <= -0.7f)
                 {
-                    // กรณีที่ 1: พื้นใต้เท้ากำลังยกตัวขึ้นดันตัวผู้เล่นอัดกับเพดาน
-                    if (platformUpwardSpeed > 0.15f)
-                    {
-                        isCrushing = true;
-                    }
-                    else
-                    {
-                        // กรณีที่ 2: วัตถุด้านบน (เช่น StitchableObject หรือ Rigidbody)
-                        StitchableObject overheadStitchable = hit.collider.GetComponentInParent<StitchableObject>();
-                        Rigidbody2D overheadRb = hit.collider.attachedRigidbody;
+                    // คำนวณระยะช่องว่างจริงระหว่างพื้นใต้เท้ากับเพดานเหนือหัว (Clearance)
+                    float clearance = ceilingHit.point.y - feetBottomY;
 
-                        if (overheadStitchable != null || (overheadRb != null && overheadRb.bodyType != RigidbodyType2D.Static))
+                    // คำนวณความเร็วในการบีบอัดเข้าหากัน (Closing Speed)
+                    float floorUpSpeed = _currentStitchable != null
+                        ? _currentStitchable.CurrentVelocity.y
+                        : (_currentGroundCollider != null && _currentGroundCollider.attachedRigidbody != null
+                            ? _currentGroundCollider.attachedRigidbody.linearVelocity.y
+                            : 0f);
+
+                    float ceilingDownSpeed = 0f;
+                    if (ceilingHit.rigidbody != null)
+                    {
+                        ceilingDownSpeed = Mathf.Max(ceilingDownSpeed, -ceilingHit.rigidbody.linearVelocity.y);
+                    }
+                    StitchableObject ceilingSo = ceilingHit.collider.GetComponentInParent<StitchableObject>();
+                    if (ceilingSo != null)
+                    {
+                        ceilingDownSpeed = Mathf.Max(ceilingDownSpeed, -ceilingSo.CurrentVelocity.y);
+                    }
+
+                    float closingSpeed = floorUpSpeed + ceilingDownSpeed;
+
+                    // ตรวจสอบสิทธิ์การบดอัด (CrushHazard Component หรือ Tag)
+                    bool isCeilingHazard = CrushHazard.IsCrushHazard(ceilingHit.collider.gameObject, out CrushHazard ceilingComp);
+                    bool canCeilingSqueeze = !isCeilingHazard || (ceilingComp == null || ceilingComp.CanCrushSqueeze);
+
+                    // ถ้าระยะ Clearance แคบกว่าความสูงตัวละคร (< 85% ของความสูง) และมีแรงบดอัดบีบเข้าหากัน (closingSpeed > 0.05 m/s)
+                    // หรือถูกบดอัดจนแบนราบ (< 60% ของความสูง)
+                    if (canCeilingSqueeze && clearance > 0f && clearance < playerHeight * 0.85f && (closingSpeed > 0.05f || clearance < playerHeight * 0.6f))
+                    {
+                        _crushTimer += Time.fixedDeltaTime;
+                        if (_crushTimer >= _crushDeathDelay)
                         {
-                            float overheadDownSpeed = 0f;
-                            if (overheadStitchable != null)
-                            {
-                                overheadDownSpeed = -overheadStitchable.CurrentVelocity.y;
-                            }
-                            else if (overheadRb != null)
-                            {
-                                overheadDownSpeed = -overheadRb.linearVelocity.y;
-                            }
-
-                            // กำลังเคลื่อนที่ลงมาทับ หรือทับแนบสนิทอยู่บนศีรษะ (ระยะห่าง <= 0.12m)
-                            if (overheadDownSpeed > 0.05f || hit.distance <= 0.12f)
-                            {
-                                isCrushing = true;
-                            }
+                            _crushTimer = 0f;
+                            ExecuteCrushDeath(
+                                $"Vertical Squeeze: clearance={clearance:F2}m < {playerHeight * 0.85f:F2}m (closingSpeed={closingSpeed:F2}m/s) between '{(_currentGroundCollider != null ? _currentGroundCollider.name : "Ground")}' and '{ceilingHit.collider.name}'",
+                                ceilingHit.collider);
                         }
+                        return;
                     }
                 }
             }
 
-            if (isCrushing)
-            {
-                _crushTimer += Time.fixedDeltaTime;
-                if (_crushTimer >= _crushDeathDelay)
-                {
-                    _crushTimer = 0f;
-                    ExecuteCrushDeath();
-                }
-            }
-            else
-            {
-                if (_crushTimer > 0f && (hit.collider == null || isSameAsGround))
-                {
-                    _crushTimer = 0f;
-                }
-            }
+            _crushTimer = 0f;
+        }
+
+        private void OnDisable()
+        {
+            RestoreIgnoredCrushColliders();
         }
 
         private void OnCollisionEnter2D(Collision2D collision)
@@ -1050,66 +1130,61 @@ namespace ThailandHorrorJam.Core
 
         private void OnCollisionStay2D(Collision2D collision)
         {
-            if (!_isGrounded) return;
             HandleOverheadCollisionImpact(collision, isEnter: false);
         }
 
         private void HandleOverheadCollisionImpact(Collision2D collision, bool isEnter)
         {
-            if (!_enableCrushDeath || _isInputLocked) return;
+            if (!_enableCrushDeath || _isInputLocked || _respawnImmunityTimer > 0f || (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning)) return;
 
-            StitchableObject so = collision.collider.GetComponentInParent<StitchableObject>();
-            Rigidbody2D otherRb = collision.rigidbody;
+            // ตรวจสอบว่าวัตถุที่ชนเป็น CrushHazard (มี Component CrushHazard หรือติด Tag 'Hazard' / 'CrushHazard')
+            bool isHazard = CrushHazard.IsCrushHazard(collision.gameObject, out CrushHazard hazardComp);
+            if (!isHazard) return;
+            if (hazardComp != null && !hazardComp.CanCrushFalling) return;
 
-            // ตรวจสอบเฉพาะการชนกับ StitchableObject หรือ Rigidbody ที่มีมวล
-            if (so == null && otherRb == null) return;
-
-            // คำนวณความเร็วสัมพัทธ์ในแนวดิ่งก่อนการชน (Relative downward velocity)
-            float relDownSpeed = Mathf.Max(0f, -collision.relativeVelocity.y);
+            // คำนวณความเร็วตกของวัตถุอันตราย
+            float lethalSpeed = hazardComp != null ? hazardComp.LethalImpactSpeed : _crushImpactVelocityThreshold;
             float objDownSpeed = 0f;
-            if (otherRb != null)
+            if (collision.rigidbody != null)
             {
-                objDownSpeed = Mathf.Max(objDownSpeed, -otherRb.linearVelocity.y);
+                objDownSpeed = Mathf.Max(objDownSpeed, -collision.rigidbody.linearVelocity.y);
             }
+            StitchableObject so = collision.collider.GetComponentInParent<StitchableObject>();
             if (so != null)
             {
                 objDownSpeed = Mathf.Max(objDownSpeed, -so.CurrentVelocity.y);
             }
-            float effectiveDownSpeed = Mathf.Max(relDownSpeed, objDownSpeed);
 
-            // คำนวณระดับความสูงของศีรษะผู้เล่น
-            float playerHeadY = _col != null ? _col.bounds.max.y - 0.2f : transform.position.y + 0.4f;
+            // คำนวณขอบเขตศีรษะของผู้เล่น
+            float playerHeadY = _col != null ? _col.bounds.max.y - 0.08f : transform.position.y + 0.5f;
 
             for (int i = 0; i < collision.contactCount; i++)
             {
                 ContactPoint2D contact = collision.GetContact(i);
 
-                // หากจุดสัมผัสเกิดขึ้นที่บริเวณศีรษะ (ด้านบนสุดของผู้เล่น) หรือ normal กดลงล่าง
-                bool isHeadContact = contact.point.y >= playerHeadY || contact.normal.y < -0.3f;
-                if (isHeadContact)
+                // ต้องเป็นจุดสัมผัสที่อยู่บริเวณศีรษะ และ Normal ต้องกดลงล่างชัดเจน (normal.y <= -0.7f)
+                // เพื่อคัดกรองการเดินชนด้านข้างของกล่องออก 100%
+                if (contact.point.y >= playerHeadY && contact.normal.y <= -0.7f)
                 {
-                    // กรณีร่วงตกจากที่สูงกระแทกหัวอย่างรุนแรง (Instant Impact Crush)
-                    if (isEnter && effectiveDownSpeed >= _crushImpactVelocityThreshold)
+                    // กรณีร่วงตกจากที่สูงกระแทกหัว (Falling Impact)
+                    if (isEnter && objDownSpeed >= lethalSpeed && _isGrounded)
                     {
-                        ExecuteCrushDeath();
+                        ExecuteCrushDeath(
+                            $"Crushed by falling hazard '{collision.gameObject.name}' (downSpeed={objDownSpeed:F2} >= {lethalSpeed:F2})",
+                            collision.collider);
                         return;
                     }
 
-                    // กรณีผู้เล่นยืนติดพื้นแล้วมีกล่องเลื่อนลงมาทับ หรือมีกล่องวางทับอยู่บนศีรษะต่อเนื่อง
-                    if (_isGrounded)
+                    // กรณีวัตถุหนักกดทับแช่บนศีรษะขณะยืนติดพื้น
+                    if (_isGrounded && objDownSpeed > 0.1f)
                     {
-                        if (effectiveDownSpeed > 0.1f)
-                        {
-                            ExecuteCrushDeath();
-                            return;
-                        }
-
-                        // ทับแช่อยู่บนศีรษะใน OnCollisionStay
                         _crushTimer += Time.fixedDeltaTime;
                         if (_crushTimer >= _crushDeathDelay)
                         {
                             _crushTimer = 0f;
-                            ExecuteCrushDeath();
+                            ExecuteCrushDeath(
+                                $"Crushed under descending hazard '{collision.gameObject.name}'",
+                                collision.collider);
                             return;
                         }
                     }
@@ -1117,8 +1192,13 @@ namespace ThailandHorrorJam.Core
             }
         }
 
-        private void ExecuteCrushDeath()
+        private void ExecuteCrushDeath(string reason = "Unknown crush", Collider2D crushingCollider = null)
         {
+            Debug.Log($"[Crush Death] Player died from Crush hazard! Reason: {reason} | Pos: {transform.position} | Ground: {(_currentGroundCollider != null ? _currentGroundCollider.name : "null")}");
+
+            IgnoreCrushingCollider(crushingCollider);
+            StopHorizontalMovement();
+
             if (CheckpointManager.Instance != null && !CheckpointManager.Instance.IsRespawning)
             {
                 CameraController2D.Instance?.Shake(0.35f, 0.45f);
@@ -1128,6 +1208,44 @@ namespace ThailandHorrorJam.Core
             {
                 UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
             }
+        }
+
+        private void IgnoreCrushingCollider(Collider2D crushingCollider)
+        {
+            if (crushingCollider == null || crushingCollider == _currentGroundCollider) return;
+
+            if (_col != null)
+            {
+                Physics2D.IgnoreCollision(_col, crushingCollider, true);
+            }
+            if (_feetCollider != null)
+            {
+                Physics2D.IgnoreCollision(_feetCollider, crushingCollider, true);
+            }
+
+            if (!_ignoredCrushColliders.Contains(crushingCollider))
+            {
+                _ignoredCrushColliders.Add(crushingCollider);
+            }
+        }
+
+        private void RestoreIgnoredCrushColliders()
+        {
+            for (int i = 0; i < _ignoredCrushColliders.Count; i++)
+            {
+                Collider2D ignored = _ignoredCrushColliders[i];
+                if (ignored == null) continue;
+
+                if (_col != null)
+                {
+                    Physics2D.IgnoreCollision(_col, ignored, false);
+                }
+                if (_feetCollider != null)
+                {
+                    Physics2D.IgnoreCollision(_feetCollider, ignored, false);
+                }
+            }
+            _ignoredCrushColliders.Clear();
         }
 
         private void ApplyCornerCorrection()

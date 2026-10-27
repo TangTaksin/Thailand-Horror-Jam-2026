@@ -17,7 +17,8 @@ namespace ThailandHorrorJam.Core
             FallLoop,
             Aim,
             Throw,
-            Dead
+            Dead,
+            WakeUp
         }
 
         [Header("References")]
@@ -37,6 +38,7 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private Sprite[] _aimSprites;
         [SerializeField] private Sprite[] _throwSprites;
         [SerializeField] private Sprite[] _deadSprites;
+        [SerializeField] private Sprite[] _wakeUpSprites;
 
         [Header("Throw FX & Ripple")]
         [SerializeField] private GameObject _rippleEffectPrefab;
@@ -60,6 +62,7 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private float _aimFps = 6f;
         [SerializeField] private float _throwFps = 14f;
         [SerializeField] private float _deadFps = 8f;
+        [SerializeField] private float _wakeUpFps = 8f;
         [SerializeField] private float _throwDuration = 0.18f;
 
         [Header("Airborne Thresholds")]
@@ -118,6 +121,7 @@ namespace ThailandHorrorJam.Core
         private Vector3 _recoilOffset = Vector3.zero;
         private float _throwTimer;
         private bool _isDead;
+        private bool _isWakingUp;
         private bool _isSubscribedToCheckpointManager;
 
         public VisualState CurrentState => _currentState;
@@ -272,6 +276,7 @@ namespace ThailandHorrorJam.Core
         private void HandlePlayerDied()
         {
             _isDead = true;
+            _isWakingUp = false;
             _throwTimer = 0f;
             if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
             if (_controller != null)
@@ -285,8 +290,29 @@ namespace ThailandHorrorJam.Core
         {
             _isDead = false;
             _throwTimer = 0f;
+            _scaleModifier = Vector3.one;
+            _recoilOffset = Vector3.zero;
+            _currentTiltAngle = 0f;
+            if (_visualHolder != null)
+            {
+                float dirX = _isFacingRight ? 1f : -1f;
+                _visualHolder.localScale = new Vector3(dirX * _baseScale.x, _baseScale.y, 1f);
+                _visualHolder.localRotation = Quaternion.identity;
+                _visualHolder.localPosition = Vector3.zero;
+            }
             if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
-            SetState(VisualState.Idle, forceRestart: true);
+
+            Sprite[] wakeClip = GetSpritesForState(VisualState.WakeUp);
+            if (wakeClip != null && wakeClip.Length > 0)
+            {
+                _isWakingUp = true;
+                SetState(VisualState.WakeUp, forceRestart: true);
+            }
+            else
+            {
+                _isWakingUp = false;
+                SetState(VisualState.Idle, forceRestart: true);
+            }
         }
 
         private void LateUpdate()
@@ -347,9 +373,25 @@ namespace ThailandHorrorJam.Core
 
             if (_throwTimer > 0f)
             {
+                _isWakingUp = false;
                 _throwTimer -= Time.deltaTime;
                 SetState(VisualState.Throw);
                 return;
+            }
+
+            if (_isWakingUp)
+            {
+                bool hasMoveInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.05f;
+                bool isAimingNow = _needleController != null && _needleController.IsAiming;
+                if (!_controller.IsGrounded || hasMoveInput || isAimingNow)
+                {
+                    _isWakingUp = false;
+                }
+                else
+                {
+                    SetState(VisualState.WakeUp);
+                    return;
+                }
             }
 
             if (!_controller.IsGrounded)
@@ -405,14 +447,14 @@ namespace ThailandHorrorJam.Core
             if (_currentState == newState && !forceRestart) return;
 
             _currentState = newState;
-            _currentFrame = 0;
             _frameTimer = 0f;
+            _currentFrame = 0;
 
             _currentClip = GetSpritesForState(newState);
 
             if (_currentClip != null && _currentClip.Length > 0 && _spriteRenderer != null)
             {
-                _spriteRenderer.sprite = _currentClip[0];
+                _spriteRenderer.sprite = _currentClip[_currentFrame];
             }
         }
 
@@ -442,6 +484,10 @@ namespace ThailandHorrorJam.Core
                     return _throwSprites != null && _throwSprites.Length > 0 ? _throwSprites : _idleSprites;
                 case VisualState.Dead:
                     return _deadSprites != null && _deadSprites.Length > 0 ? _deadSprites : _idleSprites;
+                case VisualState.WakeUp:
+                    return _wakeUpSprites != null && _wakeUpSprites.Length > 0
+                        ? _wakeUpSprites
+                        : (_deadSprites != null && _deadSprites.Length > 0 ? _deadSprites : _idleSprites);
                 default:
                     return _idleSprites;
             }
@@ -478,6 +524,19 @@ namespace ThailandHorrorJam.Core
                     if (_currentFrame < _currentClip.Length - 1)
                     {
                         _currentFrame++;
+                    }
+                }
+                else if (_currentState == VisualState.WakeUp)
+                {
+                    if (_currentFrame < _currentClip.Length - 1)
+                    {
+                        _currentFrame++;
+                    }
+                    else
+                    {
+                        _isWakingUp = false;
+                        SetState(VisualState.Idle, forceRestart: true);
+                        return;
                     }
                 }
                 else if (_currentState == VisualState.Fall)
@@ -542,6 +601,8 @@ namespace ThailandHorrorJam.Core
                     return _throwFps;
                 case VisualState.Dead:
                     return _deadFps;
+                case VisualState.WakeUp:
+                    return _wakeUpFps;
                 default:
                     return 10f;
             }
