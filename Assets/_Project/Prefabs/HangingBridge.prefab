@@ -82,7 +82,7 @@ SpriteRenderer:
   m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0.35, g: 0.85, b: 0.45, a: 1}
+  m_Color: {r: 0.31, g: 0.27, b: 0.24, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -314,7 +314,11 @@ MonoBehaviour:
   _hingePivot: {fileID: 4256606948895568849}
   _flatRestAngle: 0
   _fallRotationSpeed: 180
+  _manageBridgeGeometry: 1
   _bridgeLength: 4.2579145
   _bridgeThickness: 0.35
+  _enableLandingShake: 1
+  _landingShakeIntensity: 0.22
+  _landingShakeDuration: 0.25
   _sutureThread: {fileID: 0}
   _sutureThreadPrefab: {fileID: 373652911262524282, guid: 7f7a91f1bf44e484fb2df67ebadd5747, type: 3}

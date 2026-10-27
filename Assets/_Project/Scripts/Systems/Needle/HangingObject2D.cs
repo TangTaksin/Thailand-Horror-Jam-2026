@@ -8,18 +8,24 @@ namespace ThailandHorrorJam.Systems.Needle
     public enum HangingMode
     {
         [Tooltip("Drawbridge: Rotates down around a hinge/pivot until resting flat as a solid walkway.")]
-        Drawbridge,
+        Drawbridge = 0,
 
         [Tooltip("FreeFall: Drops straight down with gravity when cut.")]
-        FreeFall
+        FreeFall = 1
     }
 
     /// <summary>
-    /// Suspends an object (such as a drawbridge plank or hanging crate) with a cuttable red suture thread from the start of the game.
-    /// When the player cuts the thread with a needle, the bridge/object falls and locks into place as a walkable platform.
+    /// Universal hanging object system that suspends any object (such as a drawbridge plank,
+    /// a hanging stitchable crate, or heavy prop) with a cuttable red suture thread from the ceiling.
+    ///
+    /// Modes:
+    /// - Drawbridge: Rotates down smoothly to a flat rest angle upon being cut.
+    /// - FreeFall: Falls straight down with gravity upon being cut. If a StitchableObject component
+    ///   is present, it seamlessly delegates all IStitchable interactions (tethering, hauling, pinning)
+    ///   to the StitchableObject once dropped!
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
-    public sealed class HangingObject2D : MonoBehaviour, IStitchable
+    public sealed class HangingObject2D : MonoBehaviour, IStitchable, IHintDismissCondition
     {
         [Header("Mode")]
         [Tooltip("Drawbridge: Rotates around a pivot down to flat angle. FreeFall: Drops straight down with gravity.")]
@@ -29,7 +35,7 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Transform representing the anchor point on the ceiling/wall where the thread is tied.")]
         [SerializeField] private Transform _ceilingAnchor;
 
-        [Tooltip("Attachment point on this object where the thread is tied (e.g. tip of the bridge). If null, uses object transform.")]
+        [Tooltip("Attachment point on this object where the thread is tied. If null, uses object transform.")]
         [SerializeField] private Transform _objectAnchor;
 
         [Header("Drawbridge Settings (If Mode = Drawbridge)")]
@@ -42,7 +48,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Speed (degrees/sec) at which the bridge rotates down upon being cut.")]
         [SerializeField] private float _fallRotationSpeed = 160f;
 
-        [Header("Designer Dimensions")]
+        [Header("Designer Dimensions (Drawbridge Only)")]
+        [Tooltip("If true, automatically adjusts BoxCollider2D, TipAnchor, and Visual child sprite to match length and thickness. Disable if using a custom prefab with its own sprite and collider.")]
+        [SerializeField] private bool _manageBridgeGeometry = true;
+
         [Tooltip("Bridge plank length. Changing this automatically resizes the Visual sprite, BoxCollider2D, and TipAnchor!")]
         [Min(0.5f)]
         [SerializeField] private float _bridgeLength = 2.4f;
@@ -50,6 +59,19 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Bridge plank thickness/height.")]
         [Min(0.05f)]
         [SerializeField] private float _bridgeThickness = 0.35f;
+
+        [Header("Free Fall Settings (If Mode = FreeFall)")]
+        [Tooltip("Gravity scale applied to the Rigidbody2D when falling after being cut.")]
+        [SerializeField] private float _freeFallGravityScale = 1.5f;
+
+        [Tooltip("Lock the object as Static ground once it lands on the floor (useful for static platforms/steps). Ignored if a StitchableObject is attached.")]
+        [SerializeField] private bool _lockAsStaticOnLanding = false;
+
+        [Header("Landing Impact FX")]
+        [Tooltip("Trigger camera screen shake when bridge reaches flat resting position or freefall object lands.")]
+        [SerializeField] private bool _enableLandingShake = true;
+        [SerializeField] private float _landingShakeIntensity = 0.22f;
+        [SerializeField] private float _landingShakeDuration = 0.25f;
 
         [Header("Thread Component")]
         [Tooltip("SutureThread component rendering the hanging thread. If unassigned, auto-finds child or instantiates prefab.")]
@@ -59,15 +81,20 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private SutureThread _sutureThreadPrefab;
 
         private Rigidbody2D _rb;
+        private RigidbodyType2D _originalBodyType = RigidbodyType2D.Dynamic;
+        private StitchableObject _stitchableTarget;
         private bool _isSuspended = true;
         private bool _isRotatingDown;
+        private bool _isFreeFalling;
         private bool _isLockedAtRest;
 
         private Vector3 _initialPosition;
         private Quaternion _initialRotation;
 
+        public HangingMode Mode => _mode;
         public bool IsSuspended => _isSuspended;
         public bool IsLockedAtRest => _isLockedAtRest;
+        public bool IsHintDismissed => !_isSuspended;
         public Transform CeilingAnchor => _ceilingAnchor;
         public Transform ObjectAnchor => _objectAnchor;
         public Transform HingePivot => _hingePivot;
@@ -75,17 +102,19 @@ namespace ThailandHorrorJam.Systems.Needle
         public float BridgeLength => _bridgeLength;
         public float BridgeThickness => _bridgeThickness;
         public float FlatRestAngle => _flatRestAngle;
+        public bool ManageBridgeGeometry => _manageBridgeGeometry;
+        public StitchableObject StitchableTarget => _stitchableTarget;
 
         private void OnValidate()
         {
-            if (_mode == HangingMode.Drawbridge && !Application.isPlaying)
+            if (_mode == HangingMode.Drawbridge && _manageBridgeGeometry && !Application.isPlaying)
             {
                 ApplyDimensions(_bridgeLength, _bridgeThickness);
             }
         }
 
         /// <summary>
-        /// Resizes the BoxCollider2D, TipAnchor, and child Visual sprite together to ensure perfect alignment.
+        /// Resizes the BoxCollider2D, TipAnchor, and child Visual sprite together to ensure perfect alignment for bridges.
         /// </summary>
         public void ApplyDimensions(float length, float thickness)
         {
@@ -139,27 +168,104 @@ namespace ThailandHorrorJam.Systems.Needle
         }
 
         #region IStitchable Implementation
-        public StitchState CurrentState => _isSuspended ? StitchState.Tethered : StitchState.Idle;
+        public StitchState CurrentState
+        {
+            get
+            {
+                if (_isSuspended) return StitchState.Tethered;
+                if (_stitchableTarget != null) return _stitchableTarget.CurrentState;
+                return StitchState.Idle;
+            }
+        }
+
         public Transform ObjectTransform => transform;
-        public Vector2 CurrentPosition => _rb != null ? _rb.position : (Vector2)transform.position;
-        public void AttachThread() { }
-        public void UpdatePinnedWaypoints(IReadOnlyList<Vector2> waypoints) { }
-        public void UpdateInFlightNeedle(Vector2 needlePos) { }
-        public void UpdateAimLeash(Vector2 playerPos, float maxLeashDistance) { }
-        public void StartLoopAlongWaypoints(IReadOnlyList<Vector2> waypoints, LoopPlaybackMode mode) { }
-        public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb) { }
-        public void ReleasePlayerTether() { }
+
+        public Vector2 CurrentPosition
+        {
+            get
+            {
+                if (!_isSuspended && _stitchableTarget != null) return _stitchableTarget.CurrentPosition;
+                return _rb != null ? _rb.position : (Vector2)transform.position;
+            }
+        }
+
+        public void AttachThread()
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.AttachThread();
+            }
+        }
+
+        public void UpdatePinnedWaypoints(IReadOnlyList<Vector2> waypoints)
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.UpdatePinnedWaypoints(waypoints);
+            }
+        }
+
+        public void UpdateInFlightNeedle(Vector2 needlePos)
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.UpdateInFlightNeedle(needlePos);
+            }
+        }
+
+        public void UpdateAimLeash(Vector2 playerPos, float maxLeashDistance)
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.UpdateAimLeash(playerPos, maxLeashDistance);
+            }
+        }
+
+        public void StartLoopAlongWaypoints(IReadOnlyList<Vector2> waypoints, LoopPlaybackMode mode)
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.StartLoopAlongWaypoints(waypoints, mode);
+            }
+        }
+
+        public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb)
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.StartPlayerTether(playerTransform, playerRb);
+            }
+        }
+
+        public void ReleasePlayerTether()
+        {
+            if (!_isSuspended && _stitchableTarget != null)
+            {
+                _stitchableTarget.ReleasePlayerTether();
+            }
+        }
+
         public void CutThread()
         {
-            SeverHangingThread();
+            if (_isSuspended)
+            {
+                SeverHangingThread();
+            }
+            else if (_stitchableTarget != null)
+            {
+                _stitchableTarget.CutThread();
+            }
         }
         #endregion
 
         private void Awake()
         {
             _rb = GetComponent<Rigidbody2D>();
+            _stitchableTarget = GetComponent<StitchableObject>();
+
             if (_rb != null)
             {
+                _originalBodyType = _rb.bodyType;
                 _rb.bodyType = RigidbodyType2D.Static;
             }
 
@@ -205,6 +311,38 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_isRotatingDown && _mode == HangingMode.Drawbridge)
             {
                 StepDrawbridgeRotation(Time.deltaTime);
+            }
+        }
+
+        private void OnCollisionEnter2D(Collision2D collision)
+        {
+            if (!_isFreeFalling || _isLockedAtRest) return;
+
+            // FreeFall landing detection: collision with floor/ground
+            if (collision.relativeVelocity.magnitude > 1.2f || (collision.contacts.Length > 0 && collision.contacts[0].normal.y > 0.5f))
+            {
+                _isFreeFalling = false;
+                _isLockedAtRest = true;
+
+                if (_enableLandingShake)
+                {
+                    CameraController2D.Instance?.Shake(_landingShakeIntensity, _landingShakeDuration);
+                }
+
+                if (_lockAsStaticOnLanding && _stitchableTarget == null)
+                {
+                    if (_rb != null)
+                    {
+                        _rb.linearVelocity = Vector2.zero;
+                        _rb.angularVelocity = 0f;
+                        _rb.bodyType = RigidbodyType2D.Static;
+                    }
+                }
+                else if (_stitchableTarget != null && _rb != null)
+                {
+                    // Restore original dynamic state for stitchable object hauling
+                    _rb.bodyType = _originalBodyType;
+                }
             }
         }
 
@@ -260,12 +398,13 @@ namespace ThailandHorrorJam.Systems.Needle
                     _rb.angularVelocity = 0f;
                 }
             }
-            else
+            else // FreeFall
             {
+                _isFreeFalling = true;
                 if (_rb != null)
                 {
                     _rb.bodyType = RigidbodyType2D.Dynamic;
-                    _rb.gravityScale = 1f;
+                    _rb.gravityScale = _freeFallGravityScale;
                     _rb.WakeUp();
                 }
             }
@@ -291,6 +430,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 _isRotatingDown = false;
                 _isLockedAtRest = true;
 
+                if (_enableLandingShake)
+                {
+                    CameraController2D.Instance?.Shake(_landingShakeIntensity, _landingShakeDuration);
+                }
+
                 if (_rb != null)
                 {
                     _rb.bodyType = RigidbodyType2D.Static;
@@ -302,6 +446,7 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             _isSuspended = true;
             _isRotatingDown = false;
+            _isFreeFalling = false;
             _isLockedAtRest = false;
 
             transform.position = _initialPosition;
@@ -315,6 +460,11 @@ namespace ThailandHorrorJam.Systems.Needle
                     _rb.angularVelocity = 0f;
                 }
                 _rb.bodyType = RigidbodyType2D.Static;
+            }
+
+            if (_stitchableTarget != null)
+            {
+                _stitchableTarget.RestoreOriginalBodyState();
             }
 
             InitializeThreadVisual();
@@ -351,7 +501,7 @@ namespace ThailandHorrorJam.Systems.Needle
             Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(ceilingPos, 0.15f);
 
-            // Object attachment tip anchor (Cyan)
+            // Object attachment anchor (Cyan)
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(objPos, 0.1f);
 
