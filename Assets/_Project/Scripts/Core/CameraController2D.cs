@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 namespace ThailandHorrorJam.Core
 {
@@ -31,6 +32,15 @@ namespace ThailandHorrorJam.Core
         private Vector3 _punchOffset;
         private const float k_PunchDamping = 12f;
 
+        private Camera _cam;
+        private float _defaultOrthoSize = 5.5f;
+        private Vector3 _defaultOffset;
+        private Tween _zoomTween;
+        private Tween _offsetTween;
+
+        public float DefaultOrthoSize => _defaultOrthoSize;
+        public Vector3 DefaultOffset => _defaultOffset;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -39,6 +49,8 @@ namespace ThailandHorrorJam.Core
                 return;
             }
             Instance = this;
+
+            _defaultOffset = _offset;
 
             if (_target == null)
             {
@@ -53,10 +65,18 @@ namespace ThailandHorrorJam.Core
             {
                 _targetRb = _target.GetComponent<Rigidbody2D>();
             }
+
+            _cam = GetComponent<Camera>();
+            if (_cam != null)
+            {
+                _defaultOrthoSize = _cam.orthographicSize;
+            }
         }
 
         private void OnDestroy()
         {
+            _zoomTween?.Kill();
+            _offsetTween?.Kill();
             if (Instance == this)
             {
                 Instance = null;
@@ -128,6 +148,64 @@ namespace ThailandHorrorJam.Core
         {
             _target = target;
             _targetRb = target != null ? target.GetComponent<Rigidbody2D>() : null;
+        }
+
+        /// <summary>
+        /// Smoothly animates the camera orthographic size to a target value (cinematic zoom).
+        /// </summary>
+        public void ZoomTo(float targetOrthoSize, float duration, Ease ease = Ease.InOutCubic)
+        {
+            if (_cam == null) _cam = GetComponent<Camera>();
+            if (_cam == null) return;
+
+            _zoomTween?.Kill();
+            if (duration <= 0.001f)
+            {
+                _cam.orthographicSize = targetOrthoSize;
+                return;
+            }
+
+            _zoomTween = DOTween.To(() => _cam.orthographicSize, x => _cam.orthographicSize = x, targetOrthoSize, duration).SetEase(ease);
+        }
+
+        /// <summary>
+        /// Returns camera orthographic size smoothly back to its default scene value.
+        /// </summary>
+        public void ResetZoom(float duration, Ease ease = Ease.InOutQuad)
+        {
+            ZoomTo(_defaultOrthoSize, duration, ease);
+        }
+
+        /// <summary>
+        /// Smoothly shifts the camera tracking offset (e.g. lifting the camera up in Y during cinematic reveals).
+        /// </summary>
+        public void ShiftOffset(Vector3 targetOffset, float duration, Ease ease = Ease.InOutCubic)
+        {
+            _offsetTween?.Kill();
+            if (duration <= 0.001f)
+            {
+                _offset = targetOffset;
+                return;
+            }
+
+            _offsetTween = DOTween.To(() => _offset, x => _offset = x, targetOffset, duration).SetEase(ease);
+        }
+
+        /// <summary>
+        /// Smoothly shifts only the camera's Y offset.
+        /// </summary>
+        public void ShiftOffsetY(float targetOffsetY, float duration, Ease ease = Ease.InOutCubic)
+        {
+            Vector3 target = new Vector3(_offset.x, targetOffsetY, _offset.z);
+            ShiftOffset(target, duration, ease);
+        }
+
+        /// <summary>
+        /// Smoothly resets camera offset back to its default scene value.
+        /// </summary>
+        public void ResetOffset(float duration, Ease ease = Ease.InOutQuad)
+        {
+            ShiftOffset(_defaultOffset, duration, ease);
         }
 
         /// <summary>
