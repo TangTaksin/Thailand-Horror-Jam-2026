@@ -158,6 +158,10 @@ MonoBehaviour:
   _lineRenderer: {fileID: 6780262508308102681}
   _threadColor: {r: 0.92, g: 0.15, b: 0.15, a: 0.95}
   _threadWidth: 0.09375
+  _useProceduralBraidedTexture: 1
+  _maxTensionThinning: 0.28
+  _bendingStiffness: 0.18
+  _inFlightWhipAmplitude: 0.045
   _enablePixelSnapping: 1
   _pixelSnapPPU: 32
   _enableOutline: 1
@@ -173,7 +177,7 @@ MonoBehaviour:
   _constraintIterations: 6
   _gravity: 3
   _airDamping: 3.2
-  _slackFactor: 1.025
+  _slackFactor: 1.4
   _twangImpulse: 4.2
   _enableGroundCollision: 1
   _collisionMask:
@@ -187,3 +191,5 @@ MonoBehaviour:
   _scrollSpeed: 2.5
   _tilingFrequency: 2.5
   _hideDestinationPinDot: 1
+  _hideAllPins: 0
+  _isCuttable: 1
