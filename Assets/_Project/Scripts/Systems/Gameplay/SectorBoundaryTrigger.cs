@@ -49,7 +49,20 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
         }
 
+        private void Start()
+        {
+            if (LevelSeamlessManager.Instance == null)
+            {
+                Debug.LogWarning($"[SectorBoundaryTrigger] '{gameObject.name}' could not find LevelSeamlessManager.Instance. Make sure LevelSeamlessManager is present in the scene so seamless sector transitions can execute.");
+            }
+        }
+
         private void OnTriggerEnter2D(Collider2D other)
+        {
+            HandlePlayerContact(other);
+        }
+
+        private void OnTriggerStay2D(Collider2D other)
         {
             HandlePlayerContact(other);
         }
@@ -71,11 +84,24 @@ namespace ThailandHorrorJam.Systems.Gameplay
                         if (dot > _directionTolerance)
                         {
                             LevelSeamlessManager.Instance?.TransitionToSector(_sectorB);
+                            return;
                         }
                         else if (dot < -_directionTolerance)
                         {
                             LevelSeamlessManager.Instance?.TransitionToSector(_sectorA);
+                            return;
                         }
+                    }
+
+                    // Fallback when moving slowly or resuming movement inside trigger
+                    float relativeOffset = Vector2.Dot((Vector2)other.transform.position - (Vector2)transform.position, _expectedDirection.normalized);
+                    if (relativeOffset > 0.1f)
+                    {
+                        LevelSeamlessManager.Instance?.TransitionToSector(_sectorB);
+                    }
+                    else if (relativeOffset < -0.1f)
+                    {
+                        LevelSeamlessManager.Instance?.TransitionToSector(_sectorA);
                     }
                 }
                 return;

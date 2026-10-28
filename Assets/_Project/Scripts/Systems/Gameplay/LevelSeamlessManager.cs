@@ -253,7 +253,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 if (_sectors[i] != null && _sectors[i].rootObject != null)
                 {
-                    float dist = Mathf.Abs(spawnPos.x - _sectors[i].rootObject.transform.position.x);
+                    float sectorCenterX = GetSectorCenterX(_sectors[i]);
+                    float dist = Mathf.Abs(spawnPos.x - sectorCenterX);
                     if (dist < closestDistance)
                     {
                         closestDistance = dist;
@@ -263,6 +264,25 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
 
             return closestIndex;
+        }
+
+        public static float GetSectorCenterX(SectorEntry sector)
+        {
+            if (sector == null || sector.rootObject == null) return 0f;
+            if (sector.defaultCheckpoint != null) return sector.defaultCheckpoint.transform.position.x;
+
+            Transform t = sector.rootObject.transform;
+            if (t.childCount > 0)
+            {
+                float sumX = 0f;
+                for (int c = 0; c < t.childCount; c++)
+                {
+                    sumX += t.GetChild(c).position.x;
+                }
+                return sumX / t.childCount;
+            }
+
+            return t.position.x;
         }
 
         private int AutoDetectSectorFromPlayerPosition()
@@ -277,8 +297,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 if (_sectors[i] != null && _sectors[i].rootObject != null)
                 {
-                    float sectorX = _sectors[i].rootObject.transform.position.x;
-                    float dist = Mathf.Abs(playerX - sectorX);
+                    float sectorCenterX = GetSectorCenterX(_sectors[i]);
+                    float dist = Mathf.Abs(playerX - sectorCenterX);
                     if (dist < closestDistance)
                     {
                         closestDistance = dist;
@@ -288,6 +308,24 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
 
             return closestIndex;
+        }
+
+        [ContextMenu("Preview Active Sector in Editor")]
+        public void PreviewActiveSectorInEditor()
+        {
+            SetCurrentSector(_initialSectorIndex >= 0 ? _initialSectorIndex : 0);
+        }
+
+        [ContextMenu("Show All Sectors")]
+        public void ShowAllSectorsInEditor()
+        {
+            for (int i = 0; i < _sectors.Count; i++)
+            {
+                if (_sectors[i]?.rootObject != null)
+                {
+                    _sectors[i].rootObject.SetActive(true);
+                }
+            }
         }
 
         private void OnDrawGizmosSelected()
@@ -304,7 +342,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     : (i == _currentSectorIndex || (i == 0 && _currentSectorIndex < 0));
 
                 Gizmos.color = isActive ? new Color(0.2f, 1f, 0.3f, 0.6f) : new Color(0.7f, 0.7f, 0.7f, 0.25f);
-                Vector3 pos = sector.rootObject.transform.position;
+                float centerX = GetSectorCenterX(sector);
+                Vector3 pos = new Vector3(centerX, sector.rootObject.transform.position.y, 0f);
                 Gizmos.DrawWireCube(pos + Vector3.up * 2f, new Vector3(8f, 6f, 1f));
             }
         }

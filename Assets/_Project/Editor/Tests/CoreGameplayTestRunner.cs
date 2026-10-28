@@ -55,6 +55,12 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t1.SetUp(); t1.ResetToInitialState_RestoresTransformPositionAndClearsVelocities(); t1.TearDown(); },
                 "StitchableState: ResetToInitialState Restores Position & Velocity");
 
+            RunTest(() => { t1.SetUp(); t1.ResetToInitialState_WhenPreserveLoopOnRespawnTrueAndLooping_PreservesLoopingState(); t1.TearDown(); },
+                "StitchableState: Preserve Loop On Respawn Keeps Looping Circuit Active");
+
+            RunTest(() => { t1.SetUp(); t1.ResetToInitialState_WhenForceReset_ResetsEvenIfPreserveLoopTrue(); t1.TearDown(); },
+                "StitchableState: Force Reset Resets Crate To Alcove Even If Preserve Loop True");
+
             // 2. StitchableWaypointNavigationTests
             var t2 = new StitchableWaypointNavigationTests();
 
@@ -121,6 +127,19 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t5.SetUp(); t5.SeverHangingThread_WhileAlreadyTethered_DropsAsDynamicAndMaintainsTether(); t5.TearDown(); },
                 "UniversalHanging: Severing Thread While Already Tethered Drops As Dynamic And Maintains Tether");
 
+            // 6. LevelSeamlessTransitionTests
+            var t6 = new LevelSeamlessTransitionTests();
+            RunTest(() => { t6.SetUp(); t6.InitialSector_Zero_ActivatesOnlySector0And1_CullsSectors2To4(); t6.TearDown(); },
+                "LevelSeamless: Initial Sector 0 Activates Sector 0 & 1, Culls Sectors 2 to 4");
+            RunTest(() => { t6.SetUp(); t6.TransitionToSector2_ActivatesSectors123_CullsSectors0And4(); t6.TearDown(); },
+                "LevelSeamless: Transition To Sector 2 Activates 1, 2, 3 and Culls 0, 4");
+            RunTest(() => { t6.SetUp(); t6.TransitionToSector4_ActivatesOnlySectors3And4(); t6.TearDown(); },
+                "LevelSeamless: Transition To Sector 4 Activates Only 3 and 4");
+            RunTest(() => { t6.SetUp(); t6.TransitionToSectorObject_FindsCorrectIndex(); t6.TearDown(); },
+                "LevelSeamless: Transition To SectorObject Finds Correct Index");
+            RunTest(() => { t6.SetUp(); t6.GetSectorCenterX_ComputesCenterFromChildren_WhenRootAtZero(); t6.TearDown(); },
+                "LevelSeamless: GetSectorCenterX Computes Center From Children When Root At Zero");
+
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();
         }
@@ -130,7 +149,7 @@ namespace ThailandHorrorJam.Editor.Tests
             var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
             foreach (var go in allGos)
             {
-                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate") || go.name.StartsWith("TestCorpseGasVent") || go.name.StartsWith("TestCrate") || go.name.StartsWith("TestHangingObject")))
+                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate") || go.name.StartsWith("TestCorpseGasVent") || go.name.StartsWith("TestCrate") || go.name.StartsWith("TestHangingObject") || go.name.StartsWith("TestLevelSeamlessManager") || go.name.StartsWith("TestSector_")))
                 {
                     Object.DestroyImmediate(go);
                 }
