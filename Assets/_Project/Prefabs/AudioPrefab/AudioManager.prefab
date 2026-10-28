@@ -184,7 +184,13 @@ MonoBehaviour:
   maxPitch: 1.2
   fadeOutDuration: 0.5
   fadeInDuration: 0.5
-  sfxLibrary: []
+  sfxLibrary:
+  - name: Typewriter_1
+    clip: {fileID: 8300000, guid: f7ec83771e4a18a4b86688026a2646ab, type: 3}
+    volume: 1
+  - name: Typewriter_2
+    clip: {fileID: 8300000, guid: 95eeda34c46ebd34a9653682bce25c75, type: 3}
+    volume: 1
   loopSFXSource: {fileID: 1269994080291057903}
 --- !u!1 &8378100414635023576
 GameObject:
