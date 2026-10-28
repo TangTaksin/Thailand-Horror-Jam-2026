@@ -179,6 +179,18 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
 
+                // Check if hit entity responds to needle impacts (e.g. falling fish hazards)
+                INeedleHittable needleHittable = hitCol.GetComponentInParent<INeedleHittable>();
+                if (needleHittable != null)
+                {
+                    if (needleHittable.OnHitByNeedle(this, hit.point, stepDir))
+                    {
+                        transform.position = hit.point;
+                        StartRewind();
+                        return;
+                    }
+                }
+
                 // Trigger colliders are ignored unless they are an enabled NeedleAnchorPoint
                 if (hitCol.isTrigger)
                 {

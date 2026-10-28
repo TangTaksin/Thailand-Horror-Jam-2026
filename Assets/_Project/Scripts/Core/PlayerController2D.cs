@@ -119,6 +119,8 @@ namespace ThailandHorrorJam.Core
         private float _respawnImmunityTimer;
         private float _throwSlowdownTimer;
         private float _throwSlowdownMultiplier = 1f;
+        private float _knockbackTimer;
+        private Vector2 _knockbackVelocity;
 
         private bool _isOnSlope;
         private Vector2 _slopeNormal = Vector2.up;
@@ -169,6 +171,20 @@ namespace ThailandHorrorJam.Core
 
         public event System.Action<float> OnLanded;
         public event System.Action OnJumped;
+
+        /// <summary>
+        /// Applies an external physics knockback impulse to the player (e.g. from falling fish hazards).
+        /// </summary>
+        public void ApplyKnockback(Vector2 impulse, float duration = 0.22f)
+        {
+            if (_rb == null) _rb = GetComponent<Rigidbody2D>();
+            if (_rb == null) _rb = GetComponentInParent<Rigidbody2D>();
+            if (_rb == null) return;
+            _knockbackTimer = Mathf.Max(_knockbackTimer, duration);
+            _knockbackVelocity = impulse;
+            _rb.linearVelocity = impulse;
+            CameraController2D.Instance?.Shake(0.035f, 0.1f);
+        }
 
         public void SetInputLocked(bool locked)
         {
@@ -602,6 +618,14 @@ namespace ThailandHorrorJam.Core
 
         private void ApplyHorizontalMovement()
         {
+            if (_knockbackTimer > 0f)
+            {
+                _knockbackTimer -= Time.fixedDeltaTime;
+                _knockbackVelocity.x = Mathf.MoveTowards(_knockbackVelocity.x, 0f, _deceleration * 0.75f * Time.fixedDeltaTime);
+                _rb.linearVelocity = new Vector2(_knockbackVelocity.x, _rb.linearVelocity.y);
+                return;
+            }
+
             float speed = _moveSpeed;
 
             if (_throwSlowdownTimer > 0f)
