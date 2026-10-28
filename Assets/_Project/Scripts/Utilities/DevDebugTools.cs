@@ -30,7 +30,7 @@ namespace ThailandHorrorJam.Utilities
         [SerializeField] private bool _enableDebugTools = true;
 
         [Tooltip("ปุ่มเปิด/ปิดการทำงานของ Dev Tools ทั้งหมด")]
-        [SerializeField] private Key _toggleKey = Key.F1;
+        [SerializeField] private Key _toggleKey = Key.Backquote;
 
         [Tooltip("แสดงคำแนะนำมุมจอด้านซ้ายบนหรือไม่")]
         [SerializeField] private bool _showWatermark = true;
@@ -55,14 +55,26 @@ namespace ThailandHorrorJam.Utilities
         [SerializeField] private bool _snapCamera = true;
 
         [Header("Extra Shortcuts")]
-        [Tooltip("ปุ่ม Reload ฉากปัจจุบัน (F5 หรือ Ctrl+R)")]
+        [Tooltip("ปุ่ม Reload ฉากปัจจุบัน (Ctrl+R)")]
         [SerializeField] private bool _enableQuickReload = true;
 
-        [Tooltip("กด F2 เพื่อสลับสถานะอมตะ (God Mode)")]
+        [Tooltip("ปุ่ม Reset ผู้เล่นกลับ Checkpoint ล่าสุดพร้อมรีเซ็ต Puzzle ในห้องนั้น")]
+        [SerializeField] private bool _enableCheckpointReset = true;
+
+        [Tooltip("ปุ่ม Reset to Checkpoint (Default: Key.K หรือคลิกจาก Inspector)")]
+        [SerializeField] private Key _resetCheckpointKey = Key.K;
+
+        [Tooltip("กดปุ่ม G เพื่อสลับสถานะอมตะ (God Mode)")]
         [SerializeField] private bool _enableGodModeToggle = true;
 
-        [Tooltip("กด F3 เพื่อปลดล็อก/ล็อกเข็มกับด้ายทันที")]
+        [Tooltip("ปุ่ม Toggle God Mode")]
+        [SerializeField] private Key _godModeKey = Key.G;
+
+        [Tooltip("กดปุ่ม H เพื่อปลดล็อก/ล็อกเข็มกับด้ายทันที")]
         [SerializeField] private bool _enableNeedleToggle = true;
+
+        [Tooltip("ปุ่ม Toggle Needle")]
+        [SerializeField] private Key _needleToggleKey = Key.H;
 
         private Camera _mainCamera;
         private PlayerController2D _playerController;
@@ -198,12 +210,11 @@ namespace ThailandHorrorJam.Utilities
         {
             if (Keyboard.current == null) return;
 
-            // Quick Reload (F5 or Ctrl+R)
+            // Quick Reload (Ctrl+R)
             if (_enableQuickReload)
             {
-                bool f5Pressed = Keyboard.current.f5Key.wasPressedThisFrame;
                 bool ctrlRPressed = Keyboard.current.leftCtrlKey.isPressed && Keyboard.current.rKey.wasPressedThisFrame;
-                if (f5Pressed || ctrlRPressed)
+                if (ctrlRPressed)
                 {
                     Debug.Log("[DevDebug] Reloading current scene...");
                     SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -211,8 +222,14 @@ namespace ThailandHorrorJam.Utilities
                 }
             }
 
-            // Toggle God Mode (F2)
-            if (_enableGodModeToggle && Keyboard.current.f2Key.wasPressedThisFrame)
+            // Reset to Checkpoint & Reset Puzzle (K)
+            if (_enableCheckpointReset && Keyboard.current[_resetCheckpointKey].wasPressedThisFrame)
+            {
+                ResetToCheckpointAndPuzzle();
+            }
+
+            // Toggle God Mode (G)
+            if (_enableGodModeToggle && Keyboard.current[_godModeKey].wasPressedThisFrame)
             {
                 _isGodMode = !_isGodMode;
                 Debug.Log($"[DevDebug] God Mode: {(_isGodMode ? "ON" : "OFF")}");
@@ -223,8 +240,8 @@ namespace ThailandHorrorJam.Utilities
                 _playerController.ResetRespawnImmunity(1.0f);
             }
 
-            // Toggle Needle Controller (F3)
-            if (_enableNeedleToggle && Keyboard.current.f3Key.wasPressedThisFrame)
+            // Toggle Needle Controller (H)
+            if (_enableNeedleToggle && Keyboard.current[_needleToggleKey].wasPressedThisFrame)
             {
                 if (_playerController != null)
                 {
@@ -234,6 +251,46 @@ namespace ThailandHorrorJam.Utilities
                         nc.enabled = !nc.enabled;
                         Debug.Log($"[DevDebug] NeedleController enabled: {nc.enabled}");
                     }
+                }
+            }
+        }
+
+        [ContextMenu("Reset to Checkpoint & Puzzle")]
+        public void ResetToCheckpointAndPuzzle()
+        {
+            Debug.Log("[DevDebug] Resetting player to checkpoint and resetting puzzle elements...");
+
+            // 1. Reset Needle and Thread states
+            if (_playerController != null)
+            {
+                var needle = _playerController.GetComponent<NeedleController>();
+                needle?.ResetAllNeedleStates();
+            }
+
+            // 2. Trigger CheckpointManager respawn & puzzle reset sequence if available
+            if (CheckpointManager.Instance != null)
+            {
+                CheckpointManager.Instance.ResetAssociatedOrAllStitchables();
+                CheckpointManager.Instance.TriggerPlayerDeath(shakeIntensity: 0.1f, shakeDuration: 0.15f);
+            }
+            else
+            {
+                // Fallback if CheckpointManager is not present in scene
+                var allStitchables = FindObjectsByType<StitchableObject>(FindObjectsInactive.Exclude);
+                for (int i = 0; i < allStitchables.Length; i++)
+                {
+                    allStitchables[i]?.ResetToInitialState(forceReset: true);
+                }
+
+                var allHanging = FindObjectsByType<HangingObject2D>(FindObjectsInactive.Exclude);
+                for (int i = 0; i < allHanging.Length; i++)
+                {
+                    allHanging[i]?.ResetToInitialState();
+                }
+
+                if (_playerController != null)
+                {
+                    _playerController.TeleportTo(_playerController.transform.position, true, snapToGround: true);
                 }
             }
         }
@@ -252,8 +309,8 @@ namespace ThailandHorrorJam.Utilities
             };
             style.normal.textColor = new Color(0.3f, 0.95f, 0.4f, 0.85f);
 
-            string info = $"[DEV] {modText} on empty space: Teleport | F1: Hide | F2: God{godText} | F5: Reload";
-            GUI.Label(new Rect(10, 10, 600, 25), info, style);
+            string info = $"[DEV] {modText} on empty space: Teleport | {_toggleKey}: Hide | {_resetCheckpointKey}: Reset CP | {_godModeKey}: God{godText} | Ctrl+R: Reload";
+            GUI.Label(new Rect(10, 10, 700, 25), info, style);
         }
     }
 }
