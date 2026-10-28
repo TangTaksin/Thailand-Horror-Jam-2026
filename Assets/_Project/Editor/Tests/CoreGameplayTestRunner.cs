@@ -140,6 +140,19 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t6.SetUp(); t6.GetSectorCenterX_ComputesCenterFromChildren_WhenRootAtZero(); t6.TearDown(); },
                 "LevelSeamless: GetSectorCenterX Computes Center From Children When Root At Zero");
 
+            // 7. FishWaterfallHazardTests
+            var t7 = new FishWaterfallHazardTests();
+            RunTest(() => { t7.SetUp(); t7.FishHazard_InitialSpawn_SetsActiveAndNotDeflected(); t7.TearDown(); },
+                "FishWaterfall: Initial Spawn Sets Active And Not Deflected");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_GentleNeedleHit_DeflectsSidewaysWithoutHarm(); t7.TearDown(); },
+                "FishWaterfall: Gentle Needle Hit Deflects Sideways Without Harm");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_Despawn_DeactivatesGameObject(); t7.TearDown(); },
+                "FishWaterfall: Despawn Deactivates GameObject And Recycles To Pool");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_Knockback_PushesPlayerToTheLeft(); t7.TearDown(); },
+                "FishWaterfall: Knockback Strictly Pushes Player To The Left (-X)");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_SpeedRemainsConstant_AfterNeedleHitAndRespawn(); t7.TearDown(); },
+                "FishWaterfall: Fall Speed Remains Constant Across Spawn & Respawn Cycles");
+
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();
         }
