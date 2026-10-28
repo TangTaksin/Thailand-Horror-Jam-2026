@@ -14,6 +14,12 @@ namespace ThailandHorrorJam.Systems.UI
     {
         [Header("Scene Transition")]
         [SerializeField] private SceneSwitcher _sceneSwitcher;
+        [SerializeField] private SceneTransition _sceneTransition;
+        [SerializeField] private TransitionEventChannelSO _transitionEventChannel;
+        [SerializeField] private ThailandHorrorJam.Systems.Gameplay.CutsceneController _introCutscene;
+        [SerializeField] private CanvasGroup _titleMenuCanvasGroup;
+        [Tooltip("Delay in seconds between transition completion and starting the Intro cutscene.")]
+        [SerializeField] private float _introStartDelay = 1.5f;
 
         [Header("Visual Elements")]
         [SerializeField] private RectTransform _logoRectTransform;
@@ -79,16 +85,78 @@ namespace ThailandHorrorJam.Systems.UI
             if (_hasStarted) return;
             _hasStarted = true;
 
-            Debug.Log("[MainMenu] Starting game transition into Gameplay scene...");
+            Debug.Log("[MainMenu] Starting game transition into Intro/Gameplay...");
 
             if (_promptCanvasGroup != null)
             {
                 _promptCanvasGroup.alpha = 1f;
             }
 
+            // If we have an Intro cutscene, play Pixel Transition first before starting the cutscene
+            if (_introCutscene != null)
+            {
+                StartCoroutine(PlayTransitionThenStartIntro());
+                return;
+            }
+
+            // Fallback: direct scene transition to Gameplay
             if (_sceneSwitcher != null)
             {
                 _sceneSwitcher.LoadNextScene();
+            }
+        }
+
+        private System.Collections.IEnumerator PlayTransitionThenStartIntro()
+        {
+            // 1. Locate SceneTransition if not explicitly assigned
+            SceneTransition transition = _sceneTransition;
+            if (transition == null)
+            {
+                transition = FindAnyObjectByType<SceneTransition>();
+            }
+
+            if (transition != null)
+            {
+                bool isDone = false;
+                UnityEngine.Events.UnityAction onDone = () => isDone = true;
+                transition.OnTransitionDone.AddListener(onDone);
+
+                // Play pixel transition (matures pixel curtain to cover screen)
+                transition.PlayTransition();
+
+                while (!isDone)
+                {
+                    yield return null;
+                }
+
+                transition.OnTransitionDone.RemoveListener(onDone);
+            }
+
+            // 2. Hide Main Menu title UI while screen is covered by pixels
+            if (_titleMenuCanvasGroup != null)
+            {
+                _titleMenuCanvasGroup.alpha = 0f;
+                _titleMenuCanvasGroup.blocksRaycasts = false;
+                _titleMenuCanvasGroup.interactable = false;
+            }
+
+            // Ominous silence / suspense delay (1.5 seconds) in total blackness before Intro begins
+            if (_introStartDelay > 0f)
+            {
+                yield return new WaitForSeconds(_introStartDelay);
+            }
+
+            // 3. Start Intro Cutscene Canvas behind the pixel veil
+            if (_introCutscene != null)
+            {
+                _introCutscene.StartCutscene();
+            }
+
+            // 4. Reveal screen back from pixels into the Intro cutscene
+            if (transition != null)
+            {
+                // Play forward to clear the pixel curtain (0 -> 1)
+                transition.SendMessage("Start", UnityEngine.SendMessageOptions.DontRequireReceiver);
             }
         }
     }
