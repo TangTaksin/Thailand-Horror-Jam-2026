@@ -6,6 +6,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
 using UnityEngine.Rendering.Universal;
 using TMPro;
 using ThailandHorrorJam.Core;
@@ -38,6 +39,8 @@ namespace ThailandHorrorJam.Editor
         private const string k_HangingBridgePrefabPath = "Assets/_Project/Prefabs/HangingBridge.prefab";
         private const string k_DeadFishSpriteSheetPath = "Assets/_Project/Art/Sprites/Character/Dead_Fish_SpriteSheet.png";
         private const string k_FallingFishPrefabPath = "Assets/_Project/Prefabs/Gameplay/FallingDeadFish.prefab";
+        private const string k_PixelTransitionChannelPath = "Assets/_Project/ScriptableObjects/EventChannel/PixelTransitionChannel.asset";
+        private const string k_EndingSpritesDir = "Assets/_Project/Art/Sprites/Ending";
         private const string k_InputTilesheetPath = "Assets/_Project/Art/Sprites/UI/tilemap_white_packed.png";
 
         [MenuItem("Tools/Horror Jam/Generate Graybox Prefab Library", false, 10)]
@@ -96,19 +99,55 @@ namespace ThailandHorrorJam.Editor
             Object.DestroyImmediate(go);
         }
 
+        public static Sprite[] LoadFishSprites()
+        {
+            return AssetDatabase.LoadAllAssetsAtPath(k_DeadFishSpriteSheetPath)
+                .OfType<Sprite>()
+                .OrderBy(s =>
+                {
+                    string name = s.name;
+                    int lastUnder = name.LastIndexOf('_');
+                    if (lastUnder >= 0 && int.TryParse(name.Substring(lastUnder + 1), out int n))
+                        return n;
+                    return 0;
+                })
+                .ToArray();
+        }
+
         private static FallingFishHazard2D EnsureFallingFishPrefab(Sprite[] fishSprites)
         {
             var existing = AssetDatabase.LoadAssetAtPath<FallingFishHazard2D>(k_FallingFishPrefabPath);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                if (fishSprites != null && fishSprites.Length > 0)
+                {
+                    var existingSo = new SerializedObject(existing);
+                    var framesProp = existingSo.FindProperty("_animationFrames");
+                    framesProp.arraySize = fishSprites.Length;
+                    for (int i = 0; i < fishSprites.Length; i++)
+                    {
+                        framesProp.GetArrayElementAtIndex(i).objectReferenceValue = fishSprites[i];
+                    }
+                    existingSo.ApplyModifiedProperties();
+
+                    var sr = existing.GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        sr.sprite = fishSprites[0];
+                    }
+                    PrefabUtility.SavePrefabAsset(existing.gameObject);
+                }
+                return existing;
+            }
 
             GameObject go = new GameObject("FallingDeadFish");
-            var sr = go.AddComponent<SpriteRenderer>();
+            var srNew = go.AddComponent<SpriteRenderer>();
             if (fishSprites != null && fishSprites.Length > 0)
             {
-                sr.sprite = fishSprites[0];
+                srNew.sprite = fishSprites[0];
             }
-            sr.sortingLayerName = "Default";
-            sr.sortingOrder = 6;
+            srNew.sortingLayerName = "Default";
+            srNew.sortingOrder = 6;
 
             var col = go.AddComponent<CircleCollider2D>();
             col.isTrigger = true;
@@ -1335,10 +1374,7 @@ namespace ThailandHorrorJam.Editor
             sbtSo.ApplyModifiedProperties();
 
             // 10. Fish Waterfall Hazard (over chasm gap from X = 107.0 to 112.0)
-            Sprite[] fishSprites = AssetDatabase.LoadAllAssetsAtPath(k_DeadFishSpriteSheetPath)
-                .OfType<Sprite>()
-                .OrderBy(s => s.name)
-                .ToArray();
+            Sprite[] fishSprites = LoadFishSprites();
 
             FallingFishHazard2D fishPrefab = EnsureFallingFishPrefab(fishSprites);
 
@@ -1474,6 +1510,527 @@ namespace ThailandHorrorJam.Editor
             Debug.Log("[LevelTemplateCreator] Successfully built Sector_05 in Gameplay.unity!");
         }
 
+        public static Sprite[] LoadEndingSprites()
+        {
+            if (!Directory.Exists(k_EndingSpritesDir)) return new Sprite[0];
+
+            string[] files = Directory.GetFiles(k_EndingSpritesDir, "End_SC*.png");
+            return files
+                .OrderBy(path => {
+                    string fname = Path.GetFileNameWithoutExtension(path);
+                    string numStr = fname.Replace("End_SC", "");
+                    return int.TryParse(numStr, out int n) ? n : 999;
+                })
+                .Select(path => AssetDatabase.LoadAssetAtPath<Sprite>(path))
+                .Where(s => s != null)
+                .ToArray();
+        }
+
+        public static EndingCutsceneController EnsureEndingCutsceneCanvas(Sprite[] endingSprites, TMP_FontAsset fontAsset)
+        {
+            var existing = Object.FindAnyObjectByType<EndingCutsceneController>(FindObjectsInactive.Include);
+            if (existing != null)
+            {
+                var soExisting = new SerializedObject(existing);
+                var slidesPropExisting = soExisting.FindProperty("_slides");
+                slidesPropExisting.arraySize = endingSprites.Length;
+                for (int i = 0; i < endingSprites.Length; i++)
+                {
+                    slidesPropExisting.GetArrayElementAtIndex(i).objectReferenceValue = endingSprites[i];
+                }
+                soExisting.ApplyModifiedProperties();
+                return existing;
+            }
+
+            GameObject canvasGo = new GameObject("EndingCutsceneCanvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            canvasGo.AddComponent<GraphicRaycaster>();
+            var cg = canvasGo.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+            cg.blocksRaycasts = false;
+
+            // Background blackout
+            GameObject bgGo = new GameObject("BlackoutBackground");
+            bgGo.transform.SetParent(canvasGo.transform, false);
+            var bgImg = bgGo.AddComponent<Image>();
+            bgImg.color = Color.black;
+            var bgRect = bgGo.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.sizeDelta = Vector2.zero;
+
+            // Slide Image
+            GameObject slideGo = new GameObject("SlideImage");
+            slideGo.transform.SetParent(canvasGo.transform, false);
+            var slideImg = slideGo.AddComponent<Image>();
+            slideImg.preserveAspect = true;
+            slideImg.color = Color.white;
+            if (endingSprites != null && endingSprites.Length > 0)
+            {
+                slideImg.sprite = endingSprites[0];
+            }
+            var slideRect = slideGo.GetComponent<RectTransform>();
+            slideRect.anchorMin = Vector2.zero;
+            slideRect.anchorMax = Vector2.one;
+            slideRect.sizeDelta = Vector2.zero;
+
+            // End Card Panel
+            GameObject endCardGo = new GameObject("EndCardPanel");
+            endCardGo.transform.SetParent(canvasGo.transform, false);
+            var endCardImg = endCardGo.AddComponent<Image>();
+            endCardImg.color = new Color(0f, 0f, 0f, 0.75f);
+            var endCardRect = endCardGo.GetComponent<RectTransform>();
+            endCardRect.anchorMin = new Vector2(0.5f, 0f);
+            endCardRect.anchorMax = new Vector2(0.5f, 0f);
+            endCardRect.pivot = new Vector2(0.5f, 0f);
+            endCardRect.sizeDelta = new Vector2(900f, 260f);
+            endCardRect.anchoredPosition = new Vector2(0f, 40f);
+
+            // Title Text
+            GameObject titleGo = new GameObject("TitleText");
+            titleGo.transform.SetParent(endCardGo.transform, false);
+            var titleTmp = titleGo.AddComponent<TextMeshProUGUI>();
+            if (fontAsset != null) titleTmp.font = fontAsset;
+            titleTmp.text = "THE END";
+            titleTmp.fontSize = 54;
+            titleTmp.alignment = TextAlignmentOptions.Center;
+            titleTmp.color = new Color(0.95f, 0.85f, 0.45f, 1f);
+            var titleRect = titleGo.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 0.5f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.sizeDelta = Vector2.zero;
+            titleRect.anchoredPosition = new Vector2(0f, 10f);
+
+            // Credits Text
+            GameObject creditsGo = new GameObject("CreditsText");
+            creditsGo.transform.SetParent(endCardGo.transform, false);
+            var creditsTmp = creditsGo.AddComponent<TextMeshProUGUI>();
+            if (fontAsset != null) creditsTmp.font = fontAsset;
+            creditsTmp.text = "Thailand Horror Jam 2026 — Theme: Loop\nThank you for playing!";
+            creditsTmp.fontSize = 28;
+            creditsTmp.alignment = TextAlignmentOptions.Center;
+            creditsTmp.color = new Color(0.85f, 0.85f, 0.85f, 1f);
+            var creditsRect = creditsGo.GetComponent<RectTransform>();
+            creditsRect.anchorMin = new Vector2(0f, 0f);
+            creditsRect.anchorMax = new Vector2(1f, 0.5f);
+            creditsRect.sizeDelta = Vector2.zero;
+            creditsRect.anchoredPosition = new Vector2(0f, 20f);
+
+            // Re-enter Loop Button
+            GameObject btnGo = new GameObject("ReenterLoopButton");
+            btnGo.transform.SetParent(endCardGo.transform, false);
+            var btnImg = btnGo.AddComponent<Image>();
+            btnImg.color = new Color(0.2f, 0.2f, 0.25f, 0.9f);
+            var btn = btnGo.AddComponent<Button>();
+            var btnRect = btnGo.GetComponent<RectTransform>();
+            btnRect.anchorMin = new Vector2(0.5f, 0f);
+            btnRect.anchorMax = new Vector2(0.5f, 0f);
+            btnRect.pivot = new Vector2(0.5f, 0f);
+            btnRect.sizeDelta = new Vector2(260f, 50f);
+            btnRect.anchoredPosition = new Vector2(0f, 15f);
+
+            GameObject btnTextGo = new GameObject("BtnText");
+            btnTextGo.transform.SetParent(btnGo.transform, false);
+            var btnTmp = btnTextGo.AddComponent<TextMeshProUGUI>();
+            if (fontAsset != null) btnTmp.font = fontAsset;
+            btnTmp.text = "[ Re-enter Loop ]";
+            btnTmp.fontSize = 24;
+            btnTmp.alignment = TextAlignmentOptions.Center;
+            btnTmp.color = Color.white;
+            var btnTextRect = btnTextGo.GetComponent<RectTransform>();
+            btnTextRect.anchorMin = Vector2.zero;
+            btnTextRect.anchorMax = Vector2.one;
+            btnTextRect.sizeDelta = Vector2.zero;
+
+            endCardGo.SetActive(false);
+
+            var controller = canvasGo.AddComponent<EndingCutsceneController>();
+            var so = new SerializedObject(controller);
+            so.FindProperty("_canvasGroup").objectReferenceValue = cg;
+            so.FindProperty("_slideImage").objectReferenceValue = slideImg;
+            so.FindProperty("_endCardPanel").objectReferenceValue = endCardGo;
+            so.FindProperty("_endCardTitleText").objectReferenceValue = titleTmp;
+            so.FindProperty("_endCardCreditsText").objectReferenceValue = creditsTmp;
+            so.FindProperty("_reenterLoopButton").objectReferenceValue = btn;
+            so.FindProperty("_slideDuration").floatValue = 2.5f;
+
+            var slidesProp = so.FindProperty("_slides");
+            slidesProp.arraySize = endingSprites.Length;
+            for (int i = 0; i < endingSprites.Length; i++)
+            {
+                slidesProp.GetArrayElementAtIndex(i).objectReferenceValue = endingSprites[i];
+            }
+            so.ApplyModifiedProperties();
+
+            return controller;
+        }
+
+        public static GameObject BuildSector6Hierarchy(
+            Scene scene,
+            Transform envRoot,
+            GameObject sector5Root,
+            Sprite squareSprite,
+            PhysicsMaterial2D onFrictionMat,
+            int groundLayer,
+            Color floorColor,
+            Color wallColor,
+            TMP_FontAsset fontAsset,
+            out Checkpoint cp6,
+            out SectorBoundaryTrigger boundaryTrigger)
+        {
+            GameObject sector6Root = new GameObject("Sector_06 (The Suture Abyss & Eternal Loop Gate)");
+            if (envRoot != null)
+            {
+                sector6Root.transform.SetParent(envRoot, false);
+            }
+
+            // 1. Entrance Ledge (X = 125.0 to 129.5, Surface Y = 10.5)
+            CreatePlatform(sector6Root.transform, "Floor_Sector6_Entrance", new Vector3(127.5f, 10.0f, 0f), new Vector2(5.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Ceiling_Sector6_Entrance", new Vector3(127.5f, 15.5f, 0f), new Vector2(5.0f, 1.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 2. Checkpoint 6 (at X = 127.0, Y = 11.5)
+            cp6 = null;
+            GameObject cpPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_CheckpointPrefabPath);
+            if (cpPrefab != null)
+            {
+                var cpGo = (GameObject)PrefabUtility.InstantiatePrefab(cpPrefab, scene);
+                cpGo.name = "Checkpoint_Sector6";
+                cpGo.transform.SetParent(sector6Root.transform, false);
+                cpGo.transform.position = new Vector3(127.0f, 11.5f, 0f);
+                cp6 = cpGo.GetComponent<Checkpoint>();
+            }
+
+            // Atmospheric Lantern Light at Entrance
+            GameObject entranceLightGo = new GameObject("Lantern_Sector6_Entrance");
+            entranceLightGo.transform.SetParent(sector6Root.transform, false);
+            entranceLightGo.transform.position = new Vector3(127.0f, 12.0f, 0f);
+            var entranceLight = entranceLightGo.AddComponent<Light2D>();
+            entranceLight.lightType = Light2D.LightType.Point;
+            entranceLight.color = new Color(0.45f, 0.85f, 0.95f, 1f);
+            entranceLight.pointLightOuterRadius = 4.5f;
+            entranceLight.intensity = 0.75f;
+
+            // 3. Descending Stepping Platforms (from Y = 10.5 down to Walkway at Y = 3.0)
+            CreatePlatform(sector6Root.transform, "Stairs_Sector6_1", new Vector3(130.5f, 7.5f, 0f), new Vector2(2.5f, 0.8f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Stairs_Sector6_2", new Vector3(132.5f, 5.0f, 0f), new Vector2(2.5f, 0.8f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Stairs_Sector6_3", new Vector3(134.5f, 2.5f, 0f), new Vector2(2.5f, 0.8f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 4. Main Shield Walkway (X = 135.0 to 148.0, Surface Y = 3.0)
+            CreatePlatform(sector6Root.transform, "Floor_Sector6_Walkway", new Vector3(141.5f, 2.5f, 0f), new Vector2(13.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 5. Bottomless Abyss Pit (from X = 128.0 to 156.0, Y = -4.0) with KillZone
+            CreatePlatform(sector6Root.transform, "Floor_Sector6_Abyss_Pit", new Vector3(142.0f, -4.5f, 0f), new Vector2(28.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            GameObject killZonePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_KillZonePrefabPath);
+            if (killZonePrefab != null)
+            {
+                var kzSector6 = (GameObject)PrefabUtility.InstantiatePrefab(killZonePrefab, scene);
+                kzSector6.name = "KillZone_Sector6_Abyss";
+                kzSector6.transform.SetParent(sector6Root.transform, false);
+                kzSector6.transform.position = new Vector3(142.0f, -3.5f, 0f);
+                var kzCol = kzSector6.GetComponent<BoxCollider2D>();
+                if (kzCol != null)
+                {
+                    kzCol.size = new Vector2(28.0f, 2.0f);
+                }
+            }
+
+            // 6. Recessed Drop Slot for Crate Bridge (X = 148.0 to 152.0 = 4m gap)
+            CreatePlatform(sector6Root.transform, "Floor_Sector6_SlotShelf", new Vector3(150.0f, 1.5f, 0f), new Vector2(4.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Wall_Sector6_SlotLeft", new Vector3(147.8f, 2.0f, 0f), new Vector2(0.4f, 2.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Wall_Sector6_SlotRight", new Vector3(152.2f, 2.0f, 0f), new Vector2(0.4f, 2.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 7. Sanctuary Floor & Walls (X = 152.0 to 164.0, Surface Y = 3.0)
+            CreatePlatform(sector6Root.transform, "Floor_Sector6_Sanctuary", new Vector3(157.0f, 2.5f, 0f), new Vector2(10.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Ceiling_Sector6_Sanctuary", new Vector3(157.0f, 9.5f, 0f), new Vector2(10.0f, 1.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(sector6Root.transform, "Wall_Sector6_End", new Vector3(162.5f, 6.0f, 0f), new Vector2(1.0f, 8.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 8. Overhead Looping Track & Stitchable Crate Shield
+            GameObject anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_NeedleAnchorPrefabPath);
+            if (anchorPrefab != null)
+            {
+                var anchorStartGo = (GameObject)PrefabUtility.InstantiatePrefab(anchorPrefab, scene);
+                anchorStartGo.name = "NeedleAnchor_Overhead_Start";
+                anchorStartGo.transform.SetParent(sector6Root.transform, false);
+                anchorStartGo.transform.position = new Vector3(136.0f, 8.0f, 0f);
+
+                var anchorDropGo = (GameObject)PrefabUtility.InstantiatePrefab(anchorPrefab, scene);
+                anchorDropGo.name = "NeedleAnchor_Overhead_DropZone";
+                anchorDropGo.transform.SetParent(sector6Root.transform, false);
+                anchorDropGo.transform.position = new Vector3(150.0f, 8.0f, 0f);
+
+                foreach (var aGo in new[] { anchorStartGo, anchorDropGo })
+                {
+                    var sr = aGo.GetComponentInChildren<SpriteRenderer>();
+                    if (sr != null) sr.color = new Color(0.95f, 0.85f, 0.45f, 1f);
+                }
+            }
+
+            GameObject cratePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_StitchableCratePrefabPath);
+            if (cratePrefab != null)
+            {
+                var crateGo = (GameObject)PrefabUtility.InstantiatePrefab(cratePrefab, scene);
+                crateGo.name = "StitchableCrate_Sector6_Shield";
+                crateGo.transform.SetParent(sector6Root.transform, false);
+                crateGo.transform.position = new Vector3(136.0f, 8.0f, 0f);
+
+                var crateSr = crateGo.GetComponentInChildren<SpriteRenderer>();
+                if (crateSr != null)
+                {
+                    crateSr.color = new Color(0.92f, 0.72f, 0.28f, 1f);
+                    crateSr.size = new Vector2(2.4f, 1.0f);
+                }
+
+                var crateCol = crateGo.GetComponent<BoxCollider2D>();
+                if (crateCol != null)
+                {
+                    crateCol.size = new Vector2(2.4f, 1.0f);
+                }
+
+                GameObject shieldRoofGo = new GameObject("FishShieldRoof");
+                shieldRoofGo.transform.SetParent(crateGo.transform, false);
+                shieldRoofGo.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+                var roofCol = shieldRoofGo.AddComponent<BoxCollider2D>();
+                roofCol.isTrigger = true;
+                roofCol.size = new Vector2(2.4f, 0.4f);
+                shieldRoofGo.AddComponent<CrateFishShieldCollector2D>();
+
+                var stitchable = crateGo.GetComponent<StitchableObject>();
+                if (stitchable != null)
+                {
+                    var so = new SerializedObject(stitchable);
+                    so.FindProperty("_travelSpeed").floatValue = 1.6f;
+                    so.FindProperty("_waypointDwellTime").floatValue = 0.5f;
+                    so.FindProperty("_preserveLoopOnRespawn").boolValue = true;
+                    so.FindProperty("_autoStartOnAwake").boolValue = true;
+                    so.FindProperty("_initialLoopMode").enumValueIndex = (int)LoopPlaybackMode.PingPong;
+
+                    var wpProp = so.FindProperty("_initialWaypoints");
+                    wpProp.ClearArray();
+                    wpProp.InsertArrayElementAtIndex(0);
+                    wpProp.GetArrayElementAtIndex(0).vector2Value = new Vector2(136.0f, 8.0f);
+                    wpProp.InsertArrayElementAtIndex(1);
+                    wpProp.GetArrayElementAtIndex(1).vector2Value = new Vector2(150.0f, 8.0f);
+
+                    so.ApplyModifiedProperties();
+                }
+            }
+
+            // 9. Ceiling Fish Waterfall Spawner (4 lanes: X = 138.0, 140.5, 143.0, 145.5 at Y = 14.5)
+            Sprite[] fishSprites = LoadFishSprites();
+
+            FallingFishHazard2D fishPrefab = EnsureFallingFishPrefab(fishSprites);
+
+            GameObject waterfallGo = new GameObject("FishWaterfall_Sector6");
+            waterfallGo.transform.SetParent(sector6Root.transform, false);
+            waterfallGo.transform.position = new Vector3(141.75f, 14.5f, 0f);
+
+            CreatePlatform(waterfallGo.transform, "Ceiling_Waterfall_Lip_S6", new Vector3(141.75f, 15.0f, 0f), new Vector2(12.0f, 0.6f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            GameObject wfLightGo = new GameObject("Waterfall_AtmosphericLight_S6");
+            wfLightGo.transform.SetParent(waterfallGo.transform, false);
+            wfLightGo.transform.localPosition = new Vector3(0f, -0.4f, 0f);
+            var wfLight = wfLightGo.AddComponent<Light2D>();
+            wfLight.lightType = Light2D.LightType.Point;
+            wfLight.color = new Color(0.25f, 0.65f, 0.85f, 1f);
+            wfLight.pointLightOuterRadius = 6.0f;
+            wfLight.intensity = 0.55f;
+
+            var spawner = waterfallGo.AddComponent<FishWaterfallSpawner2D>();
+            var spawnerSo = new SerializedObject(spawner);
+            spawnerSo.FindProperty("_spawnMode").enumValueIndex = (int)FishSpawnMode.ContinuousRain;
+            spawnerSo.FindProperty("_spawnHeightY").floatValue = 14.5f;
+            spawnerSo.FindProperty("_fishPrefab").objectReferenceValue = fishPrefab;
+            spawnerSo.FindProperty("_poolSize").intValue = 120;
+            spawnerSo.FindProperty("_activeMinX").floatValue = 124.0f;
+            spawnerSo.FindProperty("_activeMaxX").floatValue = 165.0f;
+
+            // Torrential Downpour Rain Settings:
+            spawnerSo.FindProperty("_rainMinX").floatValue = 136.0f;
+            spawnerSo.FindProperty("_rainMaxX").floatValue = 160.5f;
+            spawnerSo.FindProperty("_rainDropMinInterval").floatValue = 0.08f;
+            spawnerSo.FindProperty("_rainDropMaxInterval").floatValue = 0.16f;
+
+            // Directional Knockback & Ground Flopping:
+            spawnerSo.FindProperty("_harmPlayer").boolValue = true;
+            spawnerSo.FindProperty("_landAndFlopOnGround").boolValue = true;
+            int stitchableLayer = LayerMask.NameToLayer("Stitchable");
+            int groundMask = (1 << groundLayer) | (stitchableLayer >= 0 ? (1 << stitchableLayer) : 0);
+            spawnerSo.FindProperty("_groundLayerMask").intValue = groundMask;
+            spawnerSo.FindProperty("_groundFlopDuration").floatValue = 18.0f;
+
+            var lanesProp = spawnerSo.FindProperty("_laneXPositions");
+            lanesProp.arraySize = 4;
+            lanesProp.GetArrayElementAtIndex(0).floatValue = 138.0f;
+            lanesProp.GetArrayElementAtIndex(1).floatValue = 140.5f;
+            lanesProp.GetArrayElementAtIndex(2).floatValue = 143.0f;
+            lanesProp.GetArrayElementAtIndex(3).floatValue = 145.5f;
+
+            if (fishSprites != null && fishSprites.Length > 0)
+            {
+                var framesProp = spawnerSo.FindProperty("_deadFishFrames");
+                framesProp.arraySize = fishSprites.Length;
+                for (int i = 0; i < fishSprites.Length; i++)
+                {
+                    framesProp.GetArrayElementAtIndex(i).objectReferenceValue = fishSprites[i];
+                }
+            }
+            spawnerSo.ApplyModifiedProperties();
+
+            // 10. The Ending Slideshow Canvas (18 illustrations End_SC1 to End_SC18)
+            Sprite[] endingSprites = LoadEndingSprites();
+            EndingCutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
+
+            // 11. The Suture Gate (The Final Exit Door) at X = 159.0, Y = 4.25
+            TransitionEventChannelSO transitionChannel = AssetDatabase.LoadAssetAtPath<TransitionEventChannelSO>(k_PixelTransitionChannelPath);
+
+            GameObject gateGo = new GameObject("TheSutureGate");
+            gateGo.transform.SetParent(sector6Root.transform, false);
+            gateGo.transform.position = new Vector3(159.0f, 4.25f, 0f);
+
+            CreatePlatform(gateGo.transform, "Gate_Post_Left", new Vector3(158.2f, 4.25f, 0f), new Vector2(0.3f, 2.5f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(gateGo.transform, "Gate_Post_Right", new Vector3(159.8f, 4.25f, 0f), new Vector2(0.3f, 2.5f), wallColor, squareSprite, onFrictionMat, groundLayer);
+            CreatePlatform(gateGo.transform, "Gate_Lintel", new Vector3(159.0f, 5.6f, 0f), new Vector2(1.9f, 0.35f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            GameObject voidGo = new GameObject("Gate_VoidBackdrop");
+            voidGo.transform.SetParent(gateGo.transform, false);
+            voidGo.transform.localPosition = Vector3.zero;
+            var voidSr = voidGo.AddComponent<SpriteRenderer>();
+            voidSr.sprite = squareSprite;
+            voidSr.color = new Color(0.02f, 0.02f, 0.04f, 1f);
+            voidSr.sortingOrder = 2;
+            voidSr.size = new Vector2(1.3f, 2.4f);
+
+            GameObject gateLightGo = new GameObject("Gate_Light");
+            gateLightGo.transform.SetParent(gateGo.transform, false);
+            gateLightGo.transform.localPosition = new Vector3(0f, 0.2f, 0f);
+            var gateLight = gateLightGo.AddComponent<Light2D>();
+            gateLight.lightType = Light2D.LightType.Point;
+            gateLight.color = new Color(0.95f, 0.82f, 0.45f, 1f);
+            gateLight.pointLightOuterRadius = 5.5f;
+            gateLight.intensity = 1.1f;
+
+            var doorCol = gateGo.AddComponent<BoxCollider2D>();
+            doorCol.isTrigger = true;
+            doorCol.size = new Vector2(1.4f, 2.4f);
+
+            var exitDoor = gateGo.AddComponent<LevelExitDoor2D>();
+            var doorSo = new SerializedObject(exitDoor);
+            doorSo.FindProperty("_transitionEventChannel").objectReferenceValue = transitionChannel;
+            doorSo.FindProperty("_endingCutscene").objectReferenceValue = endingCutscene;
+            doorSo.FindProperty("_transitionDelay").floatValue = 0.85f;
+            doorSo.ApplyModifiedProperties();
+
+            // 12. Boundary Trigger Sector 5 -> Sector 6 (at X = 125.5, Y = 12.0)
+            GameObject trigger5to6Go = new GameObject("Trigger_Sector5_to_Sector6");
+            trigger5to6Go.transform.SetParent(sector6Root.transform, false);
+            trigger5to6Go.transform.position = new Vector3(125.5f, 12.0f, 0f);
+            var sbtCol = trigger5to6Go.AddComponent<BoxCollider2D>();
+            sbtCol.isTrigger = true;
+            sbtCol.size = new Vector2(1.5f, 5.0f);
+
+            boundaryTrigger = trigger5to6Go.AddComponent<SectorBoundaryTrigger>();
+            var sbtSo = new SerializedObject(boundaryTrigger);
+            sbtSo.FindProperty("_isBidirectional").boolValue = true;
+            sbtSo.FindProperty("_sectorA").objectReferenceValue = sector5Root;
+            sbtSo.FindProperty("_sectorB").objectReferenceValue = sector6Root;
+            sbtSo.FindProperty("_expectedDirection").vector2Value = Vector2.right;
+            sbtSo.FindProperty("_targetSectorIndex").intValue = 5;
+            sbtSo.FindProperty("_targetSectorObject").objectReferenceValue = sector6Root;
+            sbtSo.ApplyModifiedProperties();
+
+            return sector6Root;
+        }
+
+        [MenuItem("Tools/Horror Jam/Build Sector 06 in Gameplay Scene", false, 13)]
+        public static void BuildSector06InGameplayScene()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.path.EndsWith("Gameplay.unity"))
+            {
+                scene = EditorSceneManager.OpenScene(k_GameplayScenePath, OpenSceneMode.Single);
+            }
+
+            GameObject existingSector6 = GameObject.Find("Sector_06 (The Suture Abyss & Eternal Loop Gate)");
+            if (existingSector6 != null)
+            {
+                Object.DestroyImmediate(existingSector6);
+            }
+
+            GameObject sector5Root = GameObject.Find("Sector_05 (Stitch Rail & Chasm Loop)");
+            GameObject envRoot = GameObject.Find("--- ENVIRONMENT --------------------------------");
+            Transform envTransform = envRoot != null ? envRoot.transform : null;
+
+            Sprite squareSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath(k_SquareSpriteGuid));
+            PhysicsMaterial2D frictionMat = AssetDatabase.LoadAssetAtPath<PhysicsMaterial2D>(k_PhysicsMaterialPath);
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            if (groundLayer < 0) groundLayer = 0;
+
+            Color floorColor = new Color(0.22f, 0.22f, 0.25f, 1f);
+            Color wallColor = new Color(0.15f, 0.15f, 0.18f, 1f);
+
+            TMP_FontAsset fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/_Project/Art/Fonts/monogram SDF.asset");
+
+            GameObject sector6Root = BuildSector6Hierarchy(
+                scene,
+                envTransform,
+                sector5Root,
+                squareSprite,
+                frictionMat,
+                groundLayer,
+                floorColor,
+                wallColor,
+                fontAsset,
+                out Checkpoint cp6,
+                out SectorBoundaryTrigger boundaryTrigger
+            );
+
+            // Register with LevelSeamlessManager
+            LevelSeamlessManager seamlessMgr = Object.FindAnyObjectByType<LevelSeamlessManager>();
+            if (seamlessMgr != null)
+            {
+                var lmSo = new SerializedObject(seamlessMgr);
+                var sectorsProp = lmSo.FindProperty("_sectors");
+                if (sectorsProp != null)
+                {
+                    bool found = false;
+                    for (int i = 0; i < sectorsProp.arraySize; i++)
+                    {
+                        var el = sectorsProp.GetArrayElementAtIndex(i);
+                        if (el.FindPropertyRelative("name").stringValue == "Sector 6 (The Suture Abyss & Eternal Loop Gate)")
+                        {
+                            el.FindPropertyRelative("rootObject").objectReferenceValue = sector6Root;
+                            el.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp6;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        int idx = sectorsProp.arraySize;
+                        sectorsProp.InsertArrayElementAtIndex(idx);
+                        var newEl = sectorsProp.GetArrayElementAtIndex(idx);
+                        newEl.FindPropertyRelative("name").stringValue = "Sector 6 (The Suture Abyss & Eternal Loop Gate)";
+                        newEl.FindPropertyRelative("rootObject").objectReferenceValue = sector6Root;
+                        newEl.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp6;
+                    }
+                    lmSo.ApplyModifiedProperties();
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[LevelTemplateCreator] Successfully built Sector_06 in Gameplay.unity!");
+        }
+
         [MenuItem("Tools/Horror Jam/Setup LevelSeamless in Gameplay Scene", false, 13)]
         public static void SetupLevelSeamlessInGameplayScene()
         {
@@ -1489,6 +2046,7 @@ namespace ThailandHorrorJam.Editor
             GameObject s3 = GameObject.Find("Sector_03 (Bridge & Needle Cutting)");
             GameObject s4 = GameObject.Find("Sector_04 (Bloated Carcass & Drag Tether)");
             GameObject s5 = GameObject.Find("Sector_05 (Stitch Rail & Chasm Loop)");
+            GameObject s6 = GameObject.Find("Sector_06 (The Suture Abyss & Eternal Loop Gate)");
 
             if (s1 == null || s2 == null || s3 == null || s4 == null || s5 == null)
             {
@@ -1519,6 +2077,7 @@ namespace ThailandHorrorJam.Editor
             Checkpoint cp3 = FindNearestCheckpoint(55.5f);
             Checkpoint cp4 = FindNearestCheckpoint(78f);
             Checkpoint cp5 = FindNearestCheckpoint(104f);
+            Checkpoint cp6 = s6 != null ? FindNearestCheckpoint(127f) : null;
 
             // 3. Find or create LevelSeamlessManager
             LevelSeamlessManager seamlessMgr = Object.FindAnyObjectByType<LevelSeamlessManager>(FindObjectsInactive.Include);
@@ -1549,7 +2108,7 @@ namespace ThailandHorrorJam.Editor
             var sectorsProp = lmSo.FindProperty("_sectors");
             sectorsProp.ClearArray();
 
-            var sectorDefs = new (string name, GameObject go, Checkpoint cp)[]
+            var sectorDefsList = new System.Collections.Generic.List<(string name, GameObject go, Checkpoint cp)>
             {
                 ("Sector 1 (Intro)", s1, cp1),
                 ("Sector 2 (Credit)", s2, cp2),
@@ -1558,13 +2117,18 @@ namespace ThailandHorrorJam.Editor
                 ("Sector 5 (Stitch Rail & Chasm Loop)", s5, cp5)
             };
 
-            for (int i = 0; i < sectorDefs.Length; i++)
+            if (s6 != null)
+            {
+                sectorDefsList.Add(("Sector 6 (The Suture Abyss & Eternal Loop Gate)", s6, cp6));
+            }
+
+            for (int i = 0; i < sectorDefsList.Count; i++)
             {
                 sectorsProp.InsertArrayElementAtIndex(i);
                 var entry = sectorsProp.GetArrayElementAtIndex(i);
-                entry.FindPropertyRelative("name").stringValue = sectorDefs[i].name;
-                entry.FindPropertyRelative("rootObject").objectReferenceValue = sectorDefs[i].go;
-                entry.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = sectorDefs[i].cp;
+                entry.FindPropertyRelative("name").stringValue = sectorDefsList[i].name;
+                entry.FindPropertyRelative("rootObject").objectReferenceValue = sectorDefsList[i].go;
+                entry.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = sectorDefsList[i].cp;
             }
             lmSo.ApplyModifiedProperties();
 
@@ -1645,9 +2209,63 @@ namespace ThailandHorrorJam.Editor
                 }
             }
 
+            // Verify or Create S5 -> S6 (x = 125.5)
+            if (s6 != null)
+            {
+                GameObject t56 = GameObject.Find("Trigger_Sector5_to_Sector6");
+                if (t56 == null)
+                {
+                    t56 = new GameObject("Trigger_Sector5_to_Sector6");
+                    if (triggersParent != null) t56.transform.SetParent(triggersParent, false);
+                    t56.transform.position = new Vector3(125.5f, 12.0f, 0f);
+
+                    var col = t56.AddComponent<BoxCollider2D>();
+                    col.size = new Vector2(2f, 8f);
+                    col.isTrigger = true;
+
+                    var trigger = t56.AddComponent<SectorBoundaryTrigger>();
+                    var tSo = new SerializedObject(trigger);
+                    tSo.FindProperty("_isBidirectional").boolValue = true;
+                    tSo.FindProperty("_sectorA").objectReferenceValue = s5;
+                    tSo.FindProperty("_sectorB").objectReferenceValue = s6;
+                    tSo.FindProperty("_targetSectorIndex").intValue = 5;
+                    tSo.FindProperty("_targetSectorObject").objectReferenceValue = s6;
+                    tSo.ApplyModifiedProperties();
+                    Debug.Log("[LevelTemplateCreator] Created Trigger_Sector5_to_Sector6 at x=125.5.");
+                }
+                else
+                {
+                    var trigger = t56.GetComponent<SectorBoundaryTrigger>();
+                    if (trigger != null)
+                    {
+                        var tSo = new SerializedObject(trigger);
+                        tSo.FindProperty("_isBidirectional").boolValue = true;
+                        tSo.FindProperty("_sectorA").objectReferenceValue = s5;
+                        tSo.FindProperty("_sectorB").objectReferenceValue = s6;
+                        tSo.FindProperty("_targetSectorIndex").intValue = 5;
+                        tSo.FindProperty("_targetSectorObject").objectReferenceValue = s6;
+                        tSo.ApplyModifiedProperties();
+                    }
+                }
+
+                // 6. Ensure Ending Cutscene Canvas & link to LevelExitDoor2D
+                TMP_FontAsset fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/_Project/Art/Fonts/monogram SDF.asset");
+                Sprite[] endingSprites = LoadEndingSprites();
+                EndingCutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
+
+                LevelExitDoor2D exitDoor = Object.FindAnyObjectByType<LevelExitDoor2D>(FindObjectsInactive.Include);
+                if (exitDoor != null && endingCutscene != null)
+                {
+                    var doorSo = new SerializedObject(exitDoor);
+                    doorSo.FindProperty("_endingCutscene").objectReferenceValue = endingCutscene;
+                    doorSo.ApplyModifiedProperties();
+                    Debug.Log("[LevelTemplateCreator] Linked LevelExitDoor2D to EndingCutsceneController.");
+                }
+            }
+
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log("[LevelTemplateCreator] Successfully configured LevelSeamlessManager and all triggers in Gameplay.unity!");
+            Debug.Log("[LevelTemplateCreator] Successfully configured LevelSeamlessManager, triggers, and EndingCutscene in Gameplay.unity!");
         }
     }
 }
