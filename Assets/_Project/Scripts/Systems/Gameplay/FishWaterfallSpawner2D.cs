@@ -4,29 +4,62 @@ using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Gameplay
 {
+    public enum FishSpawnMode
+    {
+        [Tooltip("Sector 05: 3 lanes with safe gaps for chasm traversal timing.")]
+        DiscreteLanes = 0,
+
+        [Tooltip("Sector 06: Chaotic continuous fish rain with random X coordinates and speeds.")]
+        ContinuousRain = 1
+    }
+
     /// <summary>
-    /// Spawner for the Sector 05 fish waterfall hazard above the chasm (X: 107.0 - 112.0).
+    /// Spawner for the Sector 05 fish waterfall hazard above the chasm (X: 107.0 - 112.0)
+    /// and Sector 06 torrential chaotic dead fish rain (X: 136.0 - 160.5).
     /// Features:
-    /// - 3 spawn lanes (Left, Center, Right).
-    /// - Safe gap wave rhythm: Spawns 1 or 2 fish per wave, guaranteeing at least one safe gap in every wave.
-    /// - Built-in zero-allocation object pool for WebGL performance.
-    /// - Proximity / Sector check: only runs when the player is within Sector 05 bounds.
+    /// - DiscreteLanes mode (3 lanes with safe gaps).
+    /// - ContinuousRain mode (random X coordinates, fall speed variance, and horizontal drift).
+    /// - Built-in zero-allocation object pool (supports 120+ instances smoothly for WebGL).
+    /// - Proximity / Sector check: only runs when the player is within sector bounds.
     /// </summary>
     public sealed class FishWaterfallSpawner2D : MonoBehaviour
     {
-        [Header("Spawn Lanes")]
-        [Tooltip("World X positions for the 3 lanes across the 5m chasm.")]
+        [Header("Spawn Mode")]
+        [Tooltip("DiscreteLanes for Sector 05 puzzle; ContinuousRain for Sector 06 chaotic downpour.")]
+        [SerializeField] private FishSpawnMode _spawnMode = FishSpawnMode.DiscreteLanes;
+
+        [Header("Discrete Spawn Lanes (Sector 05)")]
+        [Tooltip("World X positions for discrete lanes across the chasm.")]
         [SerializeField] private float[] _laneXPositions = new float[] { 108.0f, 109.5f, 111.0f };
 
         [Tooltip("World Y height at which fish spawn.")]
         [SerializeField] private float _spawnHeightY = 7.5f;
 
-        [Header("Rhythm & Timing")]
+        [Header("Rhythm & Timing (Discrete Lanes)")]
         [Tooltip("Minimum time between spawn waves (seconds).")]
         [SerializeField] private float _minInterval = 1.15f;
 
         [Tooltip("Maximum time between spawn waves (seconds).")]
         [SerializeField] private float _maxInterval = 1.65f;
+
+        [Header("Continuous Rain Settings (Sector 06 Downpour)")]
+        [Tooltip("Minimum X world position for random rain drops.")]
+        [SerializeField] private float _rainMinX = 136.0f;
+
+        [Tooltip("Maximum X world position for random rain drops.")]
+        [SerializeField] private float _rainMaxX = 160.5f;
+
+        [Tooltip("Minimum time between rain drops (seconds).")]
+        [SerializeField] private float _rainDropMinInterval = 0.08f;
+
+        [Tooltip("Maximum time between rain drops (seconds).")]
+        [SerializeField] private float _rainDropMaxInterval = 0.16f;
+
+        [Tooltip("Multiplier variance range for fish fall speed (e.g. 0.85 to 1.25).")]
+        [SerializeField] private Vector2 _speedVarianceRange = new Vector2(0.85f, 1.25f);
+
+        [Tooltip("Max horizontal drift velocity applied to falling fish.")]
+        [SerializeField] private float _horizontalDriftRange = 0.35f;
 
         [Header("Object Pooling")]
         [Tooltip("Prefab for the falling fish hazard.")]
@@ -46,11 +79,31 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("Maximum player X position to activate spawner.")]
         [SerializeField] private float _activeMaxX = 126.0f;
 
+        [Header("Sector 06 / Ambient Behavior")]
+        [Tooltip("If false, fish will not knockback or harm the player on contact (ambient fish rain).")]
+        [SerializeField] private bool _harmPlayer = true;
+
+        [Tooltip("If true, fish will detect the ground, stop falling, and flop on the floor continuously.")]
+        [SerializeField] private bool _landAndFlopOnGround = false;
+
+        [Tooltip("Ground layer mask for landing surfaces.")]
+        [SerializeField] private LayerMask _groundLayerMask = 1 << 6;
+
+        [Tooltip("Duration in seconds that fish flop on ground before recycling (0 = infinite).")]
+        [SerializeField] private float _groundFlopDuration = 16f;
+
+        public FishSpawnMode SpawnMode => _spawnMode;
+        public float RainMinX => _rainMinX;
+        public float RainMaxX => _rainMaxX;
+        public bool HarmPlayer => _harmPlayer;
+        public bool LandAndFlopOnGround => _landAndFlopOnGround;
+
         private readonly Queue<FallingFishHazard2D> _pool = new Queue<FallingFishHazard2D>();
         private readonly List<FallingFishHazard2D> _allSpawned = new List<FallingFishHazard2D>();
         private float _waveTimer;
         private float _currentWaveInterval = 1.3f;
         private Transform _playerTransform;
+        private Transform _poolRoot;
 
         private void Awake()
         {
@@ -70,12 +123,16 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 return;
             }
 
-            Transform poolRoot = new GameObject("FishPool").transform;
-            poolRoot.SetParent(transform, false);
+            if (_poolRoot == null)
+            {
+                _poolRoot = new GameObject("FishPool").transform;
+                _poolRoot.SetParent(transform, false);
+            }
 
             for (int i = 0; i < _poolSize; i++)
             {
-                FallingFishHazard2D fish = Instantiate(_fishPrefab, poolRoot);
+                FallingFishHazard2D fish = Instantiate(_fishPrefab, _poolRoot);
+                fish.SetPoolParent(_poolRoot);
                 fish.gameObject.SetActive(false);
                 _pool.Enqueue(fish);
                 _allSpawned.Add(fish);
@@ -93,9 +150,36 @@ namespace ThailandHorrorJam.Systems.Gameplay
             if (_waveTimer >= _currentWaveInterval)
             {
                 _waveTimer = 0f;
-                _currentWaveInterval = Random.Range(_minInterval, _maxInterval);
-                SpawnWave();
+                if (_spawnMode == FishSpawnMode.ContinuousRain)
+                {
+                    _currentWaveInterval = Random.Range(_rainDropMinInterval, _rainDropMaxInterval);
+                    SpawnRainDrop();
+                }
+                else
+                {
+                    _currentWaveInterval = Random.Range(_minInterval, _maxInterval);
+                    SpawnWave();
+                }
             }
+        }
+
+        /// <summary>
+        /// Spawns a single rain drop fish at a continuous random X position across [_rainMinX, _rainMaxX].
+        /// </summary>
+        public void SpawnRainDrop()
+        {
+            FallingFishHazard2D fish = GetFishFromPool();
+            if (fish == null) return;
+
+            float randomX = Random.Range(_rainMinX, _rainMaxX);
+            Vector3 spawnPos = new Vector3(randomX, _spawnHeightY, 0f);
+
+            fish.ConfigureBehavior(_harmPlayer, _landAndFlopOnGround, _groundLayerMask, _groundFlopDuration);
+
+            float speedMul = Random.Range(_speedVarianceRange.x, _speedVarianceRange.y);
+            float driftX = Random.Range(-_horizontalDriftRange, _horizontalDriftRange);
+
+            fish.Spawn(spawnPos, ReturnFishToPool, _deadFishFrames, speedMul, driftX);
         }
 
         /// <summary>
@@ -135,6 +219,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             FallingFishHazard2D fish = GetFishFromPool();
             if (fish == null) return;
 
+            fish.ConfigureBehavior(_harmPlayer, _landAndFlopOnGround, _groundLayerMask, _groundFlopDuration);
             Vector3 spawnPos = new Vector3(_laneXPositions[laneIndex], _spawnHeightY, 0f);
             fish.Spawn(spawnPos, ReturnFishToPool, _deadFishFrames);
         }
@@ -146,10 +231,28 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 return _pool.Dequeue();
             }
 
-            // Fallback: instantiate a new one if pool is exhausted
-            if (_fishPrefab != null)
+            // หากเปิดโหมดดิ้นบนพื้นและพูลหมด ให้รีไซเคิลปลาตัวที่ดิ้นบนพื้นมานานที่สุดเพื่อนำมาใช้ใหม่
+            if (_landAndFlopOnGround)
             {
-                FallingFishHazard2D newFish = Instantiate(_fishPrefab, transform);
+                for (int i = 0; i < _allSpawned.Count; i++)
+                {
+                    if (_allSpawned[i] != null && _allSpawned[i].gameObject.activeSelf && _allSpawned[i].IsFloppingOnGround)
+                    {
+                        _allSpawned[i].Despawn();
+                        if (_pool.Count > 0)
+                        {
+                            return _pool.Dequeue();
+                        }
+                    }
+                }
+            }
+
+            // Fallback: instantiate a new one if pool is exhausted and under safety cap
+            if (_fishPrefab != null && _allSpawned.Count < 150)
+            {
+                Transform parent = _poolRoot != null ? _poolRoot : transform;
+                FallingFishHazard2D newFish = Instantiate(_fishPrefab, parent);
+                newFish.SetPoolParent(parent);
                 _allSpawned.Add(newFish);
                 return newFish;
             }
@@ -160,6 +263,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
         private void ReturnFishToPool(FallingFishHazard2D fish)
         {
             if (fish == null) return;
+            if (_poolRoot != null && fish.transform.parent != _poolRoot)
+            {
+                fish.transform.SetParent(_poolRoot, false);
+            }
             if (!_pool.Contains(fish))
             {
                 _pool.Enqueue(fish);

@@ -120,6 +120,7 @@ namespace ThailandHorrorJam.Core
         private float _throwSlowdownTimer;
         private float _throwSlowdownMultiplier = 1f;
         private float _knockbackTimer;
+        private float _hazardKnockbackCooldownTimer;
         private Vector2 _knockbackVelocity;
 
         private bool _isOnSlope;
@@ -130,6 +131,8 @@ namespace ThailandHorrorJam.Core
         public bool IsGrounded => _isGrounded;
         public bool IsHauling => _isHauling;
         public bool IsInputLocked => _isInputLocked;
+        public bool IsFacingRight => _playerVisuals != null ? _playerVisuals.IsFacingRight : true;
+        public bool CanReceiveHazardKnockback => _hazardKnockbackCooldownTimer <= 0f;
         public float HorizontalInput => _horizontalInput;
         public Collider2D MainCollider => _col;
         public Vector2 Velocity => _rb != null ? _rb.linearVelocity : Vector2.zero;
@@ -184,6 +187,11 @@ namespace ThailandHorrorJam.Core
             _knockbackVelocity = impulse;
             _rb.linearVelocity = impulse;
             CameraController2D.Instance?.Shake(0.035f, 0.1f);
+        }
+
+        public void SetHazardKnockbackCooldown(float duration = 0.28f)
+        {
+            _hazardKnockbackCooldownTimer = Mathf.Max(_hazardKnockbackCooldownTimer, duration);
         }
 
         public void SetInputLocked(bool locked)
@@ -411,6 +419,10 @@ namespace ThailandHorrorJam.Core
 
         private void Update()
         {
+            if (_hazardKnockbackCooldownTimer > 0f)
+            {
+                _hazardKnockbackCooldownTimer -= Time.deltaTime;
+            }
             ReadMovementInput();
             HandleJumpTimers();
         }

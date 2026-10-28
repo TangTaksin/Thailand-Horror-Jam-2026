@@ -57,12 +57,38 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [SerializeField] private float _playerHitSpinAngle = 320f;
         [SerializeField] private float _playerHitTweenDuration = 0.5f;
 
+        [Header("Hazard vs Ambient Ground Flop Mode")]
+        [Tooltip("If false, fish will not knockback or harm the player on contact (e.g. Sector 06 ambient fish rain).")]
+        [SerializeField] private bool _harmPlayer = true;
+
+        [Tooltip("If true, fish detects the ground, stops falling on impact, and flops continuously on the surface.")]
+        [SerializeField] private bool _landAndFlopOnGround = false;
+
+        [Tooltip("Ground layer mask for detecting landing surfaces (e.g. Ground layer).")]
+        [SerializeField] private LayerMask _groundLayerMask = 1 << 6;
+
+        [Tooltip("Vertical offset from ground hit point to fish center when resting on floor.")]
+        [SerializeField] private float _groundRestOffset = 0.18f;
+
+        [Tooltip("Duration in seconds that the fish remains flopping on the ground before recycling (0 = forever until pool recycles).")]
+        [SerializeField] private float _groundFlopDuration = 16f;
+
         private Collider2D _collider;
         private bool _isDeflected;
+        private bool _isCaughtOnShield;
+        private bool _isFloppingOnGround;
+        private float _groundFlopTimer;
+        private float _twitchTimer;
+        private float _nextTwitchInterval = 0.8f;
         private Vector2 _currentVelocity;
         private float _animTimer;
         private int _currentFrame;
         private Action<FallingFishHazard2D> _returnToPoolAction;
+
+        private Transform _originalPoolParent;
+        private Vector3 _groundRestPosition;
+        private float _activeFallSpeed;
+        private float _activeHorizontalDrift;
 
         // ระบบจำค่าเริ่มต้นสำหรับ Object Pool (รับประกันค่า 1, 1, 1 เสมอ)
         private bool _isInitialized;
@@ -72,12 +98,23 @@ namespace ThailandHorrorJam.Systems.Gameplay
         private Tween _fallScaleTween;
 
         public bool IsDeflected => _isDeflected;
+        public bool IsCaughtOnShield => _isCaughtOnShield;
+        public bool IsFloppingOnGround => _isFloppingOnGround;
+        public bool HarmPlayer => _harmPlayer;
+        public bool LandAndFlopOnGround => _landAndFlopOnGround;
         public Vector2 CurrentVelocity => _currentVelocity;
         public float FallSpeed => _fallSpeed;
+        public Transform PoolParent => _originalPoolParent;
+        public int CurrentFrame => _currentFrame;
 
         private void Awake()
         {
             EnsureInitialized();
+        }
+
+        public void SetPoolParent(Transform poolParent)
+        {
+            _originalPoolParent = poolParent;
         }
 
         /// <summary>
@@ -88,16 +125,13 @@ namespace ThailandHorrorJam.Systems.Gameplay
             if (_isInitialized) return;
             _isInitialized = true;
 
-            // ตรวจสอบค่า localScale: หากเป็น Vector3.zero หรือถูกบิดเบี้ยว ให้ใช้ Vector3.one เสมอ
-            if (transform.localScale != Vector3.zero && Mathf.Abs(transform.localScale.x - 1f) <= 0.05f)
+            if (_originalPoolParent == null && transform.parent != null)
             {
-                _baseScale = transform.localScale;
+                _originalPoolParent = transform.parent;
             }
-            else
-            {
-                _baseScale = Vector3.one;
-                transform.localScale = Vector3.one;
-            }
+
+            _baseScale = Vector3.one;
+            transform.localScale = Vector3.one;
 
             _collider = GetComponent<Collider2D>();
             if (_collider != null)
@@ -116,9 +150,25 @@ namespace ThailandHorrorJam.Systems.Gameplay
         }
 
         /// <summary>
+        /// Configures runtime behavior flags (e.g. ambient fish rain in Sector 06 vs hazard in Sector 05).
+        /// </summary>
+        public void ConfigureBehavior(bool harmPlayer, bool landAndFlopOnGround, LayerMask groundLayerMask, float groundFlopDuration = 16f)
+        {
+            _harmPlayer = harmPlayer;
+            _landAndFlopOnGround = landAndFlopOnGround;
+            _groundLayerMask = groundLayerMask;
+            _groundFlopDuration = groundFlopDuration;
+        }
+
+        /// <summary>
         /// Initializes and spawns the fish at the specified world position.
         /// </summary>
-        public void Spawn(Vector3 spawnPosition, Action<FallingFishHazard2D> returnToPoolAction, Sprite[] frames = null)
+        public void Spawn(
+            Vector3 spawnPosition, 
+            Action<FallingFishHazard2D> returnToPoolAction, 
+            Sprite[] frames = null,
+            float speedMultiplier = 1f,
+            float horizontalDrift = 0f)
         {
             EnsureInitialized();
 
@@ -133,14 +183,25 @@ namespace ThailandHorrorJam.Systems.Gameplay
             transform.position = spawnPosition;
             _returnToPoolAction = returnToPoolAction;
             _isDeflected = false;
-            _currentVelocity = new Vector2(0f, -_fallSpeed);
-            _animTimer = UnityEngine.Random.Range(0f, 0.2f);
-            _currentFrame = UnityEngine.Random.Range(0, _animationFrames != null && _animationFrames.Length > 0 ? _animationFrames.Length : 1);
+            _isCaughtOnShield = false;
+            _isFloppingOnGround = false;
 
-            if (_spriteRenderer != null && _animationFrames != null && _animationFrames.Length > 0)
+            _activeFallSpeed = _fallSpeed * speedMultiplier;
+            _activeHorizontalDrift = horizontalDrift;
+            _currentVelocity = new Vector2(_activeHorizontalDrift, -_activeFallSpeed);
+
+            _animTimer = 0f;
+            _currentFrame = 0;
+
+            if (_spriteRenderer != null)
             {
-                _spriteRenderer.sprite = _animationFrames[_currentFrame];
+                _spriteRenderer.flipX = false;
+                _spriteRenderer.flipY = false;
                 _spriteRenderer.color = Color.white;
+                if (_animationFrames != null && _animationFrames.Length > 0)
+                {
+                    _spriteRenderer.sprite = _animationFrames[0];
+                }
             }
 
             if (_collider != null)
@@ -149,12 +210,13 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
 
             gameObject.SetActive(true);
+            enabled = true;
 
             // บังคับสเกลและมุมหมุนตั้งต้นให้เป็นปกติก่อนเริ่มอนิเมชันร่วงหล่น
-            transform.localScale = _baseScale;
+            transform.localScale = Vector3.one;
             transform.localRotation = Quaternion.identity;
 
-            // เริ่มเล่น visual juice ส่ายและยืดหดตัวขณะร่วงหล่น (ความเร็วตกคงที่สม่ำเสมอ)
+            // เริ่มเล่น visual juice ส่ายอย่างเป็นธรรมชาติ (สเกลคงที่ 1:1 พิกเซลคมชัดเสมอ)
             StartFallingLoopTween();
         }
 
@@ -167,21 +229,118 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             float dt = Time.fixedDeltaTime;
 
+            if (_isFloppingOnGround)
+            {
+                UpdateFloppingState(dt);
+                return;
+            }
+
             if (_isDeflected)
             {
                 _currentVelocity.y -= 9.8f * dt;
             }
             else
             {
-                // ความเร็วตกในแนวดิ่งคงที่สม่ำเสมอเสมอเมื่อยังไม่ถูกเบี่ยงวิถี (-_fallSpeed)
-                _currentVelocity = new Vector2(0f, -_fallSpeed);
+                // ความเร็วตกในแนวดิ่งและ drift ตามค่าที่สุ่มตอน spawn
+                _currentVelocity = new Vector2(_activeHorizontalDrift, -_activeFallSpeed);
             }
 
-            transform.position += (Vector3)(_currentVelocity * dt);
+            Vector3 stepMove = (Vector3)(_currentVelocity * dt);
+
+            // ตรวจจับการกระทบพื้นเฉพาะเมื่อเปิดโหมด _landAndFlopOnGround
+            if (_landAndFlopOnGround && !_isDeflected && !_isCaughtOnShield)
+            {
+                float checkDist = Mathf.Abs(stepMove.y) + 0.18f;
+                RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, checkDist, _groundLayerMask);
+                if (hit.collider != null && !hit.collider.isTrigger)
+                {
+                    LandOnGround(hit.point, hit.normal);
+                    return;
+                }
+            }
+
+            transform.position += stepMove;
 
             if (transform.position.y <= _despawnY || Mathf.Abs(transform.position.x) > 200f)
             {
                 Despawn();
+            }
+        }
+
+        /// <summary>
+        /// เมื่อปลาตกลงกระทบพื้น จะหยุดร่วง สควอชเด้งตัว และนอนดิ้นส่ายอยู่บนพื้นอย่างต่อเนื่อง
+        /// </summary>
+        public void LandOnGround(Vector2 groundPoint, Vector2 normal)
+        {
+            if (_isFloppingOnGround || _isCaughtOnShield) return;
+
+            _isFloppingOnGround = true;
+            _currentVelocity = Vector2.zero;
+            StopFallingLoopTweens();
+
+            // ปิด Collider2D ทันทีที่กระทบพื้นเพื่อลดภาระการคำนวณ Physics 2D สำหรับปลา 100+ ตัวบนพื้น
+            if (_collider != null)
+            {
+                _collider.enabled = false;
+            }
+
+            _groundRestPosition = new Vector3(groundPoint.x, groundPoint.y + _groundRestOffset, 0f);
+            transform.position = _groundRestPosition;
+
+            // สุ่มมุมนอนระนาบพื้นเล็กน้อย (-14 ถึง +14 องศา)
+            float groundAngle = UnityEngine.Random.Range(-14f, 14f);
+            transform.localRotation = Quaternion.Euler(0f, 0f, groundAngle);
+
+            // อนิเมชันกระแทกพื้น Squish & Stretch แบบปลอดภัย สเกลกลับเป็น Vector3.one เสมอ
+            transform.DOKill();
+            transform.localScale = Vector3.one;
+            Vector3 impactPunch = new Vector3(0.35f, -0.28f, 0f);
+            transform.DOPunchScale(impactPunch, 0.22f, 8, 0.8f)
+                .OnComplete(() => transform.localScale = Vector3.one);
+
+            _twitchTimer = 0f;
+            _nextTwitchInterval = UnityEngine.Random.Range(0.45f, 0.9f);
+        }
+
+        private void UpdateFloppingState(float dt)
+        {
+            _groundFlopTimer += dt;
+            _twitchTimer += dt;
+
+            // การกระตุกดิ้นและเด้งขึ้นลงบนพื้นอย่างต่อเนื่อง (Spasmodic floor bounce & twitch)
+            if (_twitchTimer >= _nextTwitchInterval)
+            {
+                _twitchTimer = 0f;
+                _nextTwitchInterval = UnityEngine.Random.Range(0.45f, 1.0f);
+
+                float bounceHop = UnityEngine.Random.Range(0.06f, 0.16f);
+                float bounceTilt = UnityEngine.Random.Range(-18f, 18f);
+
+                // คืนค่าตำแหน่งและสเกลฐานก่อนเริ่มเด้งใหม่เสมอ ป้องกันตำแหน่งเลื่อนหรือสเกลค้าง
+                transform.DOKill();
+                transform.position = _groundRestPosition;
+                transform.localScale = Vector3.one;
+
+                transform.DOPunchPosition(new Vector3(0f, bounceHop, 0f), 0.22f, 4, 0.6f)
+                    .OnComplete(() =>
+                    {
+                        transform.position = _groundRestPosition;
+                        transform.localScale = Vector3.one;
+                    });
+                transform.DOLocalRotate(new Vector3(0f, 0f, bounceTilt), 0.20f);
+            }
+
+            // หากเกินเวลา _groundFlopDuration ให้ค่อยๆ จางและคืนสู่ Pool
+            if (_groundFlopDuration > 0f && _groundFlopTimer >= _groundFlopDuration)
+            {
+                if (_spriteRenderer != null)
+                {
+                    _spriteRenderer.DOFade(0f, 0.5f).OnComplete(Despawn);
+                }
+                else
+                {
+                    Despawn();
+                }
             }
         }
 
@@ -206,31 +365,20 @@ namespace ThailandHorrorJam.Systems.Gameplay
         #region DOTween Animations
 
         /// <summary>
-        /// 1. อนิเมชันการดิ้นส่ายและยืดหดตัวขณะร่วงหล่น (ไม่กระทบความเร็วตกในฟิสิกส์)
+        /// 1. อนิเมชันการดิ้นส่ายขณะร่วงหล่น (สเกลคงที่ 1:1 พิกเซลคมชัด ไม่บิดเบี้ยว)
         /// </summary>
         private void StartFallingLoopTween()
         {
             if (_isDeflected || !gameObject.activeInHierarchy) return;
 
-            // บังคับตั้งต้นที่ _baseScale ก่อนเข้าลูป Yoyo
-            transform.localScale = _baseScale;
+            // บังคับสเกล 1, 1, 1 ป้องกันพิกเซลย้วย
+            transform.localScale = Vector3.one;
 
             float startDir = UnityEngine.Random.value > 0.5f ? 1f : -1f;
             transform.localRotation = Quaternion.Euler(0f, 0f, -startDir * _fallWiggleAngle);
 
             _fallRotateTween = transform
                 .DOLocalRotate(new Vector3(0f, 0f, startDir * _fallWiggleAngle), _fallWiggleDuration)
-                .SetEase(Ease.InOutSine)
-                .SetLoops(-1, LoopType.Yoyo);
-
-            Vector3 targetStretch = new Vector3(
-                _baseScale.x * _fallStretchScale.x,
-                _baseScale.y * _fallStretchScale.y,
-                _baseScale.z
-            );
-
-            _fallScaleTween = transform
-                .DOScale(targetStretch, _fallWiggleDuration * 0.85f)
                 .SetEase(Ease.InOutSine)
                 .SetLoops(-1, LoopType.Yoyo);
         }
@@ -243,12 +391,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
             StopFallingLoopTweens();
 
             transform.DOKill();
-            transform.localScale = _baseScale;
+            transform.localScale = Vector3.one;
 
-            // คูณสัดส่วน Punch กับ _baseScale เพื่อให้ขนาดเด้งสัมพันธ์กับขนาดจริงของ Prefab
-            Vector3 scaledPunch = Vector3.Scale(_baseScale, _deflectPunchScale);
+            Vector3 scaledPunch = _deflectPunchScale;
             transform.DOPunchScale(scaledPunch, 0.22f, 10, 1f)
-                .OnComplete(() => transform.localScale = _baseScale);
+                .OnComplete(() => transform.localScale = Vector3.one);
 
             transform.DOLocalRotate(
                 new Vector3(0f, 0f, lateralDir * -_deflectSpinAngle),
@@ -272,11 +419,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
             StopFallingLoopTweens();
 
             transform.DOKill();
-            transform.localScale = _baseScale;
+            transform.localScale = Vector3.one;
 
-            Vector3 scaledPunch = Vector3.Scale(_baseScale, _playerHitPunchScale);
+            Vector3 scaledPunch = _playerHitPunchScale;
             transform.DOPunchScale(scaledPunch, 0.28f, 12, 0.8f)
-                .OnComplete(() => transform.localScale = _baseScale);
+                .OnComplete(() => transform.localScale = Vector3.one);
 
             transform.DOLocalRotate(
                 new Vector3(0f, 0f, -bounceDir * _playerHitSpinAngle),
@@ -302,24 +449,45 @@ namespace ThailandHorrorJam.Systems.Gameplay
         }
 
         /// <summary>
-        /// หยุด Tween ทั้งหมดและคืนค่า Transform + ฟิสิกส์ความเร็ว + สี กลับสู่ค่าเริ่มต้น (1, 1, 1) ทันที 100%
+        /// หยุด Tween ทั้งหมดและคืนค่า Transform + Parent + ฟิสิกส์ความเร็ว + สี + สไปรต์ กลับสู่เฟรมเริ่มต้น (1, 1, 1) ทันที 100%
         /// </summary>
         private void ResetPoolState()
         {
             StopFallingLoopTweens();
 
             transform.DOKill();
+
+            // คืน Parent กลับสู่ Pool ดั้งเดิมเสมอ (กรณีถูกเก็บบนหลังคาลังเคลื่อนที่)
+            if (_originalPoolParent != null && transform.parent != _originalPoolParent)
+            {
+                transform.SetParent(_originalPoolParent, false);
+            }
+
             if (_spriteRenderer != null)
             {
                 _spriteRenderer.DOKill();
                 _spriteRenderer.color = Color.white;
+                _spriteRenderer.flipX = false;
+                _spriteRenderer.flipY = false;
+                if (_animationFrames != null && _animationFrames.Length > 0)
+                {
+                    _spriteRenderer.sprite = _animationFrames[0];
+                }
             }
 
-            if (_baseScale == Vector3.zero) _baseScale = Vector3.one;
-            transform.localScale = _baseScale;
+            _baseScale = Vector3.one;
+            transform.localScale = Vector3.one;
             transform.localRotation = Quaternion.identity;
 
             _isDeflected = false;
+            _isCaughtOnShield = false;
+            _isFloppingOnGround = false;
+            _groundFlopTimer = 0f;
+            _twitchTimer = 0f;
+            _animTimer = 0f;
+            _currentFrame = 0;
+            _activeFallSpeed = _fallSpeed;
+            _activeHorizontalDrift = 0f;
             _currentVelocity = new Vector2(0f, -_fallSpeed);
             if (_collider != null)
             {
@@ -329,11 +497,37 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         #endregion
 
+        /// <summary>
+        /// Collects and attaches this falling fish onto the crate roof shield,
+        /// neutralizing its hazard physics and parenting it as visual gory debris.
+        /// </summary>
+        public void CollectOnShield(Transform shieldParent, Vector3 localPos)
+        {
+            _isCaughtOnShield = true;
+            StopFallingLoopTweens();
+            transform.DOKill();
+            if (_spriteRenderer != null)
+            {
+                _spriteRenderer.DOKill();
+            }
+
+            if (_collider != null)
+            {
+                _collider.enabled = false;
+            }
+
+            enabled = false;
+            transform.SetParent(shieldParent, true);
+            transform.localPosition = localPos;
+            transform.localRotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-25f, 25f));
+        }
+
         public bool OnHitByNeedle(NeedleProjectile projectile, Vector2 hitPoint, Vector2 hitDirection)
         {
             if (_isDeflected) return false;
 
             _isDeflected = true;
+            _isFloppingOnGround = false;
 
             float lateralDir = Mathf.Sign(hitDirection.x);
             if (Mathf.Abs(hitDirection.x) < 0.1f)
@@ -357,16 +551,27 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private void OnTriggerEnter2D(Collider2D other)
         {
-            if (_isDeflected || other == null) return;
+            if (_isFloppingOnGround || _isDeflected || other == null) return;
+
+            // หากปิด _harmPlayer ให้เพิกเฉย ไม่ผลักหรือขัดจังหวะผู้เล่น
+            if (!_harmPlayer && PlayerController2D.IsPlayer(other))
+            {
+                return;
+            }
 
             if (PlayerController2D.IsPlayer(other))
             {
                 PlayerController2D player = other.GetComponentInParent<PlayerController2D>();
                 if (player != null)
                 {
-                    float pushDir = -1f;
-                    Vector2 impulse = new Vector2(pushDir * _knockbackHorizontalForce, _knockbackVerticalForce);
-                    player.ApplyKnockback(impulse, 0.22f);
+                    if (player.CanReceiveHazardKnockback)
+                    {
+                        // Directional Knockback: ผลักผู้เล่นถอยหลังไปในทิศตรงข้ามกับที่กำลังหันหน้า!
+                        float pushDir = player.IsFacingRight ? -1f : 1f;
+                        Vector2 impulse = new Vector2(pushDir * _knockbackHorizontalForce, _knockbackVerticalForce);
+                        player.ApplyKnockback(impulse, 0.22f);
+                        player.SetHazardKnockbackCooldown(0.28f);
+                    }
                 }
 
                 _isDeflected = true;
