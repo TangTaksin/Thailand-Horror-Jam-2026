@@ -1154,5 +1154,407 @@ namespace ThailandHorrorJam.Editor
 
             return sector4Root;
         }
+
+        public static GameObject BuildSector5Hierarchy(
+            Scene scene,
+            Transform envRoot,
+            GameObject sector4Root,
+            Sprite squareSprite,
+            PhysicsMaterial2D onFrictionMat,
+            int groundLayer,
+            Color floorColor,
+            Color wallColor,
+            out Checkpoint cp5,
+            out SectorBoundaryTrigger boundaryTrigger)
+        {
+            GameObject sector5Root = new GameObject("Sector_05 (Stitch Rail & Chasm Loop)");
+            if (envRoot != null)
+            {
+                sector5Root.transform.SetParent(envRoot, false);
+            }
+
+            // 1. Approach & Left Platform (from X = 99.0 to 107.0, surface at Y = 2.0)
+            CreatePlatform(sector5Root.transform, "Floor_Sector5_Left", new Vector3(103.0f, 1.0f, 0f), new Vector2(8.0f, 2.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 2. Alcove Low Ceiling (Overhang from X = 98.75 to 103.25 at Y = 4.5)
+            CreatePlatform(sector5Root.transform, "Ceiling_Sector5_Alcove", new Vector3(101.0f, 4.5f, 0f), new Vector2(4.5f, 1.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 3. Checkpoint 5 (at X = 99.5, Y = 2.5)
+            cp5 = null;
+            GameObject cpPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_CheckpointPrefabPath);
+            if (cpPrefab != null)
+            {
+                var cpGo = (GameObject)PrefabUtility.InstantiatePrefab(cpPrefab, scene);
+                cpGo.name = "Checkpoint_Sector5";
+                cpGo.transform.SetParent(sector5Root.transform, false);
+                cpGo.transform.position = new Vector3(99.5f, 2.5f, 0f);
+                cp5 = cpGo.GetComponent<Checkpoint>();
+            }
+
+            // 4. Yellow Stitchable Crate inside Alcove (at X = 101.5, Y = 2.5)
+            GameObject cratePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_StitchableCratePrefabPath);
+            if (cratePrefab != null)
+            {
+                var crateGo = (GameObject)PrefabUtility.InstantiatePrefab(cratePrefab, scene);
+                crateGo.name = "StitchableCrate_Sector5";
+                crateGo.transform.SetParent(sector5Root.transform, false);
+                crateGo.transform.position = new Vector3(101.5f, 2.5f, 0f);
+
+                var crateSr = crateGo.GetComponentInChildren<SpriteRenderer>();
+                if (crateSr != null)
+                {
+                    crateSr.color = new Color(0.85f, 0.65f, 0.22f, 1f); // Distinct warm yellow
+                    crateSr.sortingLayerName = "Default";
+                    crateSr.sortingOrder = 5;
+                }
+
+                var stitchable = crateGo.GetComponent<StitchableObject>();
+                if (stitchable != null)
+                {
+                    var so = new SerializedObject(stitchable);
+                    so.FindProperty("_travelSpeed").floatValue = 1.5f;
+                    so.FindProperty("_waypointDwellTime").floatValue = 0.8f;
+                    so.FindProperty("_preserveLoopOnRespawn").boolValue = true;
+                    so.ApplyModifiedProperties();
+                }
+            }
+
+            // 5. Chasm Pit & KillZone (Gap from X = 107.0 to 112.0 = 5.0m span)
+            CreatePlatform(sector5Root.transform, "Floor_Sector5_Pit", new Vector3(109.5f, -3.0f, 0f), new Vector2(7.0f, 1.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            GameObject killZonePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_KillZonePrefabPath);
+            if (killZonePrefab != null)
+            {
+                var kzSector5 = (GameObject)PrefabUtility.InstantiatePrefab(killZonePrefab, scene);
+                kzSector5.name = "KillZone_Sector5_Chasm";
+                kzSector5.transform.SetParent(sector5Root.transform, false);
+                kzSector5.transform.position = new Vector3(109.5f, -2.0f, 0f);
+                var kzCol = kzSector5.GetComponent<BoxCollider2D>();
+                if (kzCol != null)
+                {
+                    kzCol.size = new Vector2(6.5f, 2.0f);
+                }
+            }
+
+            // 6. Right Receiving Platform (from X = 112.0 to 121.0, surface at Y = 2.0)
+            CreatePlatform(sector5Root.transform, "Floor_Sector5_Right", new Vector3(116.5f, 1.0f, 0f), new Vector2(9.0f, 2.0f), floorColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 7. Green Needle Anchor Point at Right Cliff Face (at X = 112.0, Y = 2.5)
+            GameObject anchorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(k_NeedleAnchorPrefabPath);
+            if (anchorPrefab != null)
+            {
+                var anchorGo = (GameObject)PrefabUtility.InstantiatePrefab(anchorPrefab, scene);
+                anchorGo.name = "NeedleAnchor_Sector5";
+                anchorGo.transform.SetParent(sector5Root.transform, false);
+                anchorGo.transform.position = new Vector3(112.0f, 2.5f, 0f);
+
+                var anchorSr = anchorGo.GetComponentInChildren<SpriteRenderer>();
+                if (anchorSr != null)
+                {
+                    anchorSr.color = new Color(0.28f, 0.88f, 0.45f, 1f); // Vibrant green
+                    anchorSr.sortingOrder = 4;
+                }
+
+                // Add PointLight2D for atmospheric environmental guidance
+                GameObject anchorLightGo = new GameObject("Anchor_Light");
+                anchorLightGo.transform.SetParent(anchorGo.transform, false);
+                anchorLightGo.transform.localPosition = Vector3.zero;
+                var light2D = anchorLightGo.AddComponent<Light2D>();
+                light2D.lightType = Light2D.LightType.Point;
+                light2D.color = new Color(0.25f, 0.95f, 0.45f, 1f);
+                light2D.pointLightOuterRadius = 3.5f;
+                light2D.intensity = 0.65f;
+            }
+
+            // 8. Solid End Wall (at X = 121.5, Y = 6.0)
+            CreatePlatform(sector5Root.transform, "Wall_Sector5_End", new Vector3(121.5f, 6.0f, 0f), new Vector2(1.0f, 10.0f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // 9. Boundary Trigger Sector 4 -> Sector 5
+            GameObject trigger4to5Go = new GameObject("Trigger_Sector4_to_Sector5");
+            trigger4to5Go.transform.SetParent(sector5Root.transform, false);
+            trigger4to5Go.transform.position = new Vector3(98.5f, 3.0f, 0f);
+            var sbtCol = trigger4to5Go.AddComponent<BoxCollider2D>();
+            sbtCol.isTrigger = true;
+            sbtCol.size = new Vector2(1.5f, 3.5f);
+
+            boundaryTrigger = trigger4to5Go.AddComponent<SectorBoundaryTrigger>();
+            var sbtSo = new SerializedObject(boundaryTrigger);
+            sbtSo.FindProperty("_isBidirectional").boolValue = true;
+            sbtSo.FindProperty("_sectorA").objectReferenceValue = sector4Root;
+            sbtSo.FindProperty("_sectorB").objectReferenceValue = sector5Root;
+            sbtSo.FindProperty("_expectedDirection").vector2Value = Vector2.right;
+            sbtSo.FindProperty("_targetSectorIndex").intValue = 4;
+            sbtSo.FindProperty("_targetSectorObject").objectReferenceValue = sector5Root;
+            sbtSo.ApplyModifiedProperties();
+
+            return sector5Root;
+        }
+
+        [MenuItem("Tools/Horror Jam/Build Sector 05 in Gameplay Scene", false, 12)]
+        public static void BuildSector05InGameplayScene()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.path.EndsWith("Gameplay.unity"))
+            {
+                scene = EditorSceneManager.OpenScene(k_GameplayScenePath, OpenSceneMode.Single);
+            }
+
+            // Find or modify Wall_Sector4_End into an overhead doorway lintel
+            GameObject existingWall4End = GameObject.Find("Wall_Sector4_End");
+            if (existingWall4End != null)
+            {
+                existingWall4End.transform.position = new Vector3(98.5f, 7.0f, 0f);
+                var col = existingWall4End.GetComponent<BoxCollider2D>();
+                if (col != null) col.size = new Vector2(1.0f, 6.0f);
+                var sr = existingWall4End.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.size = new Vector2(1.0f, 6.0f);
+                EditorUtility.SetDirty(existingWall4End);
+            }
+
+            // Remove existing Sector 5 if re-running builder
+            GameObject existingSector5 = GameObject.Find("Sector_05 (Stitch Rail & Chasm Loop)");
+            if (existingSector5 != null)
+            {
+                Object.DestroyImmediate(existingSector5);
+            }
+
+            GameObject sector4Root = GameObject.Find("Sector_04 (Bloated Carcass & Drag Tether)");
+            GameObject envRoot = GameObject.Find("--- ENVIRONMENT --------------------------------");
+            Transform envTransform = envRoot != null ? envRoot.transform : null;
+
+            Sprite squareSprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath(k_SquareSpriteGuid));
+            PhysicsMaterial2D frictionMat = AssetDatabase.LoadAssetAtPath<PhysicsMaterial2D>(k_PhysicsMaterialPath);
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            if (groundLayer < 0) groundLayer = 0;
+
+            Color floorColor = new Color(0.22f, 0.22f, 0.25f, 1f);
+            Color wallColor = new Color(0.15f, 0.15f, 0.18f, 1f);
+
+            GameObject sector5Root = BuildSector5Hierarchy(
+                scene,
+                envTransform,
+                sector4Root,
+                squareSprite,
+                frictionMat,
+                groundLayer,
+                floorColor,
+                wallColor,
+                out Checkpoint cp5,
+                out SectorBoundaryTrigger boundaryTrigger
+            );
+
+            // Register with LevelSeamlessManager if present
+            LevelSeamlessManager seamlessMgr = Object.FindAnyObjectByType<LevelSeamlessManager>();
+            if (seamlessMgr != null)
+            {
+                var lmSo = new SerializedObject(seamlessMgr);
+                var sectorsProp = lmSo.FindProperty("_sectors");
+                if (sectorsProp != null)
+                {
+                    bool found = false;
+                    for (int i = 0; i < sectorsProp.arraySize; i++)
+                    {
+                        var el = sectorsProp.GetArrayElementAtIndex(i);
+                        if (el.FindPropertyRelative("name").stringValue == "Sector 5 (Stitch Rail & Chasm Loop)")
+                        {
+                            el.FindPropertyRelative("rootObject").objectReferenceValue = sector5Root;
+                            el.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp5;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        int idx = sectorsProp.arraySize;
+                        sectorsProp.InsertArrayElementAtIndex(idx);
+                        var newEl = sectorsProp.GetArrayElementAtIndex(idx);
+                        newEl.FindPropertyRelative("name").stringValue = "Sector 5 (Stitch Rail & Chasm Loop)";
+                        newEl.FindPropertyRelative("rootObject").objectReferenceValue = sector5Root;
+                        newEl.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = cp5;
+                    }
+                    lmSo.ApplyModifiedProperties();
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[LevelTemplateCreator] Successfully built Sector_05 in Gameplay.unity!");
+        }
+
+        [MenuItem("Tools/Horror Jam/Setup LevelSeamless in Gameplay Scene", false, 13)]
+        public static void SetupLevelSeamlessInGameplayScene()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.path.EndsWith("Gameplay.unity"))
+            {
+                scene = EditorSceneManager.OpenScene(k_GameplayScenePath, OpenSceneMode.Single);
+            }
+
+            // 1. Locate Sector roots
+            GameObject s1 = GameObject.Find("Sector_01 (Intro)");
+            GameObject s2 = GameObject.Find("Sector_02(Credit)") ?? GameObject.Find("Sector_02 (Courtyard)");
+            GameObject s3 = GameObject.Find("Sector_03 (Bridge & Needle Cutting)");
+            GameObject s4 = GameObject.Find("Sector_04 (Bloated Carcass & Drag Tether)");
+            GameObject s5 = GameObject.Find("Sector_05 (Stitch Rail & Chasm Loop)");
+
+            if (s1 == null || s2 == null || s3 == null || s4 == null || s5 == null)
+            {
+                Debug.LogError($"[LevelTemplateCreator] Missing sector roots in Gameplay scene! S1:{s1!=null}, S2:{s2!=null}, S3:{s3!=null}, S4:{s4!=null}, S5:{s5!=null}");
+                return;
+            }
+
+            // 2. Locate Checkpoints by proximity
+            Checkpoint[] allCps = Object.FindObjectsByType<Checkpoint>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Checkpoint FindNearestCheckpoint(float targetX)
+            {
+                Checkpoint best = null;
+                float bestDist = float.MaxValue;
+                foreach (var cp in allCps)
+                {
+                    float d = Mathf.Abs(cp.transform.position.x - targetX);
+                    if (d < bestDist)
+                    {
+                        bestDist = d;
+                        best = cp;
+                    }
+                }
+                return best;
+            }
+
+            Checkpoint cp1 = FindNearestCheckpoint(-12f);
+            Checkpoint cp2 = FindNearestCheckpoint(44f);
+            Checkpoint cp3 = FindNearestCheckpoint(55.5f);
+            Checkpoint cp4 = FindNearestCheckpoint(78f);
+            Checkpoint cp5 = FindNearestCheckpoint(104f);
+
+            // 3. Find or create LevelSeamlessManager
+            LevelSeamlessManager seamlessMgr = Object.FindAnyObjectByType<LevelSeamlessManager>(FindObjectsInactive.Include);
+            if (seamlessMgr == null)
+            {
+                GameObject mgrRoot = GameObject.Find("Manager ======================== ") 
+                    ?? GameObject.Find("System========================");
+                GameObject levelMgrGo = new GameObject("LevelSeamlessManager");
+                if (mgrRoot != null)
+                {
+                    levelMgrGo.transform.SetParent(mgrRoot.transform, false);
+                }
+                seamlessMgr = levelMgrGo.AddComponent<LevelSeamlessManager>();
+                Debug.Log("[LevelTemplateCreator] Created LevelSeamlessManager GameObject.");
+            }
+
+            // 4. Configure LevelSeamlessManager SerializedObject
+            var lmSo = new SerializedObject(seamlessMgr);
+            PlayerController2D player = Object.FindAnyObjectByType<PlayerController2D>(FindObjectsInactive.Include);
+            NeedleController needle = Object.FindAnyObjectByType<NeedleController>(FindObjectsInactive.Include);
+
+            if (player != null) lmSo.FindProperty("_playerController").objectReferenceValue = player;
+            if (needle != null) lmSo.FindProperty("_needleController").objectReferenceValue = needle;
+
+            lmSo.FindProperty("_activeRadius").intValue = 1;
+            lmSo.FindProperty("_initialSectorIndex").intValue = 0;
+
+            var sectorsProp = lmSo.FindProperty("_sectors");
+            sectorsProp.ClearArray();
+
+            var sectorDefs = new (string name, GameObject go, Checkpoint cp)[]
+            {
+                ("Sector 1 (Intro)", s1, cp1),
+                ("Sector 2 (Credit)", s2, cp2),
+                ("Sector 3 (Bridge & Needle Cutting)", s3, cp3),
+                ("Sector 4 (Bloated Carcass & Drag Tether)", s4, cp4),
+                ("Sector 5 (Stitch Rail & Chasm Loop)", s5, cp5)
+            };
+
+            for (int i = 0; i < sectorDefs.Length; i++)
+            {
+                sectorsProp.InsertArrayElementAtIndex(i);
+                var entry = sectorsProp.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("name").stringValue = sectorDefs[i].name;
+                entry.FindPropertyRelative("rootObject").objectReferenceValue = sectorDefs[i].go;
+                entry.FindPropertyRelative("defaultCheckpoint").objectReferenceValue = sectorDefs[i].cp;
+            }
+            lmSo.ApplyModifiedProperties();
+
+            // 5. Ensure Triggers
+            Transform triggersParent = GameObject.Find("Triggers ======================== ")?.transform;
+
+            // Trigger S1 -> S2 (x = 17)
+            GameObject t12 = GameObject.Find("Trigger_Sector1_to_Sector2");
+            if (t12 == null)
+            {
+                t12 = new GameObject("Trigger_Sector1_to_Sector2");
+                if (triggersParent != null) t12.transform.SetParent(triggersParent, false);
+                t12.transform.position = new Vector3(17f, 3.5f, 0f);
+
+                var col = t12.AddComponent<BoxCollider2D>();
+                col.size = new Vector2(2f, 8f);
+                col.isTrigger = true;
+
+                var trigger = t12.AddComponent<SectorBoundaryTrigger>();
+                var tSo = new SerializedObject(trigger);
+                tSo.FindProperty("_isBidirectional").boolValue = true;
+                tSo.FindProperty("_sectorA").objectReferenceValue = s1;
+                tSo.FindProperty("_sectorB").objectReferenceValue = s2;
+                tSo.FindProperty("_targetSectorIndex").intValue = 1;
+                tSo.FindProperty("_targetSectorObject").objectReferenceValue = s2;
+                tSo.ApplyModifiedProperties();
+                Debug.Log("[LevelTemplateCreator] Created Trigger_Sector1_to_Sector2 at x=17.");
+            }
+
+            // Verify S2 -> S3 (x = 54)
+            GameObject t23 = GameObject.Find("Trigger_Sector2_to_Sector3");
+            if (t23 != null)
+            {
+                var trigger = t23.GetComponent<SectorBoundaryTrigger>();
+                if (trigger != null)
+                {
+                    var tSo = new SerializedObject(trigger);
+                    tSo.FindProperty("_isBidirectional").boolValue = true;
+                    tSo.FindProperty("_sectorA").objectReferenceValue = s2;
+                    tSo.FindProperty("_sectorB").objectReferenceValue = s3;
+                    tSo.FindProperty("_targetSectorIndex").intValue = 2;
+                    tSo.FindProperty("_targetSectorObject").objectReferenceValue = s3;
+                    tSo.ApplyModifiedProperties();
+                }
+            }
+
+            // Verify S3 -> S4 (x = 76)
+            GameObject t34 = GameObject.Find("Trigger_Sector3_to_Sector4");
+            if (t34 != null)
+            {
+                var trigger = t34.GetComponent<SectorBoundaryTrigger>();
+                if (trigger != null)
+                {
+                    var tSo = new SerializedObject(trigger);
+                    tSo.FindProperty("_isBidirectional").boolValue = true;
+                    tSo.FindProperty("_sectorA").objectReferenceValue = s3;
+                    tSo.FindProperty("_sectorB").objectReferenceValue = s4;
+                    tSo.FindProperty("_targetSectorIndex").intValue = 3;
+                    tSo.FindProperty("_targetSectorObject").objectReferenceValue = s4;
+                    tSo.ApplyModifiedProperties();
+                }
+            }
+
+            // Verify S4 -> S5 (x = 98.5)
+            GameObject t45 = GameObject.Find("Trigger_Sector4_to_Sector5");
+            if (t45 != null)
+            {
+                var trigger = t45.GetComponent<SectorBoundaryTrigger>();
+                if (trigger != null)
+                {
+                    var tSo = new SerializedObject(trigger);
+                    tSo.FindProperty("_isBidirectional").boolValue = true;
+                    tSo.FindProperty("_sectorA").objectReferenceValue = s4;
+                    tSo.FindProperty("_sectorB").objectReferenceValue = s5;
+                    tSo.FindProperty("_targetSectorIndex").intValue = 4;
+                    tSo.FindProperty("_targetSectorObject").objectReferenceValue = s5;
+                    tSo.ApplyModifiedProperties();
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[LevelTemplateCreator] Successfully configured LevelSeamlessManager and all triggers in Gameplay.unity!");
+        }
     }
 }
