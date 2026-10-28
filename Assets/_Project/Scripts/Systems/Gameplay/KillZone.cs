@@ -76,7 +76,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 if (stitchable != null)
                 {
                     Debug.Log($"[KillZone] Resetting dropped StitchableObject '{stitchable.name}' back to initial state.");
-                    stitchable.ResetToInitialState();
+                    stitchable.ResetToInitialState(forceReset: true);
                 }
             }
         }

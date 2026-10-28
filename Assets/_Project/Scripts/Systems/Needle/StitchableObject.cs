@@ -54,6 +54,10 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Impulse applied to the thread when the player jumps off.")]
         [SerializeField] private float _jumpKickImpulse = 2.4f;
 
+        [Header("Respawn Persistence")]
+        [Tooltip("If true and this object is currently looping, it will not be reset when the player respawns at a checkpoint.")]
+        [SerializeField] private bool _preserveLoopOnRespawn;
+
         private Rigidbody2D _rb;
         private RigidbodyType2D _originalBodyType;
         private RigidbodyConstraints2D _originalConstraints;
@@ -95,6 +99,11 @@ namespace ThailandHorrorJam.Systems.Needle
         public SutureThread SutureThread => _sutureThread;
         public float OriginalMass => _originalMass;
         public float TetheredMassMultiplier => _tetheredMassMultiplier;
+        public bool PreserveLoopOnRespawn
+        {
+            get => _preserveLoopOnRespawn;
+            set => _preserveLoopOnRespawn = value;
+        }
 
         private void Awake()
         {
@@ -859,6 +868,16 @@ namespace ThailandHorrorJam.Systems.Needle
 
         public void ResetToInitialState()
         {
+            ResetToInitialState(forceReset: false);
+        }
+
+        public void ResetToInitialState(bool forceReset)
+        {
+            if (!forceReset && _preserveLoopOnRespawn && _currentState == StitchState.Looping)
+            {
+                return;
+            }
+
             CutThread();
 
             if (_hasRb)

@@ -118,6 +118,35 @@ namespace ThailandHorrorJam.Editor.Tests
         }
 
         [Test]
+        public void ResetToInitialState_WhenPreserveLoopOnRespawnTrueAndLooping_PreservesLoopingState()
+        {
+            _stitchable.PreserveLoopOnRespawn = true;
+            var waypoints = new List<Vector2> { new Vector2(2f, 3f), new Vector2(6f, 3f) };
+            _stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
+            Assert.AreEqual(StitchState.Looping, _stitchable.CurrentState);
+
+            _stitchable.ResetToInitialState(forceReset: false);
+
+            Assert.AreEqual(StitchState.Looping, _stitchable.CurrentState, "When PreserveLoopOnRespawn is true, ResetToInitialState must not terminate loop.");
+            Assert.AreEqual(RigidbodyType2D.Static, _rb.bodyType);
+        }
+
+        [Test]
+        public void ResetToInitialState_WhenForceReset_ResetsEvenIfPreserveLoopTrue()
+        {
+            _stitchable.PreserveLoopOnRespawn = true;
+            var waypoints = new List<Vector2> { new Vector2(2f, 3f), new Vector2(6f, 3f) };
+            _stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
+            Assert.AreEqual(StitchState.Looping, _stitchable.CurrentState);
+
+            _stitchable.ResetToInitialState(forceReset: true);
+
+            Assert.AreEqual(StitchState.Idle, _stitchable.CurrentState, "ForceReset must reset to Idle even when PreserveLoopOnRespawn is true.");
+            Assert.AreEqual(RigidbodyType2D.Dynamic, _rb.bodyType);
+            Assert.AreEqual(new Vector2(2f, 3f), (Vector2)_go.transform.position);
+        }
+
+        [Test]
         public void WhenBoxPushedOffLedgeDuringHauling_TetherSnapsAndReleasesAutomatically()
         {
             GameObject playerObj = new GameObject("TestHaulPlayer");

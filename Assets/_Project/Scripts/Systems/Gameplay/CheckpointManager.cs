@@ -300,7 +300,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
         }
 
-        private void ResetAssociatedOrAllStitchables()
+        /// <summary>
+        /// Resets puzzle objects associated with the current checkpoint (or all active level stitchables).
+        /// </summary>
+        public void ResetAssociatedOrAllStitchables()
         {
             if (_currentCheckpoint != null && _currentCheckpoint.AssociatedStitchables != null && _currentCheckpoint.AssociatedStitchables.Count > 0)
             {
