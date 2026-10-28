@@ -152,6 +152,33 @@ namespace ThailandHorrorJam.Editor.Tests
                 "FishWaterfall: Knockback Strictly Pushes Player To The Left (-X)");
             RunTest(() => { t7.SetUp(); t7.FishHazard_SpeedRemainsConstant_AfterNeedleHitAndRespawn(); t7.TearDown(); },
                 "FishWaterfall: Fall Speed Remains Constant Across Spawn & Respawn Cycles");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_Spawn_ResetsScaleToOne_AndInitialFrameToZero(); t7.TearDown(); },
+                "FishWaterfall: Spawn Resets Scale To One And Initial Frame To Zero");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_AfterShieldCollectAndDespawn_RestoresPoolParent(); t7.TearDown(); },
+                "FishWaterfall: After Shield Collect And Despawn Restores Pool Parent");
+            RunTest(() => { t7.SetUp(); t7.FishHazard_NumericalSpriteFrames_AreInAscendingSequence(); t7.TearDown(); },
+                "FishWaterfall: Numerical Sprite Frames Are In Ascending Sequence");
+
+            // 8. Sector06GrandClimaxTests
+            var t8 = new Sector06GrandClimaxTests();
+            RunTest(() => { t8.SetUp(); t8.FishShieldCollector_BlocksFish_AndParentsToShield(); t8.TearDown(); },
+                "Sector06: Fish Shield Blocks Fish And Parents To Roof");
+            RunTest(() => { t8.SetUp(); t8.FishShieldCollector_ClampsMaxAccumulatedDebris_ToPreventMemoryLeak(); t8.TearDown(); },
+                "Sector06: Fish Shield Clamps Max Visual Debris (Zero Memory Leak)");
+            RunTest(() => { t8.SetUp(); t8.CrateDropBridge_GeometryMatchesWalkwayLevel(); t8.TearDown(); },
+                "Sector06: Crate Drop Bridge Geometry Matches Walkway Level (Flush Bridge)");
+            RunTest(() => { t8.SetUp(); t8.LevelExitDoor_LocksInput_AndTriggersTransition(); t8.TearDown(); },
+                "Sector06: Level Exit Door Locks Input And Triggers Ending Transition");
+            RunTest(() => { t8.SetUp(); t8.EndingCutscene_ContainsAll18Sprites_InCorrectOrder(); t8.TearDown(); },
+                "Sector06: Ending Cutscene Contains All 18 Sprites In Correct Numerical Order");
+            RunTest(() => { t8.SetUp(); t8.FallingFish_AirborneHit_AppliesDirectionalKnockback_OppositePlayerFacing(); t8.TearDown(); },
+                "Sector06: Falling Fish Applies Directional Knockback Opposite Facing");
+            RunTest(() => { t8.SetUp(); t8.FallingFish_ConsecutiveHits_RespectsKnockbackCooldownWindow(); t8.TearDown(); },
+                "Sector06: Consecutive Hits Respect Knockback Cooldown Window");
+            RunTest(() => { t8.SetUp(); t8.FallingFish_GroundLanding_DisablesCollider_AndEntersBouncingFloppingState(); t8.TearDown(); },
+                "Sector06: Ground Landing Disables Collider & Enters Bouncing Flopping State");
+            RunTest(() => { t8.SetUp(); t8.FishSpawner_ContinuousRain_SpawnsAcrossFullSectorRange_UpToGate(); t8.TearDown(); },
+                "Sector06: Fish Spawner Continuous Rain Covers Sector Up To Gate");
 
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();
@@ -162,7 +189,7 @@ namespace ThailandHorrorJam.Editor.Tests
             var allGos = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include);
             foreach (var go in allGos)
             {
-                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate") || go.name.StartsWith("TestCorpseGasVent") || go.name.StartsWith("TestCrate") || go.name.StartsWith("TestHangingObject") || go.name.StartsWith("TestLevelSeamlessManager") || go.name.StartsWith("TestSector_")))
+                if (go != null && (go.name.StartsWith("TestNavBox") || go.name.StartsWith("TestPlayer") || go.name.StartsWith("TestVerticalWall") || go.name.StartsWith("TestFloor") || go.name.StartsWith("TestStitchableCrate") || go.name.StartsWith("TestCorpseGasVent") || go.name.StartsWith("TestCrate") || go.name.StartsWith("TestHangingObject") || go.name.StartsWith("TestLevelSeamlessManager") || go.name.StartsWith("TestSector_") || go.name.StartsWith("TestShieldCrate") || go.name.StartsWith("TestFish") || go.name.StartsWith("TestExitDoor")))
                 {
                     Object.DestroyImmediate(go);
                 }
