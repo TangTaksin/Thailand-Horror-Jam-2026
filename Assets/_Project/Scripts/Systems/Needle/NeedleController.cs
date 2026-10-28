@@ -52,6 +52,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("When true, completing a new circuit severs the previous circuit (Faustian sacrifice).")]
         [SerializeField] private bool _singleCircuitLimit = true;
 
+        [Tooltip("When true, the player must be grounded to start or maintain aiming.")]
+        [SerializeField] private bool _requireGroundedToAim = true;
+
         [Header("Layer Masks")]
         [FormerlySerializedAs("stitchableLayer")]
         [SerializeField] private LayerMask _stitchableLayer;
@@ -133,6 +136,12 @@ namespace ThailandHorrorJam.Systems.Needle
         private SpriteRenderer _reticleSprite;
         private Vector3 _reticleBaseScale = Vector3.one;
         private float _deniedFlashTimer;
+
+        public bool RequireGroundedToAim
+        {
+            get => _requireGroundedToAim;
+            set => _requireGroundedToAim = value;
+        }
 
         public bool IsPinning => _isPinning;
         public bool IsCutAiming => _isCutAiming;
@@ -327,6 +336,26 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_deniedFlashTimer > 0f)
             {
                 _deniedFlashTimer -= Time.deltaTime;
+            }
+
+            // ถ้ากำลังเล็งอยู่ (Pinning หรือ Cut Aiming) แล้วผู้เล่นลอยอยู่กลางอากาศ (เช่น ตกขอบหรือกระโดด) ให้ยกเลิกการเล็งทันที
+            if (_requireGroundedToAim && IsAiming)
+            {
+                EnsurePlayerComponents();
+                if (_playerController != null && !_playerController.IsGrounded)
+                {
+                    if (_isPinning && !_isNeedleInFlight)
+                    {
+                        LogWarning("[Needle] Aim canceled because player became airborne!");
+                        CancelStitching();
+                        OnThreadSevered?.Invoke();
+                    }
+                    else if (_isCutAiming && !_isCutNeedleInFlight)
+                    {
+                        LogWarning("[Needle] Cut aim canceled because player became airborne!");
+                        ResetCutAimState();
+                    }
+                }
             }
 
             SyncFirstWaypointWithActiveTarget();
@@ -526,6 +555,17 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             if (stitchable == null || stitchable.ObjectTransform == null) return false;
 
+            EnsurePlayerComponents();
+
+            // ตรวจสอบว่าผู้เล่นลอยอยู่กลางอากาศหรือไม่ ถ้าต้องการปักเย็บ/เล็ง (ห้ามเล็งตอนลอยอยู่)
+            if (_requireGroundedToAim && actionDesc == "stitch" && _playerController != null && !_playerController.IsGrounded)
+            {
+                LogWarning($"[Needle] Cannot {actionDesc} {stitchable.ObjectTransform.name} while airborne!");
+                CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                NotifyActionDenied();
+                return false;
+            }
+
             // อนุญาตให้ Tether ขณะยืนอยู่บนวัตถุได้ โดยระบบฟิสิกส์จะพักแรง Joint ชั่วคราวเพื่อป้องกัน hoverboard
             bool allowWhileStanding = actionDesc == "tether";
             if (!allowWhileStanding && _playerController != null && _playerController.IsStandingOn(stitchable.ObjectTransform))
@@ -591,6 +631,15 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 if (_tetheredStitchable != null)
                 {
+                    EnsurePlayerComponents();
+                    if (_requireGroundedToAim && _playerController != null && !_playerController.IsGrounded)
+                    {
+                        LogWarning($"[Needle] Cannot aim while airborne!");
+                        CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                        NotifyActionDenied();
+                        return;
+                    }
+
                     IStitchable target = _tetheredStitchable;
                     if (_playerController != null && _playerController.IsStandingOn(target.ObjectTransform))
                     {
@@ -838,6 +887,15 @@ namespace ThailandHorrorJam.Systems.Needle
         public void StartCutAiming()
         {
             if (_isCutAiming) return;
+
+            EnsurePlayerComponents();
+            if (_requireGroundedToAim && _playerController != null && !_playerController.IsGrounded)
+            {
+                LogWarning("[Needle] Cannot enter Cut Aim mode while airborne!");
+                CameraController2D.Instance?.Shake(0.025f, 0.08f);
+                NotifyActionDenied();
+                return;
+            }
 
             EnsureCutNeedleProjectile();
             if (_cutNeedleProjectile != null)

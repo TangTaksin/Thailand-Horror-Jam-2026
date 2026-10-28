@@ -236,5 +236,43 @@ namespace ThailandHorrorJam.Editor.Tests
             bool severed = (bool)trySeverMethod.Invoke(_needle, new object[] { new Vector2(100f, 100f), new Vector2(100f, 110f) });
             Assert.IsFalse(severed, "Segment far from threads must return false.");
         }
+
+        [Test]
+        public void Aiming_WhileAirborne_IsRejected()
+        {
+            // 1. Create a mock Player with PlayerController2D that is airborne (_isGrounded = false)
+            GameObject playerObj = new GameObject("AirbornePlayer");
+            var rb = playerObj.AddComponent<Rigidbody2D>();
+            var col = playerObj.AddComponent<BoxCollider2D>();
+            var playerCtrl = playerObj.AddComponent<ThailandHorrorJam.Core.PlayerController2D>();
+
+            // Setup NeedleController referencing this player
+            var playerField = typeof(NeedleController).GetField("_playerController", BindingFlags.NonPublic | BindingFlags.Instance);
+            playerField?.SetValue(_needle, playerCtrl);
+            var transformField = typeof(NeedleController).GetField("_playerTransform", BindingFlags.NonPublic | BindingFlags.Instance);
+            transformField?.SetValue(_needle, playerObj.transform);
+
+            Assert.IsFalse(playerCtrl.IsGrounded, "Test player must be airborne.");
+
+            // 2. Try Cut Aim while airborne
+            var secondaryClick = typeof(NeedleController).GetMethod("OnSecondaryClick", BindingFlags.NonPublic | BindingFlags.Instance);
+            secondaryClick?.Invoke(_needle, new object[] { new Vector3(50f, 50f, 0f) });
+            Assert.IsFalse(_needle.IsCutAiming, "Player must NOT be able to start Cut Aim while airborne.");
+            Assert.IsFalse(_needle.IsAiming, "IsAiming must be false when airborne.");
+
+            // 3. Try Stitch Aim while airborne on an idle stitchable
+            GameObject boxObj = new GameObject("StitchableTarget");
+            boxObj.transform.position = playerObj.transform.position + Vector3.right;
+            var boxCol = boxObj.AddComponent<BoxCollider2D>();
+            var stitchable = boxObj.AddComponent<StitchableObject>();
+            typeof(StitchableObject).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(stitchable, null);
+
+            _primaryDownMethod.Invoke(_needle, new object[] { boxObj.transform.position });
+            Assert.IsFalse(_needle.IsPinning, "Player must NOT be able to start Stitch Pinning while airborne.");
+            Assert.IsFalse(_needle.IsAiming, "IsAiming must remain false when stitch attempt is denied due to airborne.");
+
+            Object.DestroyImmediate(boxObj);
+            Object.DestroyImmediate(playerObj);
+        }
     }
 }
