@@ -36,6 +36,8 @@ namespace ThailandHorrorJam.Editor
         private const string k_NeedleAnchorPrefabPath = "Assets/_Project/Prefabs/NeedleAnchor.prefab";
         private const string k_StitchableCratePrefabPath = "Assets/_Project/Prefabs/StitchableCrate.prefab";
         private const string k_HangingBridgePrefabPath = "Assets/_Project/Prefabs/HangingBridge.prefab";
+        private const string k_DeadFishSpriteSheetPath = "Assets/_Project/Art/Sprites/Character/Dead_Fish_SpriteSheet.png";
+        private const string k_FallingFishPrefabPath = "Assets/_Project/Prefabs/Gameplay/FallingDeadFish.prefab";
         private const string k_InputTilesheetPath = "Assets/_Project/Art/Sprites/UI/tilemap_white_packed.png";
 
         [MenuItem("Tools/Horror Jam/Generate Graybox Prefab Library", false, 10)]
@@ -92,6 +94,51 @@ namespace ThailandHorrorJam.Editor
 
             PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
+        }
+
+        private static FallingFishHazard2D EnsureFallingFishPrefab(Sprite[] fishSprites)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<FallingFishHazard2D>(k_FallingFishPrefabPath);
+            if (existing != null) return existing;
+
+            GameObject go = new GameObject("FallingDeadFish");
+            var sr = go.AddComponent<SpriteRenderer>();
+            if (fishSprites != null && fishSprites.Length > 0)
+            {
+                sr.sprite = fishSprites[0];
+            }
+            sr.sortingLayerName = "Default";
+            sr.sortingOrder = 6;
+
+            var col = go.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius = 0.28f;
+
+            var hazard = go.AddComponent<FallingFishHazard2D>();
+            var so = new SerializedObject(hazard);
+            if (fishSprites != null && fishSprites.Length > 0)
+            {
+                var framesProp = so.FindProperty("_animationFrames");
+                framesProp.arraySize = fishSprites.Length;
+                for (int i = 0; i < fishSprites.Length; i++)
+                {
+                    framesProp.GetArrayElementAtIndex(i).objectReferenceValue = fishSprites[i];
+                }
+            }
+            so.FindProperty("_fallSpeed").floatValue = 4.2f;
+            so.FindProperty("_deflectLateralSpeed").floatValue = 5.0f;
+            so.FindProperty("_deflectUpwardSpeed").floatValue = 1.8f;
+            so.FindProperty("_knockbackHorizontalForce").floatValue = 4.5f;
+            so.FindProperty("_knockbackVerticalForce").floatValue = 1.8f;
+            so.FindProperty("_despawnY").floatValue = -3.2f;
+            so.ApplyModifiedProperties();
+
+            string dir = Path.GetDirectoryName(k_FallingFishPrefabPath);
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(go, k_FallingFishPrefabPath);
+            Object.DestroyImmediate(go);
+            return saved.GetComponent<FallingFishHazard2D>();
         }
 
         [MenuItem("Tools/Horror Jam/Create Level Template Scene", false, 11)]
@@ -1286,6 +1333,52 @@ namespace ThailandHorrorJam.Editor
             sbtSo.FindProperty("_targetSectorIndex").intValue = 4;
             sbtSo.FindProperty("_targetSectorObject").objectReferenceValue = sector5Root;
             sbtSo.ApplyModifiedProperties();
+
+            // 10. Fish Waterfall Hazard (over chasm gap from X = 107.0 to 112.0)
+            Sprite[] fishSprites = AssetDatabase.LoadAllAssetsAtPath(k_DeadFishSpriteSheetPath)
+                .OfType<Sprite>()
+                .OrderBy(s => s.name)
+                .ToArray();
+
+            FallingFishHazard2D fishPrefab = EnsureFallingFishPrefab(fishSprites);
+
+            GameObject waterfallGo = new GameObject("FishWaterfall_Sector5");
+            waterfallGo.transform.SetParent(sector5Root.transform, false);
+            waterfallGo.transform.position = new Vector3(109.5f, 7.5f, 0f);
+
+            // Overhead spawner lip / ceiling structure
+            CreatePlatform(waterfallGo.transform, "Ceiling_Waterfall_Lip", new Vector3(109.5f, 7.9f, 0f), new Vector2(5.5f, 0.6f), wallColor, squareSprite, onFrictionMat, groundLayer);
+
+            // Atmospheric dripping light
+            GameObject waterfallLightGo = new GameObject("Waterfall_AtmosphericLight");
+            waterfallLightGo.transform.SetParent(waterfallGo.transform, false);
+            waterfallLightGo.transform.localPosition = new Vector3(0f, -0.3f, 0f);
+            var wfLight = waterfallLightGo.AddComponent<Light2D>();
+            wfLight.lightType = Light2D.LightType.Point;
+            wfLight.color = new Color(0.35f, 0.75f, 0.85f, 1f);
+            wfLight.pointLightOuterRadius = 4.5f;
+            wfLight.intensity = 0.45f;
+
+            // Spawner component
+            var spawner = waterfallGo.AddComponent<FishWaterfallSpawner2D>();
+            var spawnerSo = new SerializedObject(spawner);
+            spawnerSo.FindProperty("_spawnHeightY").floatValue = 7.5f;
+            spawnerSo.FindProperty("_fishPrefab").objectReferenceValue = fishPrefab;
+            spawnerSo.FindProperty("_minInterval").floatValue = 1.15f;
+            spawnerSo.FindProperty("_maxInterval").floatValue = 1.65f;
+            spawnerSo.FindProperty("_activeMinX").floatValue = 94.0f;
+            spawnerSo.FindProperty("_activeMaxX").floatValue = 126.0f;
+
+            if (fishSprites != null && fishSprites.Length > 0)
+            {
+                var framesProp = spawnerSo.FindProperty("_deadFishFrames");
+                framesProp.arraySize = fishSprites.Length;
+                for (int i = 0; i < fishSprites.Length; i++)
+                {
+                    framesProp.GetArrayElementAtIndex(i).objectReferenceValue = fishSprites[i];
+                }
+            }
+            spawnerSo.ApplyModifiedProperties();
 
             return sector5Root;
         }
