@@ -58,6 +58,12 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("If true and this object is currently looping, it will not be reset when the player respawns at a checkpoint.")]
         [SerializeField] private bool _preserveLoopOnRespawn;
 
+        [Header("Auto-Start Loop")]
+        [Tooltip("If true, automatically starts looping along the initial waypoints on Start.")]
+        [SerializeField] private bool _autoStartOnAwake;
+        [SerializeField] private LoopPlaybackMode _initialLoopMode = LoopPlaybackMode.PingPong;
+        [SerializeField] private Vector2[] _initialWaypoints;
+
         private Rigidbody2D _rb;
         private RigidbodyType2D _originalBodyType;
         private RigidbodyConstraints2D _originalConstraints;
@@ -131,6 +137,14 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             EnsureSutureThreadInstance();
+        }
+
+        private void Start()
+        {
+            if (_autoStartOnAwake && _initialWaypoints != null && _initialWaypoints.Length >= 2)
+            {
+                StartLoopAlongWaypoints(_initialWaypoints, _initialLoopMode);
+            }
         }
 
         private void EnsureSutureThreadInstance()
