@@ -1526,9 +1526,9 @@ namespace ThailandHorrorJam.Editor
                 .ToArray();
         }
 
-        public static EndingCutsceneController EnsureEndingCutsceneCanvas(Sprite[] endingSprites, TMP_FontAsset fontAsset)
+        public static CutsceneController EnsureEndingCutsceneCanvas(Sprite[] endingSprites, TMP_FontAsset fontAsset)
         {
-            var existing = Object.FindAnyObjectByType<EndingCutsceneController>(FindObjectsInactive.Include);
+            var existing = Object.FindAnyObjectByType<CutsceneController>(FindObjectsInactive.Include);
             if (existing != null)
             {
                 var soExisting = new SerializedObject(existing);
@@ -1536,7 +1536,7 @@ namespace ThailandHorrorJam.Editor
                 slidesPropExisting.arraySize = endingSprites.Length;
                 for (int i = 0; i < endingSprites.Length; i++)
                 {
-                    slidesPropExisting.GetArrayElementAtIndex(i).objectReferenceValue = endingSprites[i];
+                    var elem = slidesPropExisting.GetArrayElementAtIndex(i); elem.FindPropertyRelative("image").objectReferenceValue = endingSprites[i]; elem.FindPropertyRelative("subtitle").stringValue = string.Empty; elem.FindPropertyRelative("duration").floatValue = 0f;
                 }
                 soExisting.ApplyModifiedProperties();
                 return existing;
@@ -1641,7 +1641,7 @@ namespace ThailandHorrorJam.Editor
             btnTextGo.transform.SetParent(btnGo.transform, false);
             var btnTmp = btnTextGo.AddComponent<TextMeshProUGUI>();
             if (fontAsset != null) btnTmp.font = fontAsset;
-            btnTmp.text = "[ Re-enter Loop ]";
+            btnTmp.text = "[ Main Menu ]";
             btnTmp.fontSize = 24;
             btnTmp.alignment = TextAlignmentOptions.Center;
             btnTmp.color = Color.white;
@@ -1652,13 +1652,11 @@ namespace ThailandHorrorJam.Editor
 
             endCardGo.SetActive(false);
 
-            var controller = canvasGo.AddComponent<EndingCutsceneController>();
+            var controller = canvasGo.AddComponent<CutsceneController>();
             var so = new SerializedObject(controller);
             so.FindProperty("_canvasGroup").objectReferenceValue = cg;
             so.FindProperty("_slideImage").objectReferenceValue = slideImg;
             so.FindProperty("_endCardPanel").objectReferenceValue = endCardGo;
-            so.FindProperty("_endCardTitleText").objectReferenceValue = titleTmp;
-            so.FindProperty("_endCardCreditsText").objectReferenceValue = creditsTmp;
             so.FindProperty("_reenterLoopButton").objectReferenceValue = btn;
             so.FindProperty("_slideDuration").floatValue = 2.5f;
 
@@ -1666,7 +1664,7 @@ namespace ThailandHorrorJam.Editor
             slidesProp.arraySize = endingSprites.Length;
             for (int i = 0; i < endingSprites.Length; i++)
             {
-                slidesProp.GetArrayElementAtIndex(i).objectReferenceValue = endingSprites[i];
+                var elem = slidesProp.GetArrayElementAtIndex(i); elem.FindPropertyRelative("image").objectReferenceValue = endingSprites[i]; elem.FindPropertyRelative("subtitle").stringValue = string.Empty; elem.FindPropertyRelative("duration").floatValue = 0f;
             }
             so.ApplyModifiedProperties();
 
@@ -1887,7 +1885,7 @@ namespace ThailandHorrorJam.Editor
 
             // 10. The Ending Slideshow Canvas (18 illustrations End_SC1 to End_SC18)
             Sprite[] endingSprites = LoadEndingSprites();
-            EndingCutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
+            CutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
 
             // 11. The Suture Gate (The Final Exit Door) at X = 159.0, Y = 4.25
             TransitionEventChannelSO transitionChannel = AssetDatabase.LoadAssetAtPath<TransitionEventChannelSO>(k_PixelTransitionChannelPath);
@@ -2251,7 +2249,7 @@ namespace ThailandHorrorJam.Editor
                 // 6. Ensure Ending Cutscene Canvas & link to LevelExitDoor2D
                 TMP_FontAsset fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/_Project/Art/Fonts/monogram SDF.asset");
                 Sprite[] endingSprites = LoadEndingSprites();
-                EndingCutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
+                CutsceneController endingCutscene = EnsureEndingCutsceneCanvas(endingSprites, fontAsset);
 
                 LevelExitDoor2D exitDoor = Object.FindAnyObjectByType<LevelExitDoor2D>(FindObjectsInactive.Include);
                 if (exitDoor != null && endingCutscene != null)
@@ -2259,7 +2257,7 @@ namespace ThailandHorrorJam.Editor
                     var doorSo = new SerializedObject(exitDoor);
                     doorSo.FindProperty("_endingCutscene").objectReferenceValue = endingCutscene;
                     doorSo.ApplyModifiedProperties();
-                    Debug.Log("[LevelTemplateCreator] Linked LevelExitDoor2D to EndingCutsceneController.");
+                    Debug.Log("[LevelTemplateCreator] Linked LevelExitDoor2D to CutsceneController.");
                 }
             }
 

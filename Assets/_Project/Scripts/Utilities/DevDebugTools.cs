@@ -76,6 +76,13 @@ namespace ThailandHorrorJam.Utilities
         [Tooltip("ปุ่ม Toggle Needle")]
         [SerializeField] private Key _needleToggleKey = Key.H;
 
+        [Header("Ending Cutscene Shortcut")]
+        [Tooltip("เปิดใช้งานคีย์ลัดสำหรับสั่งเล่น Ending Cutscene ทันทีเพื่อเทส")]
+        [SerializeField] private bool _enableEndingCutsceneShortcut = true;
+
+        [Tooltip("ปุ่มเล่น Ending Cutscene (Default: Key.E หรือ Ctrl+E)")]
+        [SerializeField] private Key _playEndingCutsceneKey = Key.E;
+
         private Camera _mainCamera;
         private PlayerController2D _playerController;
         private bool _isGodMode;
@@ -253,6 +260,37 @@ namespace ThailandHorrorJam.Utilities
                     }
                 }
             }
+
+            // Play Ending Cutscene Shortcut (Ctrl+E or E)
+            if (_enableEndingCutsceneShortcut && Keyboard.current[_playEndingCutsceneKey].wasPressedThisFrame)
+            {
+                TriggerEndingCutscene();
+            }
+        }
+
+        [ContextMenu("Trigger Ending Cutscene")]
+        public void TriggerEndingCutscene()
+        {
+            Debug.Log("[DevDebug] Triggering Ending Cutscene immediately...");
+            var cutscenes = FindObjectsByType<CutsceneController>(FindObjectsInactive.Include);
+            for (int i = 0; i < cutscenes.Length; i++)
+            {
+                if (cutscenes[i] != null && cutscenes[i].gameObject.name.Contains("Ending"))
+                {
+                    cutscenes[i].StartCutscene();
+                    return;
+                }
+            }
+
+            // Fallback: any CutsceneController in scene
+            if (cutscenes.Length > 0 && cutscenes[0] != null)
+            {
+                cutscenes[0].StartCutscene();
+            }
+            else
+            {
+                Debug.LogWarning("[DevDebug] No CutsceneController found in scene!");
+            }
         }
 
         [ContextMenu("Reset to Checkpoint & Puzzle")]
@@ -309,7 +347,7 @@ namespace ThailandHorrorJam.Utilities
             };
             style.normal.textColor = new Color(0.3f, 0.95f, 0.4f, 0.85f);
 
-            string info = $"[DEV] {modText} on empty space: Teleport | {_toggleKey}: Hide | {_resetCheckpointKey}: Reset CP | {_godModeKey}: God{godText} | Ctrl+R: Reload";
+            string info = $"[DEV] {modText} on empty space: Teleport | {_toggleKey}: Hide | {_playEndingCutsceneKey}: Ending | {_resetCheckpointKey}: Reset CP | {_godModeKey}: God{godText} | Ctrl+R: Reload";
             GUI.Label(new Rect(10, 10, 700, 25), info, style);
         }
     }

@@ -15,7 +15,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
     {
         [Header("Transition & Ending")]
         [SerializeField] private TransitionEventChannelSO _transitionEventChannel;
-        [SerializeField] private EndingCutsceneController _endingCutscene;
+        [SerializeField] private CutsceneController _endingCutscene;
 
         [Header("Timing")]
         [Tooltip("Delay in seconds after entering doorway before the ending cutscene starts.")]
@@ -92,13 +92,13 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
             else
             {
-                // Fallback: locate EndingCutsceneController in scene if not directly wired
-                EndingCutsceneController found = FindAnyObjectByType<EndingCutsceneController>();
+                // Fallback: locate CutsceneController in scene if not directly wired
+                CutsceneController found = FindAnyObjectByType<CutsceneController>();
                 found?.StartCutscene();
             }
         }
 
-        public void SetEndingCutscene(EndingCutsceneController cutscene)
+        public void SetEndingCutscene(CutsceneController cutscene)
         {
             _endingCutscene = cutscene;
         }
