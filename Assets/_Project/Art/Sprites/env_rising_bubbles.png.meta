@@ -1,0 +1,1540 @@
+fileFormatVersion: 2
+guid: fef609bf4eeaad948b134c599da5ca73
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 7135665834757756857
+    second: env_rising_bubbles_0
+  - first:
+      213: -2854814467921181259
+    second: env_rising_bubbles_1
+  - first:
+      213: 4700278433736885337
+    second: env_rising_bubbles_2
+  - first:
+      213: -1145457198557086061
+    second: env_rising_bubbles_3
+  - first:
+      213: 1860203277771329071
+    second: env_rising_bubbles_4
+  - first:
+      213: 4999421516106413534
+    second: env_rising_bubbles_5
+  - first:
+      213: -5473587994918036424
+    second: env_rising_bubbles_6
+  - first:
+      213: -1083857969200455688
+    second: env_rising_bubbles_7
+  - first:
+      213: 8312072929358248387
+    second: env_rising_bubbles_8
+  - first:
+      213: -6093892048725705170
+    second: env_rising_bubbles_9
+  - first:
+      213: 3955765372159158790
+    second: env_rising_bubbles_10
+  - first:
+      213: 7040130883823743080
+    second: env_rising_bubbles_11
+  - first:
+      213: 3910552707873152257
+    second: env_rising_bubbles_12
+  - first:
+      213: -690404312822934584
+    second: env_rising_bubbles_13
+  - first:
+      213: -8328444435887178611
+    second: env_rising_bubbles_14
+  - first:
+      213: 1289552040369104844
+    second: env_rising_bubbles_15
+  - first:
+      213: 4775579627091310831
+    second: env_rising_bubbles_16
+  - first:
+      213: 3496816064589178336
+    second: env_rising_bubbles_17
+  - first:
+      213: 1777077789652707976
+    second: env_rising_bubbles_18
+  - first:
+      213: 508784883977063860
+    second: env_rising_bubbles_19
+  - first:
+      213: 211032637152364201
+    second: env_rising_bubbles_20
+  - first:
+      213: -4516800228837590316
+    second: env_rising_bubbles_21
+  - first:
+      213: 1703033724085580191
+    second: env_rising_bubbles_22
+  - first:
+      213: 238551410731013890
+    second: env_rising_bubbles_23
+  - first:
+      213: 4652911835727904482
+    second: env_rising_bubbles_24
+  - first:
+      213: -96057919476452400
+    second: env_rising_bubbles_25
+  - first:
+      213: -7440076123598720682
+    second: env_rising_bubbles_26
+  - first:
+      213: 5581947655181925719
+    second: env_rising_bubbles_27
+  - first:
+      213: 6978118236576646900
+    second: env_rising_bubbles_28
+  - first:
+      213: -1259655089649410039
+    second: env_rising_bubbles_29
+  - first:
+      213: 5890150736430570939
+    second: env_rising_bubbles_30
+  - first:
+      213: 4782287628543280884
+    second: env_rising_bubbles_31
+  - first:
+      213: 5421964761467783006
+    second: env_rising_bubbles_32
+  - first:
+      213: -8995965255710072835
+    second: env_rising_bubbles_33
+  - first:
+      213: -6257249068916957481
+    second: env_rising_bubbles_34
+  - first:
+      213: 5611428093143267972
+    second: env_rising_bubbles_35
+  - first:
+      213: -6798100346040339708
+    second: env_rising_bubbles_36
+  - first:
+      213: 3478930110175313561
+    second: env_rising_bubbles_37
+  - first:
+      213: 5323319572368604194
+    second: env_rising_bubbles_38
+  - first:
+      213: 2361179539026268890
+    second: env_rising_bubbles_39
+  - first:
+      213: -8614114480812072908
+    second: env_rising_bubbles_40
+  - first:
+      213: -8895493166322671117
+    second: env_rising_bubbles_41
+  - first:
+      213: -862207638275883746
+    second: env_rising_bubbles_42
+  - first:
+      213: 5368554503701833831
+    second: env_rising_bubbles_43
+  - first:
+      213: 7521515092225239811
+    second: env_rising_bubbles_44
+  - first:
+      213: 2227974964114593753
+    second: env_rising_bubbles_45
+  - first:
+      213: -4536311828525048861
+    second: env_rising_bubbles_46
+  - first:
+      213: 3942891565842793200
+    second: env_rising_bubbles_47
+  - first:
+      213: -4282425797736579269
+    second: env_rising_bubbles_48
+  - first:
+      213: 3479441233518062819
+    second: env_rising_bubbles_49
+  - first:
+      213: 4136474273149324016
+    second: env_rising_bubbles_50
+  - first:
+      213: -593078007840283927
+    second: env_rising_bubbles_51
+  - first:
+      213: 1106634434468905491
+    second: env_rising_bubbles_52
+  - first:
+      213: 1839000487548632958
+    second: env_rising_bubbles_53
+  - first:
+      213: -1276299745674005854
+    second: env_rising_bubbles_54
+  - first:
+      213: 5432178844177351192
+    second: env_rising_bubbles_55
+  - first:
+      213: 8031619676702371541
+    second: env_rising_bubbles_56
+  - first:
+      213: -7824544289040486744
+    second: env_rising_bubbles_57
+  - first:
+      213: 4240569301141893080
+    second: env_rising_bubbles_58
+  - first:
+      213: 8439829203489402702
+    second: env_rising_bubbles_59
+  - first:
+      213: -3105755790329877329
+    second: env_rising_bubbles_60
+  - first:
+      213: -6356835892664318094
+    second: env_rising_bubbles_61
+  - first:
+      213: -3576834794627353852
+    second: env_rising_bubbles_62
+  - first:
+      213: 3412566622062878773
+    second: env_rising_bubbles_63
+  - first:
+      213: 233429809185136011
+    second: env_rising_bubbles_64
+  - first:
+      213: 4000810792948960125
+    second: env_rising_bubbles_65
+  - first:
+      213: 8430119231651644746
+    second: env_rising_bubbles_66
+  - first:
+      213: 8113524722203123942
+    second: env_rising_bubbles_67
+  - first:
+      213: -5797145257605927566
+    second: env_rising_bubbles_68
+  - first:
+      213: 4728904025095873775
+    second: env_rising_bubbles_69
+  - first:
+      213: -7100836596458295310
+    second: env_rising_bubbles_70
+  - first:
+      213: 3641033917149535142
+    second: env_rising_bubbles_71
+  - first:
+      213: 3872474116464675755
+    second: env_rising_bubbles_72
+  - first:
+      213: 588137160850103917
+    second: env_rising_bubbles_73
+  - first:
+      213: -34800972611344701
+    second: env_rising_bubbles_74
+  - first:
+      213: 7166050446229170668
+    second: env_rising_bubbles_75
+  - first:
+      213: 2456937523291104578
+    second: env_rising_bubbles_76
+  - first:
+      213: 7054230793619788530
+    second: env_rising_bubbles_77
+  - first:
+      213: 4536170859825185556
+    second: env_rising_bubbles_78
+  - first:
+      213: -7791880503962340101
+    second: env_rising_bubbles_79
+  - first:
+      213: 2993300295146769840
+    second: env_rising_bubbles_80
+  - first:
+      213: 3556068326239108445
+    second: env_rising_bubbles_81
+  - first:
+      213: -1153974055185470221
+    second: env_rising_bubbles_82
+  - first:
+      213: -3897628290785077058
+    second: env_rising_bubbles_83
+  - first:
+      213: -5993250834464994736
+    second: env_rising_bubbles_84
+  - first:
+      213: 5812224204824079445
+    second: env_rising_bubbles_85
+  - first:
+      213: 4602398955482196432
+    second: env_rising_bubbles_86
+  - first:
+      213: 3605275798629085484
+    second: env_rising_bubbles_87
+  - first:
+      213: -6528779463100974727
+    second: env_rising_bubbles_88
+  - first:
+      213: 2495589936899655167
+    second: env_rising_bubbles_89
+  - first:
+      213: 6375434598746413003
+    second: env_rising_bubbles_90
+  - first:
+      213: -302576227496127984
+    second: env_rising_bubbles_91
+  - first:
+      213: 2586315916613035274
+    second: env_rising_bubbles_92
+  - first:
+      213: 1856286058752242267
+    second: env_rising_bubbles_93
+  - first:
+      213: 7242743039244499200
+    second: env_rising_bubbles_94
+  - first:
+      213: -6703428017609059103
+    second: env_rising_bubbles_95
+  - first:
+      213: 1489284326086394685
+    second: env_rising_bubbles_96
+  - first:
+      213: 4148817961228037438
+    second: env_rising_bubbles_97
+  - first:
+      213: 1876576938048912208
+    second: env_rising_bubbles_98
+  - first:
+      213: 703602679514173279
+    second: env_rising_bubbles_99
+  - first:
+      213: -1829789179799956808
+    second: env_rising_bubbles_100
+  - first:
+      213: 7232609692064143699
+    second: env_rising_bubbles_101
+  - first:
+      213: 2098479096880855803
+    second: env_rising_bubbles_102
+  - first:
+      213: 6300463518299190222
+    second: env_rising_bubbles_103
+  - first:
+      213: -7025908900635725397
+    second: env_rising_bubbles_104
+  - first:
+      213: -1972037715158610684
+    second: env_rising_bubbles_105
+  - first:
+      213: -6150263704077816344
+    second: env_rising_bubbles_106
+  - first:
+      213: -1394243557102182322
+    second: env_rising_bubbles_107
+  - first:
+      213: -5307045182307224225
+    second: env_rising_bubbles_108
+  - first:
+      213: -5597487038429459385
+    second: env_rising_bubbles_109
+  - first:
+      213: -289194236428113807
+    second: env_rising_bubbles_110
+  - first:
+      213: -8989772301280056288
+    second: env_rising_bubbles_111
+  - first:
+      213: 2756029198024231918
+    second: env_rising_bubbles_112
+  - first:
+      213: -9201138945756530934
+    second: env_rising_bubbles_113
+  - first:
+      213: -362486780640871644
+    second: env_rising_bubbles_114
+  - first:
+      213: -715966532688283886
+    second: env_rising_bubbles_115
+  - first:
+      213: 8866398943914576487
+    second: env_rising_bubbles_116
+  - first:
+      213: 7563379784094905587
+    second: env_rising_bubbles_117
+  - first:
+      213: -4568511623240112773
+    second: env_rising_bubbles_118
+  - first:
+      213: 6613630772708129954
+    second: env_rising_bubbles_119
+  - first:
+      213: 6090862833531694415
+    second: env_rising_bubbles_120
+  - first:
+      213: 882427521988165621
+    second: env_rising_bubbles_121
+  - first:
+      213: -1024002600662678876
+    second: env_rising_bubbles_122
+  - first:
+      213: -8800884087571428894
+    second: env_rising_bubbles_123
+  - first:
+      213: 2941837753082093067
+    second: env_rising_bubbles_124
+  - first:
+      213: -4466294524943771596
+    second: env_rising_bubbles_125
+  - first:
+      213: 7575955530316134708
+    second: env_rising_bubbles_126
+  - first:
+      213: 9221286512214762200
+    second: env_rising_bubbles_127
+  - first:
+      213: 4601093939274086230
+    second: env_rising_bubbles_128
+  - first:
+      213: 442520366593928176
+    second: env_rising_bubbles_129
+  - first:
+      213: -3682477665640314328
+    second: env_rising_bubbles_130
+  - first:
+      213: 7522610913442876583
+    second: env_rising_bubbles_131
+  - first:
+      213: 273045140029037847
+    second: env_rising_bubbles_132
+  - first:
+      213: 3448476330733415121
+    second: env_rising_bubbles_133
+  - first:
+      213: -6096955553297151849
+    second: env_rising_bubbles_134
+  - first:
+      213: -4639219437959026149
+    second: env_rising_bubbles_135
+  - first:
+      213: 2460323262188938169
+    second: env_rising_bubbles_136
+  - first:
+      213: 6665317808329203401
+    second: env_rising_bubbles_137
+  - first:
+      213: -8888549825897374122
+    second: env_rising_bubbles_138
+  - first:
+      213: 3124146076754736596
+    second: env_rising_bubbles_139
+  - first:
+      213: 4587105441645671076
+    second: env_rising_bubbles_140
+  - first:
+      213: 3733746514179106423
+    second: env_rising_bubbles_141
+  - first:
+      213: -1714421137080596621
+    second: env_rising_bubbles_142
+  - first:
+      213: -3893959093126663871
+    second: env_rising_bubbles_143
+  - first:
+      213: 2369419706269602883
+    second: env_rising_bubbles_144
+  - first:
+      213: 7153754789835458712
+    second: env_rising_bubbles_145
+  - first:
+      213: -5323437116988239782
+    second: env_rising_bubbles_146
+  - first:
+      213: 6550561618349160848
+    second: env_rising_bubbles_147
+  - first:
+      213: 9099822514140480607
+    second: env_rising_bubbles_148
+  - first:
+      213: -8718586637425878323
+    second: env_rising_bubbles_149
+  - first:
+      213: -2561191993276925415
+    second: env_rising_bubbles_150
+  - first:
+      213: -7678259169361394345
+    second: env_rising_bubbles_151
+  - first:
+      213: 6033877134162889249
+    second: env_rising_bubbles_152
+  - first:
+      213: -7390634181051295714
+    second: env_rising_bubbles_153
+  - first:
+      213: 6145755705601938507
+    second: env_rising_bubbles_154
+  - first:
+      213: -5159563405943784742
+    second: env_rising_bubbles_155
+  - first:
+      213: 7887707869725096709
+    second: env_rising_bubbles_156
+  - first:
+      213: 8502789639794119729
+    second: env_rising_bubbles_157
+  - first:
+      213: 2291967278414887749
+    second: env_rising_bubbles_158
+  - first:
+      213: 5714599295838067896
+    second: env_rising_bubbles_159
+  - first:
+      213: -3775516503899737486
+    second: env_rising_bubbles_160
+  - first:
+      213: 5123623234283327498
+    second: env_rising_bubbles_161
+  - first:
+      213: -8794887822178177152
+    second: env_rising_bubbles_162
+  - first:
+      213: 6712868081582495737
+    second: env_rising_bubbles_163
+  - first:
+      213: 8735276750521508451
+    second: env_rising_bubbles_164
+  - first:
+      213: -8256013121820185740
+    second: env_rising_bubbles_165
+  - first:
+      213: 2539164180485120687
+    second: env_rising_bubbles_166
+  - first:
+      213: 7402275757165991994
+    second: env_rising_bubbles_167
+  - first:
+      213: 4955829133551026831
+    second: env_rising_bubbles_168
+  - first:
+      213: -9099332366104799413
+    second: env_rising_bubbles_169
+  - first:
+      213: -160794221893742836
+    second: env_rising_bubbles_170
+  - first:
+      213: 1111295015271924081
+    second: env_rising_bubbles_171
+  - first:
+      213: -464810129460052872
+    second: env_rising_bubbles_172
+  - first:
+      213: -1567440838268571434
+    second: env_rising_bubbles_173
+  - first:
+      213: -5622772032201378935
+    second: env_rising_bubbles_174
+  - first:
+      213: -6923661758074032149
+    second: env_rising_bubbles_175
+  - first:
+      213: -6191671750937128252
+    second: env_rising_bubbles_176
+  - first:
+      213: -6196660233727715264
+    second: env_rising_bubbles_177
+  - first:
+      213: 7715089587920337788
+    second: env_rising_bubbles_178
+  - first:
+      213: -2727448863002989656
+    second: env_rising_bubbles_179
+  - first:
+      213: 4621838244428831224
+    second: env_rising_bubbles_180
+  - first:
+      213: -5550538185930464775
+    second: env_rising_bubbles_181
+  - first:
+      213: -8715827640647829282
+    second: env_rising_bubbles_182
+  - first:
+      213: 2880858285296405005
+    second: env_rising_bubbles_183
+  - first:
+      213: 5227379758140535814
+    second: env_rising_bubbles_184
+  - first:
+      213: -8865838435559931151
+    second: env_rising_bubbles_185
+  - first:
+      213: -6526723208167215726
+    second: env_rising_bubbles_186
+  - first:
+      213: -6236333744823057134
+    second: env_rising_bubbles_187
+  - first:
+      213: 9058413114232388591
+    second: env_rising_bubbles_188
+  - first:
+      213: -2309649316836930788
+    second: env_rising_bubbles_189
+  - first:
+      213: -768865243206830210
+    second: env_rising_bubbles_190
+  - first:
+      213: 8127851440769499444
+    second: env_rising_bubbles_191
+  - first:
+      213: 2740514482558603121
+    second: env_rising_bubbles_192
+  - first:
+      213: -1424337727506160083
+    second: env_rising_bubbles_193
+  - first:
+      213: 7752960240044773277
+    second: env_rising_bubbles_194
+  - first:
+      213: 3623617836244722495
+    second: env_rising_bubbles_195
+  - first:
+      213: 8408653580575637802
+    second: env_rising_bubbles_196
+  - first:
+      213: 6984597993604721712
+    second: env_rising_bubbles_197
+  - first:
+      213: 3545316211905536321
+    second: env_rising_bubbles_198
+  - first:
+      213: 8247814947341188796
+    second: env_rising_bubbles_199
+  - first:
+      213: 2253739349361052808
+    second: env_rising_bubbles_200
+  - first:
+      213: -8892711747290661010
+    second: env_rising_bubbles_201
+  - first:
+      213: -552059862811623288
+    second: env_rising_bubbles_202
+  - first:
+      213: -536387150205475941
+    second: env_rising_bubbles_203
+  - first:
+      213: -712325617068152786
+    second: env_rising_bubbles_204
+  - first:
+      213: 2361570156796111050
+    second: env_rising_bubbles_205
+  - first:
+      213: 586718568578324106
+    second: env_rising_bubbles_206
+  - first:
+      213: 8914789864689265496
+    second: env_rising_bubbles_207
+  - first:
+      213: -1138671508671173471
+    second: env_rising_bubbles_208
+  - first:
+      213: -4797450105573907641
+    second: env_rising_bubbles_209
+  - first:
+      213: -5114079655082417346
+    second: env_rising_bubbles_210
+  - first:
+      213: -6528025066073911517
+    second: env_rising_bubbles_211
+  - first:
+      213: -168926718384101017
+    second: env_rising_bubbles_212
+  - first:
+      213: -1901631243670104060
+    second: env_rising_bubbles_213
+  - first:
+      213: -8163387864735439610
+    second: env_rising_bubbles_214
+  - first:
+      213: -8081436560657490987
+    second: env_rising_bubbles_215
+  - first:
+      213: 8077073196456258949
+    second: env_rising_bubbles_216
+  - first:
+      213: 2442085399163807243
+    second: env_rising_bubbles_217
+  - first:
+      213: 3359264127277545080
+    second: env_rising_bubbles_218
+  - first:
+      213: -3113435479575102095
+    second: env_rising_bubbles_219
+  - first:
+      213: 8786838679113674284
+    second: env_rising_bubbles_220
+  - first:
+      213: -659383040097126889
+    second: env_rising_bubbles_221
+  - first:
+      213: -4970588377522869227
+    second: env_rising_bubbles_222
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 32
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationMethod: 0
+  spriteTessellationDetail: -1
+  spriteGeometrySubdivision: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: env_rising_bubbles_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9b790a4354af60360800000000000000
+      internalID: 7135665834757756857
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_1
+      rect:
+        serializedVersion: 2
+        x: 64
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5b589ebed59a168d0800000000000000
+      internalID: -2854814467921181259
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_2
+      rect:
+        serializedVersion: 2
+        x: 128
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9540154155eba3140800000000000000
+      internalID: 4700278433736885337
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_3
+      rect:
+        serializedVersion: 2
+        x: 192
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 39e379e2fb48a10f0800000000000000
+      internalID: -1145457198557086061
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_4
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2ec39d7605c0d910800000000000000
+      internalID: 1860203277771329071
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_5
+      rect:
+        serializedVersion: 2
+        x: 320
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ed5b7fd7163816540800000000000000
+      internalID: 4999421516106413534
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_6
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 83c511c08b8e904b0800000000000000
+      internalID: -5473587994918036424
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_7
+      rect:
+        serializedVersion: 2
+        x: 448
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8ff94d66bec55f0f0800000000000000
+      internalID: -1083857969200455688
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_8
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3c9f98d3a4a6a5370800000000000000
+      internalID: 8312072929358248387
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_9
+      rect:
+        serializedVersion: 2
+        x: 576
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e2e7020f7752e6ba0800000000000000
+      internalID: -6093892048725705170
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_10
+      rect:
+        serializedVersion: 2
+        x: 640
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 60a665eb5a3b5e630800000000000000
+      internalID: 3955765372159158790
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_11
+      rect:
+        serializedVersion: 2
+        x: 704
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 86032961db193b160800000000000000
+      internalID: 7040130883823743080
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_12
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 10d983408f2154630800000000000000
+      internalID: 3910552707873152257
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_13
+      rect:
+        serializedVersion: 2
+        x: 832
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8c39ac67fe03b66f0800000000000000
+      internalID: -690404312822934584
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_14
+      rect:
+        serializedVersion: 2
+        x: 896
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d8cbd5b59eb6b6c80800000000000000
+      internalID: -8328444435887178611
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_15
+      rect:
+        serializedVersion: 2
+        x: 960
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cc7a4959fb865e110800000000000000
+      internalID: 1289552040369104844
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_16
+      rect:
+        serializedVersion: 2
+        x: 1024
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe8be556e54464240800000000000000
+      internalID: 4775579627091310831
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_17
+      rect:
+        serializedVersion: 2
+        x: 1088
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0e5a7be0faf278030800000000000000
+      internalID: 3496816064589178336
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_18
+      rect:
+        serializedVersion: 2
+        x: 1152
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 88a6c7695d279a810800000000000000
+      internalID: 1777077789652707976
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_19
+      rect:
+        serializedVersion: 2
+        x: 1216
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4bd8a8408219f0700800000000000000
+      internalID: 508784883977063860
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_20
+      rect:
+        serializedVersion: 2
+        x: 1280
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9a60b7db01dbde200800000000000000
+      internalID: 211032637152364201
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_21
+      rect:
+        serializedVersion: 2
+        x: 1344
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4da7bb67f1a1151c0800000000000000
+      internalID: -4516800228837590316
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_22
+      rect:
+        serializedVersion: 2
+        x: 1408
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f91b1a4262462a710800000000000000
+      internalID: 1703033724085580191
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_23
+      rect:
+        serializedVersion: 2
+        x: 1472
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2075a418e318f4300800000000000000
+      internalID: 238551410731013890
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_24
+      rect:
+        serializedVersion: 2
+        x: 1536
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2eeb5c399a6729040800000000000000
+      internalID: 4652911835727904482
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_25
+      rect:
+        serializedVersion: 2
+        x: 1600
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0d33eb7c4dbbaaef0800000000000000
+      internalID: -96057919476452400
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_26
+      rect:
+        serializedVersion: 2
+        x: 1664
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 651780f4f2a8fb890800000000000000
+      internalID: -7440076123598720682
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_27
+      rect:
+        serializedVersion: 2
+        x: 1728
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 75d71f561df077d40800000000000000
+      internalID: 5581947655181925719
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_28
+      rect:
+        serializedVersion: 2
+        x: 1792
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f683d3809147d060800000000000000
+      internalID: 6978118236576646900
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_29
+      rect:
+        serializedVersion: 2
+        x: 1856
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9002fe1be5ec48ee0800000000000000
+      internalID: -1259655089649410039
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_30
+      rect:
+        serializedVersion: 2
+        x: 1920
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bbd137e23e40eb150800000000000000
+      internalID: 5890150736430570939
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: env_rising_bubbles_31
+      rect:
+        serializedVersion: 2
+        x: 1984
+        y: 2
+        width: 64
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f64111b2491e5240800000000000000
+      internalID: 4782287628543280884
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5bbeae8a3f57ba040ae948f5b49fae54
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":64.0,"y":126.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
+    nameFileIdTable:
+      env_rising_bubbles_0: 7135665834757756857
+      env_rising_bubbles_1: -2854814467921181259
+      env_rising_bubbles_10: 3955765372159158790
+      env_rising_bubbles_11: 7040130883823743080
+      env_rising_bubbles_12: 3910552707873152257
+      env_rising_bubbles_13: -690404312822934584
+      env_rising_bubbles_14: -8328444435887178611
+      env_rising_bubbles_15: 1289552040369104844
+      env_rising_bubbles_16: 4775579627091310831
+      env_rising_bubbles_17: 3496816064589178336
+      env_rising_bubbles_18: 1777077789652707976
+      env_rising_bubbles_19: 508784883977063860
+      env_rising_bubbles_2: 4700278433736885337
+      env_rising_bubbles_20: 211032637152364201
+      env_rising_bubbles_21: -4516800228837590316
+      env_rising_bubbles_22: 1703033724085580191
+      env_rising_bubbles_23: 238551410731013890
+      env_rising_bubbles_24: 4652911835727904482
+      env_rising_bubbles_25: -96057919476452400
+      env_rising_bubbles_26: -7440076123598720682
+      env_rising_bubbles_27: 5581947655181925719
+      env_rising_bubbles_28: 6978118236576646900
+      env_rising_bubbles_29: -1259655089649410039
+      env_rising_bubbles_3: -1145457198557086061
+      env_rising_bubbles_30: 5890150736430570939
+      env_rising_bubbles_31: 4782287628543280884
+      env_rising_bubbles_4: 1860203277771329071
+      env_rising_bubbles_5: 4999421516106413534
+      env_rising_bubbles_6: -5473587994918036424
+      env_rising_bubbles_7: -1083857969200455688
+      env_rising_bubbles_8: 8312072929358248387
+      env_rising_bubbles_9: -6093892048725705170
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 21037, guid: 0000000000000000e000000000000000, type: 0}
