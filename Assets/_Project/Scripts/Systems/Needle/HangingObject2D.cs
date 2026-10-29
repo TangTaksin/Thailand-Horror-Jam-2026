@@ -335,6 +335,11 @@ namespace ThailandHorrorJam.Systems.Needle
                 _isFreeFalling = false;
                 _isLockedAtRest = true;
 
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_thud_impact");
+                }
+
                 if (_enableLandingShake)
                 {
                     CameraController2D.Instance?.Shake(_landingShakeIntensity, _landingShakeDuration);
@@ -469,6 +474,11 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 _isRotatingDown = false;
                 _isLockedAtRest = true;
+
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_thud_impact");
+                }
 
                 if (_enableLandingShake)
                 {

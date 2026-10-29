@@ -75,6 +75,18 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private bool _faceAimWhenPinning = true;
         [SerializeField] private bool _startFacingRight = true;
 
+        [Header("Audio (Footsteps on Walk Frames)")]
+        [Tooltip("เล่นเสียงฝีเท้าตามจังหวะเฟรมของ Sprite เดิน")]
+        [SerializeField] private bool _playFootstepAudio = true;
+        [Tooltip("ชื่อ SFX ใน AudioManager")]
+        [SerializeField] private string _footstepSFXName = "Footstep";
+        [Tooltip("ระดับความดังของเสียงฝีเท้า")]
+        [SerializeField] [Range(0f, 1f)] private float _footstepVolume = 0.65f;
+        [Tooltip("ดัชนีเฟรมใน Walk Animation ที่เท้าแตะพื้น (สำหรับ 6 เฟรม โดยปกติคือเฟรม 2 และ 5)")]
+        [SerializeField] private int[] _walkFootstepFrames = new int[] { 2, 5 };
+        [Tooltip("ดัชนีเฟรมใน HaulWalk Animation ที่เท้าแตะพื้น")]
+        [SerializeField] private int[] _haulWalkFootstepFrames = new int[] { 1 };
+
         [Header("Squash & Stretch (Juice)")]
         [SerializeField] private bool _enableSquashAndStretch = true;
         [SerializeField] private Vector3 _jumpStretch = new Vector3(0.86f, 1.18f, 1f);
@@ -594,6 +606,7 @@ namespace ThailandHorrorJam.Core
                 if (_currentFrame != previousFrame)
                 {
                     _spriteRenderer.sprite = _currentClip[_currentFrame];
+                    CheckFootstepFrame(_currentFrame);
                 }
             }
         }
@@ -605,6 +618,43 @@ namespace ThailandHorrorJam.Core
 
             bool movingRight = velX > 0f;
             return movingRight != _isFacingRight;
+        }
+
+        private void CheckFootstepFrame(int frame)
+        {
+            if (!_playFootstepAudio || string.IsNullOrEmpty(_footstepSFXName)) return;
+            if (_controller != null && !_controller.IsGrounded) return;
+            if (AudioManager.Instance == null) return;
+
+            bool isStepFrame = false;
+
+            if (_currentState == VisualState.Walk && _walkFootstepFrames != null)
+            {
+                for (int i = 0; i < _walkFootstepFrames.Length; i++)
+                {
+                    if (_walkFootstepFrames[i] == frame)
+                    {
+                        isStepFrame = true;
+                        break;
+                    }
+                }
+            }
+            else if (_currentState == VisualState.HaulWalk && _haulWalkFootstepFrames != null)
+            {
+                for (int i = 0; i < _haulWalkFootstepFrames.Length; i++)
+                {
+                    if (_haulWalkFootstepFrames[i] == frame)
+                    {
+                        isStepFrame = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isStepFrame)
+            {
+                AudioManager.Instance.PlaySFX(_footstepSFXName, _footstepVolume);
+            }
         }
 
         private float GetFpsForState(VisualState state)

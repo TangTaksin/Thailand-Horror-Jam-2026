@@ -155,6 +155,14 @@ namespace ThailandHorrorJam.Systems.Needle
         public event System.Action<Vector2> OnNeedleLaunched;
         public event System.Action OnActionDenied;
         public event System.Action OnThreadSevered;
+
+        private void TriggerThreadSeveredSound()
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_thread_cut");
+            }
+        }
         public event System.Action OnPlayerTetherAttached;
 
         private void Awake()
@@ -348,7 +356,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     {
                         LogWarning("[Needle] Aim canceled because player became airborne!");
                         CancelStitching();
-                        OnThreadSevered?.Invoke();
+                        TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                     }
                     else if (_isCutAiming && !_isCutNeedleInFlight)
                     {
@@ -737,6 +745,10 @@ namespace ThailandHorrorJam.Systems.Needle
 
             float maxFlightDist = Mathf.Max(0.2f, _maxThreadLength);
 
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_needle_shoot");
+            }
             _needleProjectile.Launch(
                 origin: startPos,
                 direction: aimDir,
@@ -850,7 +862,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_tetheredStitchable != null)
             {
                 ReleasePlayerTether();
-                OnThreadSevered?.Invoke();
+                TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                 return;
             }
 
@@ -858,7 +870,7 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_isPinning)
             {
                 CancelStitching();
-                OnThreadSevered?.Invoke();
+                TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                 return;
             }
 
@@ -911,6 +923,10 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _playerController.SetAiming(true);
             }
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_aim_needle_enter");
+            }
 
             Log("[Needle] Entered Cut Aim mode. Aim at threads and click left mouse to shoot cut needle. Right-click to cancel.");
         }
@@ -927,6 +943,10 @@ namespace ThailandHorrorJam.Systems.Needle
                 _cutNeedleProjectile.Cancel();
             }
             _isCutNeedleInFlight = false;
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_aim_cancel");
+            }
 
             if (_cutNeedleThread != null)
             {
@@ -988,6 +1008,10 @@ namespace ThailandHorrorJam.Systems.Needle
 
             float maxFlightDist = Mathf.Max(0.2f, _maxThreadLength);
 
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_needle_shoot");
+            }
             _cutNeedleProjectile.Launch(
                 origin: startPos,
                 direction: aimDir,
@@ -1036,7 +1060,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 ClearCurrentPinnedAnchor();
 
                 CameraController2D.Instance?.Shake(0.045f, 0.09f);
-                OnThreadSevered?.Invoke();
+                TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                 Log($"[Needle] Cut needle severed {severed} thread(s) along segment!");
                 return true;
             }
@@ -1082,7 +1106,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _currentlyLoopingTarget.CutThread();
                 if (notifySevered)
                 {
-                    OnThreadSevered?.Invoke();
+                    TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                 }
             }
 
@@ -1393,6 +1417,10 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 _playerController.SetAiming(true, _activeTarget.CurrentPosition, MaxAimLeashDistance);
             }
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_aim_needle_enter");
+            }
 
             Vector2 playerHandPos;
             if (!TryGetNeedleHandPosition(out playerHandPos))
@@ -1412,7 +1440,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     Log($"[Needle] Severed previous circuit on {_currentlyLoopingTarget.ObjectTransform.name} to power new circuit.");
                     _currentlyLoopingTarget.CutThread();
-                    OnThreadSevered?.Invoke();
+                    TriggerThreadSeveredSound(); OnThreadSevered?.Invoke();
                 }
 
                 _currentlyLoopingTarget = _activeTarget;
@@ -1434,6 +1462,10 @@ namespace ThailandHorrorJam.Systems.Needle
             _isPinning = false;
             _activeTarget = null;
             _pinnedWaypoints.Clear();
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_aim_cancel");
+            }
 
             EnsurePlayerComponents();
             if (_playerController != null)

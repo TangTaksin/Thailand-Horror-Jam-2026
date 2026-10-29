@@ -695,6 +695,10 @@ namespace ThailandHorrorJam.Core
             // ถ้าระหว่างติด Jump Buffer ผู้เล่นปล่อยปุ่มกระโดดไปแล้ว ให้ตัดความสูงกระโดดทันที (Short Hop)
             // ยกเว้นตอนได้ Super Jump Boost จากท่อก๊าซ จะให้วิถีส่งพุ่งเต็มแรงเสมอ
             _isJumpCut = !isVentBoostEligible && !_isJumpButtonHeld;
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX("sfx_player_jump", 0.75f);
+            }
             OnJumped?.Invoke();
         }
 
@@ -1130,6 +1134,12 @@ namespace ThailandHorrorJam.Core
 
             if (impactSpeed > 1.8f)
             {
+                if (AudioManager.Instance != null)
+                {
+                    float vol = Mathf.Clamp(impactSpeed / 10f, 0.4f, 1.0f);
+                    AudioManager.Instance.PlaySFX("sfx_player_jump_land", vol);
+                }
+
                 if (_currentStitchable != null)
                 {
                     _currentStitchable.OnPlayerLanded(impactSpeed, transform.position);

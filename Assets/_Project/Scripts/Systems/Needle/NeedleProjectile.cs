@@ -225,6 +225,10 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 transform.position = validHit.point;
                 _state = ProjectileState.Embedded;
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_needle_pin");
+                }
                 _onHitCallback?.Invoke(validHit.point, validHit.normal, validHit.collider);
                 return;
             }

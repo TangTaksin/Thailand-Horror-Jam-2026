@@ -215,7 +215,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
                 EnsurePlayerReferences();
 
-                // 1. Visceral Impact: Camera shake, lock input, cancel needle
+                // 1. Visceral Impact: SFX, Camera shake, lock input, cancel needle
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_player_death_impact");
+                }
                 CameraController2D.Instance?.Shake(shakeIntensity, shakeDuration);
 
                 if (_playerController != null)
