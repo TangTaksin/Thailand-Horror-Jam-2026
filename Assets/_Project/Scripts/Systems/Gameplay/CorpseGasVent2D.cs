@@ -442,6 +442,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
                         if (availableHeight <= 0.08f)
                         {
                             _eruptionVisual.SetActive(false);
+                            if (_eruptionSprite != null)
+                            {
+                                _eruptionSprite.size = new Vector2(_eruptionSprite.size.x, 0f);
+                            }
                         }
                         else
                         {
@@ -458,6 +462,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
                                 localBottom + availableHeight * 0.5f,
                                 _defaultEruptionLocalPos.z
                             );
+                            if (_eruptionSprite != null)
+                            {
+                                _eruptionSprite.size = new Vector2(_eruptionSprite.size.x, availableHeight);
+                            }
                         }
                     }
                     else
@@ -465,6 +473,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
                         _eruptionVisual.SetActive(true);
                         _eruptionVisual.transform.localScale = _defaultEruptionLocalScale;
                         _eruptionVisual.transform.localPosition = _defaultEruptionLocalPos;
+                        if (_eruptionSprite != null)
+                        {
+                            _eruptionSprite.size = new Vector2(_eruptionSprite.size.x, _defaultEruptionHeight);
+                        }
                     }
                 }
 

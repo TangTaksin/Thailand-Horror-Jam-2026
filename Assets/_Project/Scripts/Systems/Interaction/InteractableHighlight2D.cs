@@ -109,17 +109,65 @@ namespace ThailandHorrorJam.Systems.Interaction
             SyncSpriteWithTarget();
         }
 
+        /// <summary>
+        /// Synchronizes the rim outline renderer with the target sprite.
+        /// Preserves Simple draw mode to avoid Unity's Tight-mesh Full Rect warning while dynamically
+        /// scaling the outline transform to match any Sliced or Tiled target dimensions.
+        /// </summary>
         private void SyncSpriteWithTarget()
         {
             if (_outlineRenderer == null || _targetRenderer == null) return;
 
-            _outlineRenderer.sprite = _targetRenderer.sprite;
-            _outlineRenderer.flipX = _targetRenderer.flipX;
-            _outlineRenderer.flipY = _targetRenderer.flipY;
-            _outlineRenderer.drawMode = _targetRenderer.drawMode;
-            _outlineRenderer.size = _targetRenderer.size;
-            _outlineRenderer.sortingLayerID = _targetRenderer.sortingLayerID;
-            _outlineRenderer.sortingOrder = _targetRenderer.sortingOrder - 1;
+            if (_outlineRenderer.sprite != _targetRenderer.sprite)
+            {
+                _outlineRenderer.sprite = _targetRenderer.sprite;
+            }
+
+            if (_outlineRenderer.flipX != _targetRenderer.flipX)
+            {
+                _outlineRenderer.flipX = _targetRenderer.flipX;
+            }
+
+            if (_outlineRenderer.flipY != _targetRenderer.flipY)
+            {
+                _outlineRenderer.flipY = _targetRenderer.flipY;
+            }
+
+            // Always keep outline renderer in Simple draw mode to prevent Unity's
+            // "Sprite Tiling might not appear correctly because the Sprite used is not generated with Full Rect"
+            // warning when interactables use Sliced/Tiled drawMode on Tight-mesh sprites (e.g. built-in Square).
+            // Instead, we scale the outline transform to match the target's rendered size.
+            if (_outlineRenderer.drawMode != SpriteDrawMode.Simple)
+            {
+                _outlineRenderer.drawMode = SpriteDrawMode.Simple;
+            }
+
+            Vector3 targetScale = new Vector3(_outlineScaleMultiplier.x, _outlineScaleMultiplier.y, 1f);
+            if (_targetRenderer.drawMode != SpriteDrawMode.Simple && _targetRenderer.sprite != null)
+            {
+                Vector2 spriteSize = _targetRenderer.sprite.rect.size / _targetRenderer.sprite.pixelsPerUnit;
+                if (spriteSize.x > 0.0001f && spriteSize.y > 0.0001f)
+                {
+                    targetScale.x = (_targetRenderer.size.x / spriteSize.x) * _outlineScaleMultiplier.x;
+                    targetScale.y = (_targetRenderer.size.y / spriteSize.y) * _outlineScaleMultiplier.y;
+                }
+            }
+
+            if (_outlineObject != null && _outlineObject.transform.localScale != targetScale)
+            {
+                _outlineObject.transform.localScale = targetScale;
+            }
+
+            if (_outlineRenderer.sortingLayerID != _targetRenderer.sortingLayerID)
+            {
+                _outlineRenderer.sortingLayerID = _targetRenderer.sortingLayerID;
+            }
+
+            int targetSortingOrder = _targetRenderer.sortingOrder - 1;
+            if (_outlineRenderer.sortingOrder != targetSortingOrder)
+            {
+                _outlineRenderer.sortingOrder = targetSortingOrder;
+            }
         }
 
         private void ApplyAlphaImmediate(float alpha)

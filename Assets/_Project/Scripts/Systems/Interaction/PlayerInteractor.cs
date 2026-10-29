@@ -67,10 +67,28 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         private void Start()
         {
-            if (_promptCanvasPrefab != null && FindAnyObjectByType<InteractionPromptUI>() == null)
+            EnsurePromptCanvasInstance();
+        }
+
+        private void EnsurePromptCanvasInstance()
+        {
+            if (_promptCanvasPrefab == null) return;
+
+            if (InteractionPromptUI.Instance == null)
             {
                 InteractionPromptUI spawned = Instantiate(_promptCanvasPrefab);
                 spawned.name = "InteractionPromptCanvas";
+            }
+            else
+            {
+                if (!InteractionPromptUI.Instance.gameObject.activeInHierarchy)
+                {
+                    InteractionPromptUI.Instance.gameObject.SetActive(true);
+                }
+                if (!InteractionPromptUI.Instance.enabled)
+                {
+                    InteractionPromptUI.Instance.enabled = true;
+                }
             }
         }
 

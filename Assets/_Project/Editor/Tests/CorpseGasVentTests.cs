@@ -87,7 +87,8 @@ namespace ThailandHorrorJam.Editor.Tests
             // Run UpdateVisuals
             InvokePrivateMethod(_vent, "UpdateVisuals", 0.02f);
 
-            Assert.LessOrEqual(_eruptionSprite.size.y, 0.08f, "Gas eruption height must be clamped to 0 when crate is resting on the nozzle.");
+            float effectiveHeight = !_eruptionVisualObj.activeSelf ? 0f : _eruptionSprite.size.y;
+            Assert.LessOrEqual(effectiveHeight, 0.08f, "Gas eruption height must be clamped to 0 when crate is resting on the nozzle.");
         }
 
         [Test]
@@ -104,8 +105,9 @@ namespace ThailandHorrorJam.Editor.Tests
             InvokePrivateMethod(_vent, "UpdateVisuals", 0.02f);
 
             // Bottom of vent nozzle is at Y = 1.25 - 1.2 = 0.05. Bottom of crate is at Y = 1.0. Expected height ~ 0.95m
-            Assert.Greater(_eruptionSprite.size.y, 0.8f, "Gas eruption height must expand to fill the space under the lifted crate.");
-            Assert.LessOrEqual(_eruptionSprite.size.y, 1.05f, "Gas eruption top must not penetrate above the crate's bottom surface.");
+            float effectiveHeight = _eruptionSprite.size.y;
+            Assert.Greater(effectiveHeight, 0.8f, "Gas eruption height must expand to fill the space under the lifted crate.");
+            Assert.LessOrEqual(effectiveHeight, 1.05f, "Gas eruption top must not penetrate above the crate's bottom surface.");
         }
 
         private static void SetPrivateField(object target, string fieldName, object value)

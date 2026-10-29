@@ -9,6 +9,8 @@ namespace ThailandHorrorJam.Systems.Interaction
     [DefaultExecutionOrder(100)]
     public sealed class InteractionPromptUI : MonoBehaviour
     {
+        public static InteractionPromptUI Instance { get; private set; }
+
         private const float k_HiddenScale = 0.72f;
         private const float k_AwareDotScale = 0.65f;
         private const float k_InteractIconScale = 1.0f;
@@ -41,6 +43,10 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         private void Awake()
         {
+            if (transform.parent == null)
+            {
+                Instance = this;
+            }
             _mainCamera = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
             ResetDefaultLayout();
             ApplySpritesFromSet();
@@ -107,6 +113,14 @@ namespace ThailandHorrorJam.Systems.Interaction
         {
             if (_interactionChannel == null) return;
             _interactionChannel.FocusChanged -= HandleFocusChanged;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
 
         private void LateUpdate()

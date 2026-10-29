@@ -71,6 +71,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private readonly List<(SpriteRenderer sr, Color baseColor)> _sprites = new();
         private readonly List<(TextMeshPro tmp, Color baseColor)> _texts = new();
+        private readonly HashSet<Collider2D> _playerCollidersInside = new();
 
         private IHintDismissCondition _dismissCondition;
         private NeedleController _playerNeedle;
@@ -213,10 +214,30 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
             if (PlayerController2D.IsPlayer(other))
             {
+                _playerCollidersInside.Add(other);
                 CachePlayerNeedle(other);
                 _isPlayerInside = true;
 
                 if (MeetsPrerequisite())
+                {
+                    StartFade(1f);
+                }
+            }
+        }
+
+        private void OnTriggerStay2D(Collider2D other)
+        {
+            if (_isPermanentlyDismissed || !gameObject.activeInHierarchy || !enabled) return;
+
+            if (PlayerController2D.IsPlayer(other))
+            {
+                _playerCollidersInside.Add(other);
+                CachePlayerNeedle(other);
+                _isPlayerInside = true;
+
+                // If player met prerequisite while staying inside (e.g. acquired needle)
+                // or if alpha is not yet fully visible, maintain fade in.
+                if (MeetsPrerequisite() && _currentAlphaRatio < 1f && _fadeCoroutine == null)
                 {
                     StartFade(1f);
                 }
@@ -229,15 +250,24 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
             if (PlayerController2D.IsPlayer(other))
             {
-                _isPlayerInside = false;
+                _playerCollidersInside.Remove(other);
 
-                if (_dismissMode == HintDismissMode.OneShotOnExit)
+                // Clean up any destroyed or disabled colliders
+                _playerCollidersInside.RemoveWhere(c => c == null || !c.enabled || !c.gameObject.activeInHierarchy);
+
+                // Only fade out when ALL player colliders have left the trigger zone
+                if (_playerCollidersInside.Count == 0)
                 {
-                    DismissPermanently();
-                }
-                else
-                {
-                    StartFade(0f);
+                    _isPlayerInside = false;
+
+                    if (_dismissMode == HintDismissMode.OneShotOnExit)
+                    {
+                        DismissPermanently();
+                    }
+                    else
+                    {
+                        StartFade(0f);
+                    }
                 }
             }
         }
@@ -248,6 +278,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void DismissPermanently()
         {
             _isPermanentlyDismissed = true;
+            _playerCollidersInside.Clear();
             _isPlayerInside = false;
             StartFade(0f);
         }
@@ -318,6 +349,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 StopCoroutine(_fadeCoroutine);
                 _fadeCoroutine = null;
             }
+            _playerCollidersInside.Clear();
             _isPlayerInside = false;
         }
 
