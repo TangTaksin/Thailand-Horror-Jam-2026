@@ -38,6 +38,8 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private float _fallMultiplier = 2.5f;
         [SerializeField] private float _lowJumpMultiplier = 2f;
         [SerializeField] private float _maxFallSpeed = 20f;
+        [Tooltip("Super Jump upward velocity boost granted when jumping while attached to a StitchableObject over an erupting CorpseGasVent.")]
+        [SerializeField] private float _ventSuperJumpBoost = 7.0f;
 
         [Header("Ground Check")]
         [Tooltip("Collider ของเท้าผู้เล่น (เช่น Feet BoxCollider2D) ที่กำหนดขนาดและตำแหน่งตรวจพื้นโดยตรงจาก Prefab")]
@@ -122,6 +124,7 @@ namespace ThailandHorrorJam.Core
         private float _knockbackTimer;
         private float _hazardKnockbackCooldownTimer;
         private Vector2 _knockbackVelocity;
+        private float _ventSuperJumpTimer;
 
         private bool _isOnSlope;
         private Vector2 _slopeNormal = Vector2.up;
@@ -139,6 +142,9 @@ namespace ThailandHorrorJam.Core
         public Vector2 PlatformVelocity => _currentStitchable != null ? _currentStitchable.CurrentVelocity : Vector2.zero;
         public Vector2 RelativeVelocity => Velocity - PlatformVelocity;
         public StitchableObject CurrentStitchable => _currentStitchable;
+        public bool IsVentSuperJumping => _ventSuperJumpTimer > 0f;
+
+        public static PlayerController2D Instance { get; private set; }
 
         /// <summary>
         /// ตรวจสอบว่า Collider นี้เป็นส่วนหนึ่งของตัวผู้เล่นหรือไม่ (ทั้งแบบติดตรง หรือเป็น Compound Collider บนลูก)
@@ -153,7 +159,7 @@ namespace ThailandHorrorJam.Core
         }
 
         /// <summary>
-        /// Checks whether the given collider belongs to the player (via tag or root/parent component).
+        /// Checks whether the given collider or component belongs to the player (via tag or root/parent component).
         /// </summary>
         public static bool IsPlayer(Collider2D col)
         {
@@ -161,6 +167,14 @@ namespace ThailandHorrorJam.Core
             if (col.CompareTag("Player")) return true;
             if (col.attachedRigidbody != null && col.attachedRigidbody.CompareTag("Player")) return true;
             return col.GetComponentInParent<PlayerController2D>() != null;
+        }
+
+        public static bool IsPlayer(Component comp)
+        {
+            if (comp == null) return false;
+            if (comp.CompareTag("Player")) return true;
+            if (comp is Collider2D col && col.attachedRigidbody != null && col.attachedRigidbody.CompareTag("Player")) return true;
+            return comp.GetComponentInParent<PlayerController2D>() != null;
         }
 
         public bool IsStandingOn(Component target)
@@ -374,6 +388,8 @@ namespace ThailandHorrorJam.Core
 
         private void Awake()
         {
+            Instance = this;
+
             if (_rb == null)
             {
                 _rb = GetComponent<Rigidbody2D>();
@@ -417,6 +433,14 @@ namespace ThailandHorrorJam.Core
             _groundFilter.useTriggers = false;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
         private void Update()
         {
             if (_hazardKnockbackCooldownTimer > 0f)
@@ -432,6 +456,11 @@ namespace ThailandHorrorJam.Core
             if (_respawnImmunityTimer > 0f)
             {
                 _respawnImmunityTimer -= Time.fixedDeltaTime;
+            }
+
+            if (_ventSuperJumpTimer > 0f)
+            {
+                _ventSuperJumpTimer -= Time.fixedDeltaTime;
             }
 
             ApplyPlatformMovement();
@@ -583,7 +612,7 @@ namespace ThailandHorrorJam.Core
             if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isAiming)
             {
                 // ขณะกำลังลากวัตถุ (Hauling) หากผู้เล่นกดกระโดด จะปลดเชือกหลุดอัตโนมัติแล้วกระโดดได้อย่างคล่องตัว
-                // ยกเว้นกรณีที่ยืนอยู่บนวัตถุที่ผูกเชือกอยู่ (เช่น ยืนบนกล่องแล้วกระโดดลงมาลาก) จะไม่ปลดเชือก
+                // ยกเว้นกรณีที่ยืนอยู่บนวัตถุที่ผูกเชือกอยู่ จะไม่ปลดเชือก เพื่อให้ดีดตัวพร้อมกล่องได้
                 if (_isHauling)
                 {
                     bool standingOnTethered = (_currentStitchable != null && _currentStitchable.IsTetheredToPlayer && IsStandingOn(_currentStitchable))
@@ -604,7 +633,47 @@ namespace ThailandHorrorJam.Core
         private void ExecuteJump()
         {
             float extraBounce = 0f;
+            bool ventErupting = CorpseGasVent2D.Instance != null && CorpseGasVent2D.Instance.IsErupting;
+
+            // เงื่อนไข Super Jump Boost: ต้อง Tethered และ ยืนอยู่บนกล่อง (StitchableObject) เหนือท่อที่กำลังพ่นก๊าซ เท่านั้น
+            bool isStandingOnCrate = _currentStitchable != null && (_isGrounded || _coyoteTimeCounter > 0f);
+            if (!isStandingOnCrate && _needleController != null && _needleController.TetheredStitchable != null)
+            {
+                if (_currentGroundCollider != null && _currentGroundCollider.transform.IsChildOf(_needleController.TetheredStitchable.ObjectTransform))
+                {
+                    isStandingOnCrate = true;
+                }
+            }
+
+            bool isCrateTethered = false;
             if (_currentStitchable != null)
+            {
+                isCrateTethered = _currentStitchable.IsTetheredToPlayer || _isHauling
+                    || (_needleController != null && _needleController.IsTetheredToPlayer && (_needleController.TetheredStitchable == null || _needleController.TetheredStitchable.ObjectTransform == _currentStitchable.transform));
+            }
+            else if (_needleController != null && _needleController.IsTetheredToPlayer && _needleController.TetheredStitchable != null)
+            {
+                isCrateTethered = true;
+            }
+
+            GameObject crateObj = _currentStitchable != null ? _currentStitchable.gameObject : (_needleController?.TetheredStitchable?.ObjectTransform?.gameObject);
+            bool isCrateInVent = ventErupting && crateObj != null && CorpseGasVent2D.Instance != null && CorpseGasVent2D.Instance.IsObjectInVent(crateObj);
+
+            bool isVentBoostEligible = ventErupting && isStandingOnCrate && isCrateTethered && isCrateInVent;
+
+            if (isVentBoostEligible)
+            {
+                _ventSuperJumpTimer = 0.8f;
+                extraBounce = _ventSuperJumpBoost;
+                CameraController2D.Instance?.Punch(Vector2.up, 0.08f);
+                CameraController2D.Instance?.Shake(0.12f, 0.15f);
+
+                if (_currentStitchable != null)
+                {
+                    _currentStitchable.OnPlayerJumpedOff(transform.position);
+                }
+            }
+            else if (_currentStitchable != null)
             {
                 _currentStitchable.OnPlayerJumpedOff(transform.position);
 
@@ -624,7 +693,8 @@ namespace ThailandHorrorJam.Core
             _currentStitchable = null;
             _currentGroundCollider = null;
             // ถ้าระหว่างติด Jump Buffer ผู้เล่นปล่อยปุ่มกระโดดไปแล้ว ให้ตัดความสูงกระโดดทันที (Short Hop)
-            _isJumpCut = !_isJumpButtonHeld;
+            // ยกเว้นตอนได้ Super Jump Boost จากท่อก๊าซ จะให้วิถีส่งพุ่งเต็มแรงเสมอ
+            _isJumpCut = !isVentBoostEligible && !_isJumpButtonHeld;
             OnJumped?.Invoke();
         }
 

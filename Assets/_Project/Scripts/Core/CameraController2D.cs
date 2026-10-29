@@ -18,6 +18,11 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private float _lookAheadDistance = 1.2f;
         [SerializeField] private float _lookAheadSpeed = 3.5f;
 
+        [Header("Boundary / Confinement")]
+        [Tooltip("Collider2D defining the outer limit for the camera view (e.g. CameraBoundary with Polygon/BoxCollider2D).")]
+        [SerializeField] private Collider2D _boundaryCollider;
+        [SerializeField] private bool _enableBoundary = true;
+
         [Header("Shake Settings")]
         [SerializeField] private float _maxShakeOffset = 0.35f;
 
@@ -71,6 +76,15 @@ namespace ThailandHorrorJam.Core
             {
                 _defaultOrthoSize = _cam.orthographicSize;
             }
+
+            if (_boundaryCollider == null)
+            {
+                var boundaryObj = GameObject.Find("CameraBoundary");
+                if (boundaryObj != null)
+                {
+                    _boundaryCollider = boundaryObj.GetComponent<Collider2D>();
+                }
+            }
         }
 
         private void OnDestroy()
@@ -102,7 +116,17 @@ namespace ThailandHorrorJam.Core
             targetPos.x += _currentLookAheadX;
             targetPos.z = _offset.z;
 
+            if (_enableBoundary && _boundaryCollider != null)
+            {
+                targetPos = ClampToBounds(targetPos);
+            }
+
             Vector3 smoothPos = Vector3.SmoothDamp(transform.position, targetPos, ref _currentVelocity, _smoothTime);
+
+            if (_enableBoundary && _boundaryCollider != null)
+            {
+                smoothPos = ClampToBounds(smoothPos);
+            }
 
             // 3. Apply shake offset
             Vector3 shakeOffset = Vector3.zero;
@@ -122,7 +146,13 @@ namespace ThailandHorrorJam.Core
             // 4. Apply punch recoil
             _punchOffset = Vector3.MoveTowards(_punchOffset, Vector3.zero, k_PunchDamping * Time.deltaTime);
 
-            transform.position = smoothPos + shakeOffset + _punchOffset;
+            Vector3 finalPos = smoothPos + shakeOffset + _punchOffset;
+            if (_enableBoundary && _boundaryCollider != null)
+            {
+                finalPos = ClampToBounds(finalPos);
+            }
+
+            transform.position = finalPos;
         }
 
         /// <summary>
@@ -217,11 +247,202 @@ namespace ThailandHorrorJam.Core
             if (_target == null) return;
             Vector3 targetPos = _target.position + _offset;
             targetPos.z = _offset.z;
+            if (_enableBoundary && _boundaryCollider != null)
+            {
+                targetPos = ClampToBounds(targetPos);
+            }
             transform.position = targetPos;
             _currentVelocity = Vector3.zero;
             _currentLookAheadX = 0f;
             _shakeTimer = 0f;
             _punchOffset = Vector3.zero;
+        }
+
+        public Collider2D BoundaryCollider => _boundaryCollider;
+
+        /// <summary>
+        /// Dynamically assign or switch the active boundary collider (e.g. when entering a new sector).
+        /// </summary>
+        public void SetBoundary(Collider2D boundary)
+        {
+            _boundaryCollider = boundary;
+        }
+
+        /// <summary>
+        /// Clamps a camera position vector within _boundaryCollider.
+        /// Supports PolygonCollider2D (multi-pass shape confinement) and generic 2D colliders.
+        /// </summary>
+        public Vector3 ClampToBounds(Vector3 position)
+        {
+            if (_boundaryCollider == null || _cam == null || !_cam.orthographic) return position;
+
+            if (_boundaryCollider is PolygonCollider2D poly)
+            {
+                return ClampToPolygon(position, poly);
+            }
+
+            Bounds bounds = _boundaryCollider.bounds;
+            float vertExtent = _cam.orthographicSize;
+            float horzExtent = vertExtent * _cam.aspect;
+
+            float minX = bounds.min.x + horzExtent;
+            float maxX = bounds.max.x - horzExtent;
+            float minY = bounds.min.y + vertExtent;
+            float maxY = bounds.max.y - vertExtent;
+
+            position.x = (minX > maxX) ? bounds.center.x : Mathf.Clamp(position.x, minX, maxX);
+            position.y = (minY > maxY) ? bounds.center.y : Mathf.Clamp(position.y, minY, maxY);
+
+            return position;
+        }
+
+        private Vector3 ClampToPolygon(Vector3 pos, PolygonCollider2D poly)
+        {
+            float vertExtent = _cam.orthographicSize;
+            float horzExtent = vertExtent * _cam.aspect;
+
+            // 1. Initial outer bounding box clamp
+            Bounds b = poly.bounds;
+            float minX = b.min.x + horzExtent;
+            float maxX = b.max.x - horzExtent;
+            float minY = b.min.y + vertExtent;
+            float maxY = b.max.y - vertExtent;
+
+            pos.x = (minX > maxX) ? b.center.x : Mathf.Clamp(pos.x, minX, maxX);
+            pos.y = (minY > maxY) ? b.center.y : Mathf.Clamp(pos.y, minY, maxY);
+
+            // 2. Multi-pass viewport projection to conform to irregular ceilings, floors, and walls
+            for (int iter = 0; iter < 4; iter++)
+            {
+                Vector2 topMid = new Vector2(pos.x, pos.y + vertExtent);
+                Vector2 botMid = new Vector2(pos.x, pos.y - vertExtent);
+                Vector2 leftMid = new Vector2(pos.x - horzExtent, pos.y);
+                Vector2 rightMid = new Vector2(pos.x + horzExtent, pos.y);
+
+                float pushDown = 0f;
+                float pushUp = 0f;
+                float pushRight = 0f;
+                float pushLeft = 0f;
+
+                Vector2 closestTop = topMid;
+                Vector2 closestBot = botMid;
+                Vector2 closestLeft = leftMid;
+                Vector2 closestRight = rightMid;
+
+                if (!poly.OverlapPoint(topMid))
+                {
+                    closestTop = poly.ClosestPoint(topMid);
+                    float diff = closestTop.y - topMid.y;
+                    if (diff < 0f) pushDown = diff;
+                }
+
+                if (!poly.OverlapPoint(botMid))
+                {
+                    closestBot = poly.ClosestPoint(botMid);
+                    float diff = closestBot.y - botMid.y;
+                    if (diff > 0f) pushUp = diff;
+                }
+
+                if (!poly.OverlapPoint(leftMid))
+                {
+                    closestLeft = poly.ClosestPoint(leftMid);
+                    float diff = closestLeft.x - leftMid.x;
+                    if (diff > 0f) pushRight = diff;
+                }
+
+                if (!poly.OverlapPoint(rightMid))
+                {
+                    closestRight = poly.ClosestPoint(rightMid);
+                    float diff = closestRight.x - rightMid.x;
+                    if (diff < 0f) pushLeft = diff;
+                }
+
+                // If room height < camera height, center vertically between floor and ceiling
+                if (pushDown < -0.001f && pushUp > 0.001f)
+                {
+                    pos.y = (closestTop.y + closestBot.y) * 0.5f;
+                }
+                else
+                {
+                    pos.y += pushDown + pushUp;
+                }
+
+                // If room width < camera width, center horizontally between left and right walls
+                if (pushLeft < -0.001f && pushRight > 0.001f)
+                {
+                    pos.x = (closestLeft.x + closestRight.x) * 0.5f;
+                }
+                else
+                {
+                    pos.x += pushLeft + pushRight;
+                }
+
+                // 3. Corner checks for angled walls / sloped ceilings
+                Vector2 tl = new Vector2(pos.x - horzExtent, pos.y + vertExtent);
+                Vector2 tr = new Vector2(pos.x + horzExtent, pos.y + vertExtent);
+                Vector2 bl = new Vector2(pos.x - horzExtent, pos.y - vertExtent);
+                Vector2 br = new Vector2(pos.x + horzExtent, pos.y - vertExtent);
+
+                if (!poly.OverlapPoint(tl))
+                {
+                    Vector2 c = poly.ClosestPoint(tl);
+                    Vector2 diff = c - tl;
+                    if (diff.y < 0f) pos.y += diff.y;
+                    if (diff.x > 0f) pos.x += diff.x;
+                }
+                if (!poly.OverlapPoint(tr))
+                {
+                    Vector2 c = poly.ClosestPoint(tr);
+                    Vector2 diff = c - tr;
+                    if (diff.y < 0f) pos.y += diff.y;
+                    if (diff.x < 0f) pos.x += diff.x;
+                }
+                if (!poly.OverlapPoint(bl))
+                {
+                    Vector2 c = poly.ClosestPoint(bl);
+                    Vector2 diff = c - bl;
+                    if (diff.y > 0f) pos.y += diff.y;
+                    if (diff.x > 0f) pos.x += diff.x;
+                }
+                if (!poly.OverlapPoint(br))
+                {
+                    Vector2 c = poly.ClosestPoint(br);
+                    Vector2 diff = c - br;
+                    if (diff.y > 0f) pos.y += diff.y;
+                    if (diff.x < 0f) pos.x += diff.x;
+                }
+            }
+
+            return pos;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Camera cam = _cam != null ? _cam : GetComponent<Camera>();
+            if (cam == null || !cam.orthographic) return;
+
+            float vertExtent = cam.orthographicSize;
+            float horzExtent = vertExtent * cam.aspect;
+
+            // Viewport rect wireframe in Cyan
+            Gizmos.color = new Color(0.1f, 0.9f, 1f, 0.85f);
+            Gizmos.DrawWireCube(new Vector3(transform.position.x, transform.position.y, 0f), new Vector3(horzExtent * 2f, vertExtent * 2f, 0.1f));
+
+            if (_boundaryCollider == null) return;
+
+            Bounds bounds = _boundaryCollider.bounds;
+            float minX = bounds.min.x + horzExtent;
+            float maxX = bounds.max.x - horzExtent;
+            float minY = bounds.min.y + vertExtent;
+            float maxY = bounds.max.y - vertExtent;
+
+            if (minX <= maxX && minY <= maxY)
+            {
+                Gizmos.color = new Color(0.2f, 1f, 0.4f, 0.5f);
+                Vector3 center = new Vector3((minX + maxX) * 0.5f, (minY + maxY) * 0.5f, transform.position.z);
+                Vector3 size = new Vector3(maxX - minX, maxY - minY, 0.1f);
+                Gizmos.DrawWireCube(center, size);
+            }
         }
     }
 }
