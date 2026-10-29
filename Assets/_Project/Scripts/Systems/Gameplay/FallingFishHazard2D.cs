@@ -566,9 +566,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 {
                     if (player.CanReceiveHazardKnockback)
                     {
-                        // Directional Knockback: ผลักผู้เล่นถอยหลังไปในทิศตรงข้ามกับที่กำลังหันหน้า!
-                        float pushDir = player.IsFacingRight ? -1f : 1f;
-                        Vector2 impulse = new Vector2(pushDir * _knockbackHorizontalForce, _knockbackVerticalForce);
+                        // เด้งไปทางซ้ายเสมอ (ค่าแกน X ติดลบเสมอ) ไม่ว่าจะหันหน้าไปทางไหน
+                        Vector2 impulse = new Vector2(-Mathf.Abs(_knockbackHorizontalForce), _knockbackVerticalForce);
                         player.ApplyKnockback(impulse, 0.22f);
                         player.SetHazardKnockbackCooldown(0.28f);
                     }
