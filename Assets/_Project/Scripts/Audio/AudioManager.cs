@@ -37,8 +37,13 @@ public class AudioManager : MonoBehaviour
             // เตรียม Dictionary สำหรับ SFX
             foreach (var item in sfxLibrary)
             {
-                if (item != null && item.clip != null && !string.IsNullOrEmpty(item.name) && !sfxDictionary.ContainsKey(item.name))
-                    sfxDictionary.Add(item.name, item);
+                if (item != null && !string.IsNullOrEmpty(item.name) && !sfxDictionary.ContainsKey(item.name))
+                {
+                    if (item.HasClips)
+                    {
+                        sfxDictionary.Add(item.name, item);
+                    }
+                }
             }
         }
         else
@@ -114,45 +119,51 @@ public class AudioManager : MonoBehaviour
         if (sfxSource == null) return;
 
         SoundClip soundClip = GetSoundClip(soundName);
-        if (soundClip != null && soundClip.clip != null)
+        if (soundClip != null && soundClip.HasClips)
         {
-            sfxSource.pitch = Random.Range(minPitch, maxPitch);
-            sfxSource.PlayOneShot(soundClip.clip, soundClip.volume * volumeMultiplier);
+            AudioClip clipToPlay = soundClip.GetRandomClip();
+            if (clipToPlay != null)
+            {
+                sfxSource.pitch = Random.Range(minPitch, maxPitch);
+                sfxSource.PlayOneShot(clipToPlay, soundClip.volume * volumeMultiplier);
+                return;
+            }
         }
-        else
-        {
-            Debug.LogWarning($"[AudioManager] ไม่พบเสียงชื่อ: {soundName}");
-        }
+
+        Debug.LogWarning($"[AudioManager] ไม่พบเสียงชื่อ: {soundName}");
     }
 
     public void PlayLoopingSFX(string soundName, float pitch = 1.0f)
     {
         SoundClip soundClip = GetSoundClip(soundName);
-        if (soundClip != null && soundClip.clip != null)
+        if (soundClip != null && soundClip.HasClips)
         {
-            if (loopSFXSource == null)
+            AudioClip clipToPlay = soundClip.GetRandomClip();
+            if (clipToPlay != null)
             {
-                loopSFXSource = gameObject.AddComponent<AudioSource>();
-                loopSFXSource.loop = true;
-                if (sfxSource != null)
+                if (loopSFXSource == null)
                 {
-                    loopSFXSource.outputAudioMixerGroup = sfxSource.outputAudioMixerGroup;
+                    loopSFXSource = gameObject.AddComponent<AudioSource>();
+                    loopSFXSource.loop = true;
+                    if (sfxSource != null)
+                    {
+                        loopSFXSource.outputAudioMixerGroup = sfxSource.outputAudioMixerGroup;
+                    }
                 }
+
+                loopSFXSource.pitch = pitch;
+                loopSFXSource.volume = soundClip.volume;
+
+                if (loopSFXSource.clip == clipToPlay && loopSFXSource.isPlaying) return;
+
+                loopSFXSource.clip = clipToPlay;
+                loopSFXSource.loop = true;
+                loopSFXSource.Play();
+                return;
             }
-
-            loopSFXSource.pitch = pitch;
-            loopSFXSource.volume = soundClip.volume;
-
-            if (loopSFXSource.clip == soundClip.clip && loopSFXSource.isPlaying) return;
-
-            loopSFXSource.clip = soundClip.clip;
-            loopSFXSource.loop = true;
-            loopSFXSource.Play();
         }
-        else
-        {
-            Debug.LogWarning($"[AudioManager] ไม่พบเสียง Loop ชื่อ: {soundName}");
-        }
+
+        Debug.LogWarning($"[AudioManager] ไม่พบเสียง Loop ชื่อ: {soundName}");
     }
 
     public void StopLoopingSFX()
@@ -231,7 +242,43 @@ public class AudioManager : MonoBehaviour
 public class SoundClip
 {
     public string name;
+    [Tooltip("ใส่คลิปเสียงเดี่ยว หรือถ้ามีหลายคลิปให้ใส่ใน clips ด้านล่าง")]
     public AudioClip clip;
+    [Tooltip("ใส่รายการคลิปเสียงสุ่ม (เช่น Footstep, Hit sounds)")]
+    public AudioClip[] clips;
     [Range(0f, 1f)]
     public float volume = 1.0f;
+
+    public bool HasClips
+    {
+        get
+        {
+            if (clips != null && clips.Length > 0)
+            {
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    if (clips[i] != null) return true;
+                }
+            }
+            return clip != null;
+        }
+    }
+
+    public AudioClip GetRandomClip()
+    {
+        if (clips != null && clips.Length > 0)
+        {
+            var validClips = new List<AudioClip>();
+            for (int i = 0; i < clips.Length; i++)
+            {
+                if (clips[i] != null) validClips.Add(clips[i]);
+            }
+
+            if (validClips.Count > 0)
+            {
+                return validClips[Random.Range(0, validClips.Count)];
+            }
+        }
+        return clip;
+    }
 }

@@ -187,9 +187,58 @@ MonoBehaviour:
   sfxLibrary:
   - name: Typewriter_1
     clip: {fileID: 8300000, guid: f7ec83771e4a18a4b86688026a2646ab, type: 3}
+    clips: []
     volume: 1
   - name: Typewriter_2
     clip: {fileID: 8300000, guid: 95eeda34c46ebd34a9653682bce25c75, type: 3}
+    clips: []
+    volume: 1
+  - name: Footstep
+    clip: {fileID: 0}
+    clips:
+    - {fileID: 8300000, guid: c333fcbedfc64874985cc986c067c098, type: 3}
+    - {fileID: 8300000, guid: 9502b5c2900434243bf58d458e8f3bd7, type: 3}
+    - {fileID: 8300000, guid: 013be95c7d5084142ae6603717dd72c3, type: 3}
+    - {fileID: 8300000, guid: 022ab766d673a9946ad533d6b60f4e8b, type: 3}
+    - {fileID: 8300000, guid: cd89e90360c790148b8f13aec897370d, type: 3}
+    - {fileID: 8300000, guid: 34ae3dc1865007842aa20eaa82deae3e, type: 3}
+    - {fileID: 8300000, guid: 4c08e56eaa8522f4581b8119b95b2a80, type: 3}
+    volume: 1
+  - name: sfx_player_jump
+    clip: {fileID: 8300000, guid: f9fd690d1ddf4614e86d2dd446e79c2a, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_player_jump_land
+    clip: {fileID: 8300000, guid: 2dd0dcfd250ddca41815755869c59d11, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_needle_shoot
+    clip: {fileID: 8300000, guid: d2e675c7d71c5aa4483e4f1d943ec9e1, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_needle_pin
+    clip: {fileID: 8300000, guid: c2ab9fc0f03a6d3468cbb139a4c1a9d2, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_aim_needle_enter
+    clip: {fileID: 8300000, guid: 50edd981c0990f242a5525a28d7f48b6, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_aim_cancel
+    clip: {fileID: 8300000, guid: 0d97e62fa4f3c9745acd2110fea3a924, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_thread_cut
+    clip: {fileID: 8300000, guid: 0dbf75a5604f1d045874d28529696379, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_player_death_impact
+    clip: {fileID: 8300000, guid: c6b015bdc2acd184789f5dc0dfe3521b, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_thud_impact
+    clip: {fileID: 8300000, guid: 76627038f72c45348b88b7238592b507, type: 3}
+    clips: []
     volume: 1
   loopSFXSource: {fileID: 1269994080291057903}
 --- !u!1 &8378100414635023576
