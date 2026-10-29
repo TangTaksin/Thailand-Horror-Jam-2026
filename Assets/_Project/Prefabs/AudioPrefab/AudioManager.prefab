@@ -179,7 +179,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   musicSource: {fileID: 579321607855361387}
   sfxSource: {fileID: 7799966030440228392}
-  defaultMusicClip: {fileID: 8300000, guid: f681643464b2b0848b5cce7dbfb95b2d, type: 3}
+  defaultMusicClip: {fileID: 8300000, guid: d0fda10fb8a6cf941b4412d4e4d6b8a6, type: 3}
   minPitch: 0.8
   maxPitch: 1.2
   fadeOutDuration: 0.5
