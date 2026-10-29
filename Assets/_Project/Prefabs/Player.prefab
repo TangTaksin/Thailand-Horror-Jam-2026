@@ -363,6 +363,7 @@ MonoBehaviour:
   _fallMultiplier: 2.5
   _lowJumpMultiplier: 2
   _maxFallSpeed: 20
+  _ventSuperJumpBoost: 7
   _feetCollider: {fileID: 7939842513612774743}
   _groundLayer:
     serializedVersion: 2
@@ -397,13 +398,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Needle.NeedleController
   _minWaypointDistance: 0.9
-  _maxThreadLength: 6.2
+  _maxThreadLength: 6.5
   _maxInteractionDistance: 0.9
   _maxAimLeashDistance: 2
   _maxWaypoints: 3
   _requireSurfaceToPin: 1
   _requireAnchorComponent: 1
   _singleCircuitLimit: 0
+  _requireGroundedToAim: 1
   _stitchableLayer:
     serializedVersion: 2
     m_Bits: 0
@@ -442,8 +444,8 @@ MonoBehaviour:
   _stitchableLayer:
     serializedVersion: 2
     m_Bits: 128
-  _awareRadius: 3.2
-  _interactRadius: 1.45
+  _awareRadius: 3.8
+  _interactRadius: 2
   _scanInterval: 0.1
   _facingWeight: 0.35
   _focusStickinessBonus: 0.12
