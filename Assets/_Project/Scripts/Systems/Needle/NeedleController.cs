@@ -1476,6 +1476,11 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
 
+                if (PlayerController2D.IsPlayer(col))
+                {
+                    continue;
+                }
+
                 if (_activeTarget?.ObjectTransform != null &&
                     (col.transform == _activeTarget.ObjectTransform || col.transform.IsChildOf(_activeTarget.ObjectTransform)))
                 {
@@ -1517,6 +1522,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (col == null || col == _playerCol || col.isTrigger) continue;
 
                 if (_playerTransform != null && (col.transform == _playerTransform || col.transform.IsChildOf(_playerTransform)))
+                    continue;
+                if (PlayerController2D.IsPlayer(col))
                     continue;
                 if (ignoredOrigin != null && (col.transform == ignoredOrigin || col.transform.IsChildOf(ignoredOrigin)))
                     continue;

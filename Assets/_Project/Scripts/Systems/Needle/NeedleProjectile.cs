@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Needle
 {
@@ -171,6 +172,10 @@ namespace ThailandHorrorJam.Systems.Needle
                     continue;
                 }
                 if (_playerTransform != null && (hitCol.transform == _playerTransform || hitCol.transform.IsChildOf(_playerTransform)))
+                {
+                    continue;
+                }
+                if (PlayerController2D.IsPlayer(hitCol))
                 {
                     continue;
                 }
