@@ -1020,11 +1020,16 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void EnsureCollisionFilter()
         {
-            if (_isCollisionFilterInitialized && _collisionMask.value != 0) return;
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            if (_isCollisionFilterInitialized && _collisionMask.value != 0)
+            {
+                if (groundLayer != -1) _collisionMask.value |= (1 << groundLayer);
+                _collisionFilter.SetLayerMask(_collisionMask);
+                return;
+            }
 
             if (_collisionMask.value == 0)
             {
-                int groundLayer = LayerMask.NameToLayer("Ground");
                 int defaultLayer = LayerMask.NameToLayer("Default");
                 int stitchLayer = LayerMask.NameToLayer("Stitchable");
                 int mask = 0;
@@ -1032,6 +1037,10 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (defaultLayer != -1) mask |= (1 << defaultLayer);
                 if (stitchLayer != -1) mask |= (1 << stitchLayer);
                 _collisionMask = mask != 0 ? mask : LayerMask.GetMask("Ground", "Default", "Stitchable");
+            }
+            else if (groundLayer != -1)
+            {
+                _collisionMask.value |= (1 << groundLayer);
             }
 
             _collisionFilter = new ContactFilter2D
@@ -1193,12 +1202,36 @@ namespace ThailandHorrorJam.Systems.Needle
                     float envelope = Mathf.Sin(t * Mathf.PI);
 
                     Vector2 pos = basePos;
-                    Vector2 oldPos = basePos;
+
+                    if (_enableGroundCollision)
+                    {
+                        // Check if ground surface exists above basePos (e.g. spanning over hills/platforms)
+                        float topRayY = Mathf.Max(pStart.y, pEnd.y) + 8f;
+                        RaycastHit2D groundHit = Physics2D.Raycast(new Vector2(basePos.x, topRayY), Vector2.down, topRayY - basePos.y + 10f, _collisionMask);
+                        if (groundHit.collider != null && !ShouldIgnoreCollider(groundHit.collider) && groundHit.point.y > basePos.y)
+                        {
+                            pos.y = groundHit.point.y + _surfaceOffset;
+                        }
+                        else
+                        {
+                            int hitCount = Physics2D.OverlapPoint(pos, _collisionFilter, _pointHitBuffer);
+                            for (int h = 0; h < hitCount; h++)
+                            {
+                                if (TryResolveColliderContact(_pointHitBuffer[h], pos, _surfaceOffset, out Vector2 resolved, out _))
+                                {
+                                    pos = resolved;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    Vector2 oldPos = pos;
 
                     if (applyTwang)
                     {
                         Vector2 pluckOffset = (segNormal * (_twangImpulse * 0.08f * envelope)) + (Vector2.down * (0.04f * envelope));
-                        Vector2 candidatePos = basePos + pluckOffset;
+                        Vector2 candidatePos = pos + pluckOffset;
 
                         if (!_enableGroundCollision || Physics2D.OverlapPoint(candidatePos, _collisionFilter, _pointHitBuffer) == 0)
                         {
@@ -1206,11 +1239,6 @@ namespace ThailandHorrorJam.Systems.Needle
                             Vector2 initialVel = segNormal * (_twangImpulse * 0.65f * envelope);
                             oldPos = pos - (initialVel * dt);
                         }
-                    }
-                    else
-                    {
-                        pos += Vector2.down * (0.025f * envelope);
-                        oldPos = pos;
                     }
 
                     _nodes.Add(new VerletNode
@@ -1239,6 +1267,11 @@ namespace ThailandHorrorJam.Systems.Needle
                         RestLength = linkRestLength
                     });
                 }
+            }
+
+            if (_enableGroundCollision)
+            {
+                SolveCollisions();
             }
         }
 
@@ -1351,12 +1384,160 @@ namespace ThailandHorrorJam.Systems.Needle
             return PlayerController2D.IsPlayer(hit);
         }
 
+        private bool TryResolveColliderContact(Collider2D col, Vector2 point, float surfaceOffset, out Vector2 resolvedPoint, out Vector2 outNormal)
+        {
+            resolvedPoint = point;
+            outNormal = Vector2.up;
+
+            if (col == null || ShouldIgnoreCollider(col)) return false;
+
+            if (col is BoxCollider2D box)
+            {
+                Transform t = box.transform;
+                Vector2 localPoint = t.InverseTransformPoint(point);
+                Vector2 halfSize = box.size * 0.5f;
+                Vector2 min = box.offset - halfSize;
+                Vector2 max = box.offset + halfSize;
+
+                bool isInside = (localPoint.x >= min.x && localPoint.x <= max.x &&
+                                 localPoint.y >= min.y && localPoint.y <= max.y);
+
+                if (isInside)
+                {
+                    float dLeft = localPoint.x - min.x;
+                    float dRight = max.x - localPoint.x;
+                    float dBottom = localPoint.y - min.y;
+                    float dTop = max.y - localPoint.y;
+
+                    // Prefer top or sides for ground geometry so threads resting on ground stay on top
+                    float minD = Mathf.Min(Mathf.Min(dLeft, dRight), Mathf.Min(dBottom * 1.5f, dTop));
+                    Vector2 localSurface = localPoint;
+                    Vector2 localNorm = Vector2.up;
+
+                    if (Mathf.Abs(minD - dTop) < 0.001f)
+                    {
+                        localSurface.y = max.y;
+                        localNorm = Vector2.up;
+                    }
+                    else if (Mathf.Abs(minD - dLeft) < 0.001f)
+                    {
+                        localSurface.x = min.x;
+                        localNorm = Vector2.left;
+                    }
+                    else if (Mathf.Abs(minD - dRight) < 0.001f)
+                    {
+                        localSurface.x = max.x;
+                        localNorm = Vector2.right;
+                    }
+                    else
+                    {
+                        localSurface.y = min.y;
+                        localNorm = Vector2.down;
+                    }
+
+                    Vector2 worldSurface = t.TransformPoint(localSurface);
+                    Vector2 worldNorm = t.TransformDirection(localNorm).normalized;
+                    resolvedPoint = worldSurface + worldNorm * surfaceOffset;
+                    outNormal = worldNorm;
+                    return true;
+                }
+                else
+                {
+                    Vector2 closest = box.ClosestPoint(point);
+                    Vector2 diff = point - closest;
+                    float distSq = diff.sqrMagnitude;
+                    if (distSq < surfaceOffset * surfaceOffset)
+                    {
+                        float dist = Mathf.Sqrt(distSq);
+                        Vector2 worldNorm = dist > MinDistanceEpsilon ? diff / dist : (Vector2)t.TransformDirection(Vector2.up).normalized;
+                        resolvedPoint = closest + worldNorm * surfaceOffset;
+                        outNormal = worldNorm;
+                        return true;
+                    }
+                    return false;
+                }
+            }
+
+            if (col is CircleCollider2D circle)
+            {
+                Transform t = circle.transform;
+                Vector2 localPoint = t.InverseTransformPoint(point);
+                Vector2 diff = localPoint - circle.offset;
+                float dist = diff.magnitude;
+                float radius = circle.radius;
+
+                if (dist <= radius)
+                {
+                    Vector2 localNorm = dist > MinDistanceEpsilon ? diff / dist : Vector2.up;
+                    Vector2 localSurface = circle.offset + localNorm * radius;
+                    Vector2 worldSurface = t.TransformPoint(localSurface);
+                    Vector2 worldNorm = t.TransformDirection(localNorm).normalized;
+                    resolvedPoint = worldSurface + worldNorm * surfaceOffset;
+                    outNormal = worldNorm;
+                    return true;
+                }
+                else
+                {
+                    Vector2 closest = circle.ClosestPoint(point);
+                    Vector2 worldDiff = point - closest;
+                    float distSq = worldDiff.sqrMagnitude;
+                    if (distSq < surfaceOffset * surfaceOffset)
+                    {
+                        float d = Mathf.Sqrt(distSq);
+                        Vector2 worldNorm = d > MinDistanceEpsilon ? worldDiff / d : Vector2.up;
+                        resolvedPoint = closest + worldNorm * surfaceOffset;
+                        outNormal = worldNorm;
+                        return true;
+                    }
+                    return false;
+                }
+            }
+
+            // Generic PolygonCollider2D / CompositeCollider2D / Edge fallback
+            bool isOverlapped = col.OverlapPoint(point);
+            if (isOverlapped)
+            {
+                Vector2 center = col.bounds.center;
+                Vector2 dir = (point - center);
+                Vector2 outward = dir.sqrMagnitude > MinDistanceEpsilon ? dir.normalized : Vector2.up;
+
+                float maxDim = Mathf.Max(col.bounds.size.x, col.bounds.size.y) + 1f;
+                Vector2 rayStart = point + outward * maxDim;
+                RaycastHit2D hit = Physics2D.Raycast(rayStart, -outward, maxDim * 2f, _collisionMask);
+                if (hit.collider == col)
+                {
+                    resolvedPoint = hit.point + hit.normal * surfaceOffset;
+                    outNormal = hit.normal;
+                    return true;
+                }
+
+                resolvedPoint = new Vector2(point.x, col.bounds.max.y + surfaceOffset);
+                outNormal = Vector2.up;
+                return true;
+            }
+            else
+            {
+                Vector2 closest = col.ClosestPoint(point);
+                Vector2 diff = point - closest;
+                float distSq = diff.sqrMagnitude;
+                if (distSq < surfaceOffset * surfaceOffset)
+                {
+                    float dist = Mathf.Sqrt(distSq);
+                    Vector2 norm = dist > MinDistanceEpsilon ? diff / dist : Vector2.up;
+                    resolvedPoint = closest + norm * surfaceOffset;
+                    outNormal = norm;
+                    return true;
+                }
+                return false;
+            }
+        }
+
         private void SolveCollisions()
         {
             EnsureCollisionFilter();
 
             int nodeCount = _nodes.Count;
-            float checkRadius = _surfaceOffset * 1.5f;
+            float checkRadius = Mathf.Max(_surfaceOffset * 2.0f, 0.12f);
             float frictionFactor = Mathf.Clamp01(1f - _groundFriction);
 
             for (int i = 0; i < nodeCount; i++)
@@ -1365,53 +1546,85 @@ namespace ThailandHorrorJam.Systems.Needle
                 if (node.IsPinned) continue;
 
                 int hitCount = Physics2D.OverlapCircle(node.Position, checkRadius, _collisionFilter, _pointHitBuffer);
-                if (hitCount == 0) continue;
+                if (hitCount == 0)
+                {
+                    hitCount = Physics2D.OverlapPoint(node.Position, _collisionFilter, _pointHitBuffer);
+                    if (hitCount == 0) continue;
+                }
 
-                Collider2D validHit = null;
+                Vector2 accumulatedPos = node.Position;
+                Vector2 lastNormal = Vector2.up;
+                bool hadCollision = false;
+
                 for (int h = 0; h < hitCount; h++)
                 {
-                    if (!ShouldIgnoreCollider(_pointHitBuffer[h]))
+                    Collider2D hitCol = _pointHitBuffer[h];
+                    if (TryResolveColliderContact(hitCol, accumulatedPos, _surfaceOffset, out Vector2 resolvedPos, out Vector2 norm))
                     {
-                        validHit = _pointHitBuffer[h];
-                        break;
+                        accumulatedPos = resolvedPos;
+                        lastNormal = norm;
+                        hadCollision = true;
                     }
                 }
 
-                if (validHit == null) continue;
-
-                Vector2 closestPoint = validHit.ClosestPoint(node.Position);
-                Vector2 diff = node.Position - closestPoint;
-                float distSq = diff.sqrMagnitude;
-
-                Vector2 normal;
-                if (distSq < MinSqrDistanceEpsilon)
+                if (hadCollision)
                 {
-                    Vector2 fromCenter = node.Position - (Vector2)validHit.bounds.center;
-                    normal = fromCenter.sqrMagnitude > MinSqrDistanceEpsilon ? fromCenter.normalized : Vector2.up;
-                    node.Position = closestPoint + normal * _surfaceOffset;
+                    node.Position = accumulatedPos;
+                    Vector2 vel = node.Position - node.OldPosition;
+                    float normalVel = Vector2.Dot(vel, lastNormal);
+                    if (normalVel < 0f)
+                    {
+                        vel -= lastNormal * normalVel;
+                    }
+                    Vector2 tangentVel = vel * frictionFactor;
+
+                    if (tangentVel.sqrMagnitude < TangentSleepSqrThreshold)
+                    {
+                        tangentVel = Vector2.zero;
+                    }
+
+                    node.OldPosition = node.Position - tangentVel;
+                    _nodes[i] = node;
                 }
-                else if (distSq < _surfaceOffset * _surfaceOffset)
+            }
+
+            // Also check link midpoints to prevent chords cutting through sharp corners
+            int linkCount = _links.Count;
+            for (int l = 0; l < linkCount; l++)
+            {
+                VerletLink link = _links[l];
+                VerletNode nA = _nodes[link.NodeA];
+                VerletNode nB = _nodes[link.NodeB];
+
+                Vector2 mid = (nA.Position + nB.Position) * 0.5f;
+                int midHitCount = Physics2D.OverlapCircle(mid, _surfaceOffset, _collisionFilter, _pointHitBuffer);
+                if (midHitCount == 0)
                 {
-                    float dist = Mathf.Sqrt(distSq);
-                    normal = diff / dist;
-                    node.Position = closestPoint + normal * _surfaceOffset;
-                }
-                else
-                {
-                    continue;
+                    midHitCount = Physics2D.OverlapPoint(mid, _collisionFilter, _pointHitBuffer);
                 }
 
-                Vector2 vel = node.Position - node.OldPosition;
-                float normalVel = Vector2.Dot(vel, normal);
-                Vector2 tangentVel = (vel - normal * normalVel) * frictionFactor;
-
-                if (tangentVel.sqrMagnitude < TangentSleepSqrThreshold)
+                if (midHitCount > 0)
                 {
-                    tangentVel = Vector2.zero;
+                    for (int h = 0; h < midHitCount; h++)
+                    {
+                        Collider2D hitCol = _pointHitBuffer[h];
+                        if (TryResolveColliderContact(hitCol, mid, _surfaceOffset, out Vector2 resolvedMid, out _))
+                        {
+                            Vector2 correction = (resolvedMid - mid) * 0.5f;
+                            if (!nA.IsPinned)
+                            {
+                                nA.Position += correction;
+                                _nodes[link.NodeA] = nA;
+                            }
+                            if (!nB.IsPinned)
+                            {
+                                nB.Position += correction;
+                                _nodes[link.NodeB] = nB;
+                            }
+                            break;
+                        }
+                    }
                 }
-
-                node.OldPosition = node.Position - tangentVel;
-                _nodes[i] = node;
             }
         }
 
@@ -1442,6 +1655,24 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     float t = step * invSubdivisions;
                     Vector2 pt2D = EvaluateCatmullRom(p0, p1, p2, p3, t);
+
+                    // Prevent Catmull-Rom spline curves from dipping below ground colliders
+                    if (_enableGroundCollision)
+                    {
+                        int splineHitCount = Physics2D.OverlapPoint(pt2D, _collisionFilter, _pointHitBuffer);
+                        if (splineHitCount > 0)
+                        {
+                            for (int h = 0; h < splineHitCount; h++)
+                            {
+                                if (TryResolveColliderContact(_pointHitBuffer[h], pt2D, _surfaceOffset, out Vector2 clampedPt, out _))
+                                {
+                                    pt2D = clampedPt;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     Vector3 pt = new Vector3(pt2D.x, pt2D.y, 0f);
 
                     if (hasPrev)
