@@ -15,6 +15,13 @@ namespace ThailandHorrorJam.Systems.Needle
     [RequireComponent(typeof(LineRenderer))]
     public sealed class SutureThread : MonoBehaviour
     {
+        public enum SlackMode
+        {
+            PathContour,     // คำนวณจากความยาวเส้นทางตามแนวภูมิประเทศจริง (ไม่ตึงรั้งมุม และไม่ย้วยเป็นลอนยักษ์)
+            StraightLine,    // คำนวณจากระยะขจัดเส้นตรงระหว่างจุดปลาย
+            FixedExtraLength // เพิ่มความยาวด้ายคงที่เป็นเมตร
+        }
+
         private const int HitBufferSize = 8;
         private const int InitialNodeCapacity = 48;
         private const int InitialSplineCapacity = 128;
@@ -99,13 +106,29 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Air drag damping factor (0 = frictionless, 10 = heavy syrup).")]
         [SerializeField] private float _airDamping = 3.2f;
 
+        [Tooltip("โหมดการคำนวณความหย่อนของด้าย: PathContour (แนะนำ) อิงตามความยาวแนวภูมิประเทศจริง, StraightLine อิงระยะขจัดเส้นตรง")]
+        [SerializeField] private SlackMode _slackMode = SlackMode.PathContour;
+
         [Tooltip("Slack factor: >1.0 allows natural catenary sag; =1.0 is tight.")]
         [FormerlySerializedAs("_sagRatio")]
         [SerializeField] private float _slackFactor = 1.025f;
 
+        [Tooltip("ระยะความหย่อนด้ายส่วนเกินคงที่ (เมตร)")]
+        [SerializeField] private float _extraSlackMeters = 0.35f;
+
         [Tooltip("Transverse impulse (guitar-string pluck) applied on creation or impact.")]
         [FormerlySerializedAs("_twangImpulse")]
         [SerializeField] private float _twangImpulse = 4.2f;
+
+        [Header("Floating Silk Wave (When Gravity < 0)")]
+        [Tooltip("ความสูงของคลื่นลมพลิ้วไหวขณะลอยในอากาศ (เมตร) ช่วยให้ด้ายไม่ลอยแข็งเป็นสะพานโค้ง")]
+        [SerializeField] private float _floatingWaveAmplitude = 0.12f;
+
+        [Tooltip("ความเร็วในการกระเพื่อมของคลื่นลมลอย")]
+        [SerializeField] private float _floatingWaveSpeed = 1.6f;
+
+        [Tooltip("ความถี่ของลอนคลื่นตามแนวเส้นด้าย")]
+        [SerializeField] private float _floatingWaveFrequency = 0.28f;
 
         [Header("Ground & Surface Collision")]
         [Tooltip("Whether the thread collides with and piles up on physical surfaces (Ground, Walls).")]
@@ -123,7 +146,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         [Header("Catmull-Rom Spline Rendering")]
         [Tooltip("Subdivisions between each Verlet particle node for silk smoothness.")]
-        [SerializeField] private int _splineSubdivisions = 4;
+        [SerializeField] private int _splineSubdivisions = 8;
 
         [Header("Animated Flow (ForeignGods style)")]
         [SerializeField] private Material _materialOverride;
@@ -567,11 +590,10 @@ namespace ThailandHorrorJam.Systems.Needle
             int linkCount = _links.Count;
             if (linkCount > 0)
             {
-                float targetRestLength = restLengthBudget > 0f
-                    ? restLengthBudget
-                    : Vector2.Distance(startPos, endPos);
-
-                float perLinkRest = (targetRestLength / linkCount) * Mathf.Max(1.0f, _slackFactor);
+                float straightDist = Vector2.Distance(startPos, endPos);
+                float baseRest = restLengthBudget > 0f ? restLengthBudget : straightDist;
+                float targetRestLength = (baseRest * Mathf.Max(1.0f, _slackFactor)) + _extraSlackMeters;
+                float perLinkRest = targetRestLength / linkCount;
                 for (int i = 0; i < linkCount; i++)
                 {
                     VerletLink link = _links[i];
@@ -779,6 +801,18 @@ namespace ThailandHorrorJam.Systems.Needle
             set => _nodesPerSegment = Mathf.Max(3, value);
         }
 
+        public SlackMode SlackCalculationMode
+        {
+            get => _slackMode;
+            set => _slackMode = value;
+        }
+
+        public float ExtraSlackMeters
+        {
+            get => _extraSlackMeters;
+            set => _extraSlackMeters = Mathf.Max(0f, value);
+        }
+
         public float SlackFactor
         {
             get => _slackFactor;
@@ -801,6 +835,24 @@ namespace ThailandHorrorJam.Systems.Needle
         {
             get => _airDamping;
             set => _airDamping = Mathf.Max(0f, value);
+        }
+
+        public float FloatingWaveAmplitude
+        {
+            get => _floatingWaveAmplitude;
+            set => _floatingWaveAmplitude = Mathf.Max(0f, value);
+        }
+
+        public float FloatingWaveSpeed
+        {
+            get => _floatingWaveSpeed;
+            set => _floatingWaveSpeed = value;
+        }
+
+        public float FloatingWaveFrequency
+        {
+            get => _floatingWaveFrequency;
+            set => _floatingWaveFrequency = value;
         }
 
         /// <summary>
@@ -1059,8 +1111,8 @@ namespace ThailandHorrorJam.Systems.Needle
             _lineRenderer.sortingOrder = 10;
             _lineRenderer.textureMode = LineTextureMode.Tile;
             _lineRenderer.alignment = LineAlignment.View;
-            _lineRenderer.numCapVertices = 2;
-            _lineRenderer.numCornerVertices = 2;
+            _lineRenderer.numCapVertices = 4;
+            _lineRenderer.numCornerVertices = 8;
 
             // ใช้ Width Curve ที่จำลองปมด้ายตรงจุดยึดและลอนเกลียวด้ายตรงกลาง
             _lineRenderer.widthCurve = CreateOrganicThreadWidthCurve();
@@ -1282,7 +1334,12 @@ namespace ThailandHorrorJam.Systems.Needle
             float currentDamping = _isTautMode ? _airDamping * 1.6f : _airDamping;
             float dragFactor = Mathf.Clamp01(1f - (currentDamping * dt));
 
+            bool applyFloatingWave = !_isTautMode && !_isPooledMode && gravity < 0f && _floatingWaveAmplitude > 0.001f;
+            float time = Time.time;
+
             int nodeCount = _nodes.Count;
+            float invNodeSpan = nodeCount > 1 ? 1f / (nodeCount - 1) : 1f;
+
             for (int i = 0; i < nodeCount; i++)
             {
                 VerletNode node = _nodes[i];
@@ -1290,7 +1347,19 @@ namespace ThailandHorrorJam.Systems.Needle
 
                 Vector2 velocity = (node.Position - node.OldPosition) * dragFactor;
                 node.OldPosition = node.Position;
-                node.Position += velocity + gravityStep;
+
+                Vector2 forceStep = gravityStep;
+                if (applyFloatingWave)
+                {
+                    float t = i * invNodeSpan;
+                    float envelope = Mathf.Sin(t * Mathf.PI);
+                    float wave = (Mathf.Sin((time * _floatingWaveSpeed) + (i * _floatingWaveFrequency))
+                                + Mathf.Sin((time * _floatingWaveSpeed * 1.7f) - (i * _floatingWaveFrequency * 1.8f)) * 0.45f)
+                                * _floatingWaveAmplitude * envelope;
+                    forceStep += new Vector2(0f, wave * dt);
+                }
+
+                node.Position += velocity + forceStep;
                 _nodes[i] = node;
             }
         }
@@ -1349,16 +1418,17 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
 
-                // 2. Silk Bending Resistance (ป้องกันด้ายพับเป็นมุมหักแหลม ให้โค้งมนแบบเส้นด้ายจริง)
+                // 2. Silk Bending Resistance: smooths sharp corner kinks so thread arcs smoothly
                 if (applyBending && (iter & 1) == 0)
                 {
+                    float bendWeight = Mathf.Clamp01(_bendingStiffness * 0.5f);
                     for (int i = 1; i < nodeCount - 1; i++)
                     {
                         VerletNode mid = _nodes[i];
                         if (mid.IsPinned) continue;
 
                         Vector2 avgNeighbors = (_nodes[i - 1].Position + _nodes[i + 1].Position) * 0.5f;
-                        mid.Position = Vector2.Lerp(mid.Position, avgNeighbors, _bendingStiffness * 0.35f);
+                        mid.Position = Vector2.Lerp(mid.Position, avgNeighbors, bendWeight);
                         _nodes[i] = mid;
                     }
                 }
@@ -1399,6 +1469,9 @@ namespace ThailandHorrorJam.Systems.Needle
                 Vector2 min = box.offset - halfSize;
                 Vector2 max = box.offset + halfSize;
 
+                // Corner fillet: rounds 90-degree sharp corners so threads curve naturally over edges
+                float filletR = Mathf.Min(0.20f, Mathf.Min(halfSize.x, halfSize.y) * 0.45f);
+
                 bool isInside = (localPoint.x >= min.x && localPoint.x <= max.x &&
                                  localPoint.y >= min.y && localPoint.y <= max.y);
 
@@ -1409,30 +1482,47 @@ namespace ThailandHorrorJam.Systems.Needle
                     float dBottom = localPoint.y - min.y;
                     float dTop = max.y - localPoint.y;
 
-                    // Prefer top or sides for ground geometry so threads resting on ground stay on top
-                    float minD = Mathf.Min(Mathf.Min(dLeft, dRight), Mathf.Min(dBottom * 1.5f, dTop));
                     Vector2 localSurface = localPoint;
                     Vector2 localNorm = Vector2.up;
 
-                    if (Mathf.Abs(minD - dTop) < 0.001f)
+                    // Check top-left and top-right corners for smooth fillet arcing
+                    if (dTop < filletR && dLeft < filletR)
                     {
-                        localSurface.y = max.y;
-                        localNorm = Vector2.up;
+                        Vector2 cCenter = new Vector2(min.x + filletR, max.y - filletR);
+                        Vector2 cDiff = localPoint - cCenter;
+                        localNorm = cDiff.sqrMagnitude > MinDistanceEpsilon ? cDiff.normalized : new Vector2(-0.7071f, 0.7071f);
+                        localSurface = cCenter + localNorm * filletR;
                     }
-                    else if (Mathf.Abs(minD - dLeft) < 0.001f)
+                    else if (dTop < filletR && dRight < filletR)
                     {
-                        localSurface.x = min.x;
-                        localNorm = Vector2.left;
-                    }
-                    else if (Mathf.Abs(minD - dRight) < 0.001f)
-                    {
-                        localSurface.x = max.x;
-                        localNorm = Vector2.right;
+                        Vector2 cCenter = new Vector2(max.x - filletR, max.y - filletR);
+                        Vector2 cDiff = localPoint - cCenter;
+                        localNorm = cDiff.sqrMagnitude > MinDistanceEpsilon ? cDiff.normalized : new Vector2(0.7071f, 0.7071f);
+                        localSurface = cCenter + localNorm * filletR;
                     }
                     else
                     {
-                        localSurface.y = min.y;
-                        localNorm = Vector2.down;
+                        float minD = Mathf.Min(Mathf.Min(dLeft, dRight), Mathf.Min(dBottom * 1.5f, dTop));
+                        if (Mathf.Abs(minD - dTop) < 0.001f)
+                        {
+                            localSurface.y = max.y;
+                            localNorm = Vector2.up;
+                        }
+                        else if (Mathf.Abs(minD - dLeft) < 0.001f)
+                        {
+                            localSurface.x = min.x;
+                            localNorm = Vector2.left;
+                        }
+                        else if (Mathf.Abs(minD - dRight) < 0.001f)
+                        {
+                            localSurface.x = max.x;
+                            localNorm = Vector2.right;
+                        }
+                        else
+                        {
+                            localSurface.y = min.y;
+                            localNorm = Vector2.down;
+                        }
                     }
 
                     Vector2 worldSurface = t.TransformPoint(localSurface);
@@ -1588,44 +1678,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            // Also check link midpoints to prevent chords cutting through sharp corners
-            int linkCount = _links.Count;
-            for (int l = 0; l < linkCount; l++)
-            {
-                VerletLink link = _links[l];
-                VerletNode nA = _nodes[link.NodeA];
-                VerletNode nB = _nodes[link.NodeB];
 
-                Vector2 mid = (nA.Position + nB.Position) * 0.5f;
-                int midHitCount = Physics2D.OverlapCircle(mid, _surfaceOffset, _collisionFilter, _pointHitBuffer);
-                if (midHitCount == 0)
-                {
-                    midHitCount = Physics2D.OverlapPoint(mid, _collisionFilter, _pointHitBuffer);
-                }
-
-                if (midHitCount > 0)
-                {
-                    for (int h = 0; h < midHitCount; h++)
-                    {
-                        Collider2D hitCol = _pointHitBuffer[h];
-                        if (TryResolveColliderContact(hitCol, mid, _surfaceOffset, out Vector2 resolvedMid, out _))
-                        {
-                            Vector2 correction = (resolvedMid - mid) * 0.5f;
-                            if (!nA.IsPinned)
-                            {
-                                nA.Position += correction;
-                                _nodes[link.NodeA] = nA;
-                            }
-                            if (!nB.IsPinned)
-                            {
-                                nB.Position += correction;
-                                _nodes[link.NodeB] = nB;
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
         }
 
         private void RebuildSplineData()
@@ -1656,22 +1709,7 @@ namespace ThailandHorrorJam.Systems.Needle
                     float t = step * invSubdivisions;
                     Vector2 pt2D = EvaluateCatmullRom(p0, p1, p2, p3, t);
 
-                    // Prevent Catmull-Rom spline curves from dipping below ground colliders
-                    if (_enableGroundCollision)
-                    {
-                        int splineHitCount = Physics2D.OverlapPoint(pt2D, _collisionFilter, _pointHitBuffer);
-                        if (splineHitCount > 0)
-                        {
-                            for (int h = 0; h < splineHitCount; h++)
-                            {
-                                if (TryResolveColliderContact(_pointHitBuffer[h], pt2D, _surfaceOffset, out Vector2 clampedPt, out _))
-                                {
-                                    pt2D = clampedPt;
-                                    break;
-                                }
-                            }
-                        }
-                    }
+
 
                     Vector3 pt = new Vector3(pt2D.x, pt2D.y, 0f);
 

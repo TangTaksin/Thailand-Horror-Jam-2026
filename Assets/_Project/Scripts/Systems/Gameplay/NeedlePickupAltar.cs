@@ -73,8 +73,14 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("จำนวน Verlet Nodes (ยิ่งเยอะยิ่งละเอียด โค้งมนนุ่มนวล ไม่เป็นท่อนเหลี่ยม แนะนำ 48 - 64)")]
         [SerializeField] private int _startingThreadNodes = 52;
 
-        [Tooltip("ความหย่อนของด้าย (Slack factor): 1.0 = ตึงเปรี๊ยะเป็นเส้นตรง, 1.15 - 1.25 = หย่อนทิ้งตัวพาดพื้นนุ่มนวล")]
-        [SerializeField] private float _startingThreadSlack = 1.18f;
+        [Tooltip("โหมดการคำนวณความหย่อน: PathContour (แนะนำ) อิงตามความยาวแนวภูมิประเทศจริง, StraightLine อิงระยะขจัดเส้นตรง")]
+        [SerializeField] private SutureThread.SlackMode _slackCalculationMode = SutureThread.SlackMode.PathContour;
+
+        [Tooltip("ความหย่อนของด้าย (Slack factor): 1.0 = แนบพอดีตามแนวผิว, 1.03 - 1.08 = หย่อนทิ้งตัวพาดพื้นนุ่มนวล")]
+        [SerializeField] private float _startingThreadSlack = 1.04f;
+
+        [Tooltip("ความหย่อนส่วนเกินคงที่ (เมตร)")]
+        [SerializeField] private float _extraSlackMeters = 0.45f;
 
         [Tooltip("แรงต้านการดัดโค้ง (Bending Stiffness): ยิ่งน้อย ยิ่งอ่อนยวบเหมือนเส้นไหม ไม่กระด้าง (แนะนำ 0.02 - 0.05)")]
         [SerializeField] private float _startingBendingStiffness = 0.03f;
@@ -84,6 +90,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         [Tooltip("แรงต้านอากาศ (Air Damping): ค่าน้อยจะพลิ้วไหวตามการเคลื่อนไหว ไม่หนืดช้า (แนะนำ 1.5 - 2.2)")]
         [SerializeField] private float _startingAirDamping = 1.8f;
+
+        [Tooltip("ความสูงของคลื่นลมที่ทำให้เส้นด้ายลอยพริ้วไหวขณะ Gravity ติดลบ (เมตร)")]
+        [SerializeField] private float _startingFloatingWaveAmplitude = 0.12f;
+
+        [Tooltip("ความเร็วในการกระเพื่อมคลื่นลมลอย")]
+        [SerializeField] private float _startingFloatingWaveSpeed = 1.6f;
 
         [Tooltip("เปิดใช้งาน Pixel Snapping หรือไม่ (หากปิด จะได้เส้นด้ายโค้งมนสมูทแบบเวกเตอร์ ไหลลื่นไม่กระตุกเป็นขั้นบันไดพิกเซล)")]
         [SerializeField] private bool _enablePixelSnapping = false;
@@ -180,10 +192,14 @@ namespace ThailandHorrorJam.Systems.Gameplay
             _startingThreadInstance = Instantiate(_sutureThreadPrefab, transform);
             _startingThreadInstance.name = "StartingSutureTether";
             _startingThreadInstance.NodesPerSegment = _startingThreadNodes;
+            _startingThreadInstance.SlackCalculationMode = _slackCalculationMode;
             _startingThreadInstance.SlackFactor = _startingThreadSlack;
+            _startingThreadInstance.ExtraSlackMeters = _extraSlackMeters;
             _startingThreadInstance.BendingStiffness = _startingBendingStiffness;
             _startingThreadInstance.Gravity = _startingGravity;
             _startingThreadInstance.AirDamping = _startingAirDamping;
+            _startingThreadInstance.FloatingWaveAmplitude = _startingFloatingWaveAmplitude;
+            _startingThreadInstance.FloatingWaveSpeed = _startingFloatingWaveSpeed;
             _startingThreadInstance.IsCuttable = false;
 
             UpdateStartingTether();
@@ -197,10 +213,14 @@ namespace ThailandHorrorJam.Systems.Gameplay
             if (_playerTransform == null) return;
 
             // Allow live Inspector tuning during Play Mode
+            _startingThreadInstance.SlackCalculationMode = _slackCalculationMode;
             _startingThreadInstance.SlackFactor = _startingThreadSlack;
+            _startingThreadInstance.ExtraSlackMeters = _extraSlackMeters;
             _startingThreadInstance.BendingStiffness = _startingBendingStiffness;
             _startingThreadInstance.Gravity = _startingGravity;
             _startingThreadInstance.AirDamping = _startingAirDamping;
+            _startingThreadInstance.FloatingWaveAmplitude = _startingFloatingWaveAmplitude;
+            _startingThreadInstance.FloatingWaveSpeed = _startingFloatingWaveSpeed;
             _startingThreadInstance.EnablePixelSnapping = _enablePixelSnapping;
             _startingThreadInstance.HideAllPins = !_showNeedlePinDot;
 
