@@ -45,6 +45,7 @@ namespace ThailandHorrorJam.Editor
                 {
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_bridgeLength"));
                     EditorGUILayout.PropertyField(serializedObject.FindProperty("_bridgeThickness"));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_manageVisualTransform"));
                 }
             }
             else // FreeFall

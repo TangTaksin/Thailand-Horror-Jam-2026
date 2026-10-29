@@ -49,10 +49,13 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _fallRotationSpeed = 160f;
 
         [Header("Designer Dimensions (Drawbridge Only)")]
-        [Tooltip("If true, automatically adjusts BoxCollider2D, TipAnchor, and Visual child sprite to match length and thickness. Disable if using a custom prefab with its own sprite and collider.")]
+        [Tooltip("หากเปิด จะปรับขนาด BoxCollider2D และตำแหน่ง TipAnchor ตามความยาวและความหนา (ปิดหากต้องการตั้งค่า Collider ด้วยตัวเอง)")]
         [SerializeField] private bool _manageBridgeGeometry = true;
 
-        [Tooltip("Bridge plank length. Changing this automatically resizes the Visual sprite, BoxCollider2D, and TipAnchor!")]
+        [Tooltip("หากเปิด จะปรับขนาด Transform.localScale และตำแหน่งของ child 'Visual' ตามความยาวและความหนา (ปิดไว้เป็นค่าเริ่มต้น เพื่อคงขนาดและตำแหน่ง Visual เดิมของ Sprite/Prefab ไว้ ไม่ให้ถูกดัดแปลง)")]
+        [SerializeField] private bool _manageVisualTransform = false;
+
+        [Tooltip("Bridge plank length. Changing this automatically resizes BoxCollider2D, TipAnchor (and Visual if enabled)!")]
         [Min(0.5f)]
         [SerializeField] private float _bridgeLength = 2.4f;
 
@@ -103,6 +106,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public float BridgeThickness => _bridgeThickness;
         public float FlatRestAngle => _flatRestAngle;
         public bool ManageBridgeGeometry => _manageBridgeGeometry;
+        public bool ManageVisualTransform => _manageVisualTransform;
         public StitchableObject StitchableTarget => _stitchableTarget;
 
         private void OnValidate()
@@ -137,12 +141,15 @@ namespace ThailandHorrorJam.Systems.Needle
                 _objectAnchor.localPosition = new Vector3(-_bridgeLength, _bridgeThickness * 0.5f, 0f);
             }
 
-            // 3. Child Visual sprite
-            Transform visual = transform.Find("Visual");
-            if (visual != null)
+            // 3. Child Visual sprite (Only modify if _manageVisualTransform is explicitly enabled)
+            if (_manageVisualTransform)
             {
-                visual.localPosition = (Vector3)centerOffset;
-                visual.localScale = new Vector3(_bridgeLength, _bridgeThickness, 1f);
+                Transform visual = transform.Find("Visual");
+                if (visual != null)
+                {
+                    visual.localPosition = (Vector3)centerOffset;
+                    visual.localScale = new Vector3(_bridgeLength, _bridgeThickness, 1f);
+                }
             }
         }
 
