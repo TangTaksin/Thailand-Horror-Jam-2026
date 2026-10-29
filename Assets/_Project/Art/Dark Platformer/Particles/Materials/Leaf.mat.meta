@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fe8511f93a008754ab121c179e401ecf
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 366952
+  packageName: Dark Platformer World - 2D Environment Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/Dark Platformer/Particles/Materials/Leaf.mat
+  uploadId: 894870

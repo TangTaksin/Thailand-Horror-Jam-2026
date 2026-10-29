@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: deeb8cafca0af284e92a057261d17723
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 366952
+  packageName: Dark Platformer World - 2D Environment Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/_Project/Art/Dark Platformer/Prefabs/Particles/FallingLeaves.prefab
+  uploadId: 894870

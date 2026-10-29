@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 719f8d52fe2e6b444b41c2f7a8fe587b
+timeCreated: 1520820431
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 366952
+  packageName: Dark Platformer World - 2D Environment Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/Dark Platformer/Particles/Materials/Cloud.mat
+  uploadId: 894870
