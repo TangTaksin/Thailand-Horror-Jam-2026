@@ -100,6 +100,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("เปิดใช้งาน Pixel Snapping หรือไม่ (หากปิด จะได้เส้นด้ายโค้งมนสมูทแบบเวกเตอร์ ไหลลื่นไม่กระตุกเป็นขั้นบันไดพิกเซล)")]
         [SerializeField] private bool _enablePixelSnapping = false;
 
+        [Tooltip("ให้เส้นด้ายตอนเริ่มเกม Spawn โค้งลงมาจากบนฟ้า ป้องกันไม่ให้ด้ายเกิดใต้ดินหรือติดใต้ Collider")]
+        [SerializeField] private bool _spawnFromSky = true;
+
+        [Tooltip("ความสูงของแนวโค้งด้ายบนฟ้าตอนเริ่ม Spawn (เมตร)")]
+        [SerializeField] private float _skySpawnHeight = 8.0f;
+
         [Tooltip("ระดับความสูงของจุดเชื่อมต่อบนตัวผู้เล่น (เทียบจาก transform.position ผู้เล่นมีจุดศูนย์กลางตัวอยู่ที่ 0.0, หน้าอก/ลำตัวอยู่ที่ -0.05 ถึง 0.05)")]
         [SerializeField] private float _playerTetherHeightOffset = -0.05f;
 
@@ -201,6 +207,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
             _startingThreadInstance.FloatingWaveAmplitude = _startingFloatingWaveAmplitude;
             _startingThreadInstance.FloatingWaveSpeed = _startingFloatingWaveSpeed;
             _startingThreadInstance.IsCuttable = false;
+            _startingThreadInstance.SpawnFromSky = _spawnFromSky;
+            _startingThreadInstance.SkySpawnHeight = _skySpawnHeight;
 
             UpdateStartingTether();
         }
@@ -212,7 +220,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
             FindPlayerReferences();
             if (_playerTransform == null) return;
 
-            // Allow live Inspector tuning during Play Mode
+#if UNITY_EDITOR
+            // Allow live Inspector tuning during Play Mode in Editor
             _startingThreadInstance.SlackCalculationMode = _slackCalculationMode;
             _startingThreadInstance.SlackFactor = _startingThreadSlack;
             _startingThreadInstance.ExtraSlackMeters = _extraSlackMeters;
@@ -222,7 +231,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
             _startingThreadInstance.FloatingWaveAmplitude = _startingFloatingWaveAmplitude;
             _startingThreadInstance.FloatingWaveSpeed = _startingFloatingWaveSpeed;
             _startingThreadInstance.EnablePixelSnapping = _enablePixelSnapping;
+            _startingThreadInstance.SpawnFromSky = _spawnFromSky;
+            _startingThreadInstance.SkySpawnHeight = _skySpawnHeight;
             _startingThreadInstance.HideAllPins = !_showNeedlePinDot;
+#endif
 
             Vector2 playerTetherPos = (Vector2)_playerTransform.position + new Vector2(0f, _playerTetherHeightOffset);
             Vector2 needleEyePos;
@@ -248,6 +260,14 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 var childCanvas = GetComponentInChildren<Canvas>(true);
                 if (childCanvas != null) _promptCanvasGo = childCanvas.gameObject;
+            }
+
+            // If _promptCanvasGo points to the global player canvas in the scene, clone a dedicated copy so we do not steal or disable the player UI!
+            if (_promptCanvasGo != null && !_promptCanvasGo.transform.IsChildOf(transform))
+            {
+                GameObject template = _promptCanvasGo;
+                _promptCanvasGo = Instantiate(template, transform);
+                _promptCanvasGo.name = "Altar_InteractionPromptCanvas";
             }
 
             if (_promptCanvasGo != null)
@@ -317,11 +337,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             if (_playerTransform == null)
             {
-                var player = GameObject.FindWithTag("Player");
+                PlayerController2D player = PlayerController2D.Instance;
                 if (player != null)
                 {
                     _playerTransform = player.transform;
-                    _playerController = player.GetComponent<PlayerController2D>();
+                    _playerController = player;
                     _playerVisuals = player.GetComponentInChildren<PlayerVisuals>();
                     _needleController = player.GetComponent<NeedleController>();
                 }
@@ -582,6 +602,13 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             if (_promptCanvasGo == null) return;
 
+            if (_promptCanvasGo.transform.IsChildOf(transform))
+            {
+                Destroy(_promptCanvasGo);
+                _promptCanvasGo = null;
+                return;
+            }
+
             var promptUI = _promptCanvasGo.GetComponentInChildren<ThailandHorrorJam.Systems.Interaction.InteractionPromptUI>(true);
             if (promptUI != null)
             {
@@ -597,6 +624,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private void OnDestroy()
         {
+            if (_promptCanvasGo != null && _promptCanvasGo.transform.IsChildOf(transform))
+            {
+                Destroy(_promptCanvasGo);
+                _promptCanvasGo = null;
+            }
+
             if (_startingThreadInstance != null)
             {
                 _startingThreadInstance.Clear();

@@ -174,11 +174,30 @@ namespace ThailandHorrorJam.Systems.Needle
         [Range(0.01f, 0.15f)]
         [SerializeField] private float _pooledPileHeight = 0.055f;
 
+        [Header("Spawn Configuration")]
+        [Tooltip("If true, initial intermediate Verlet nodes are spawned from the sky (raycasting down onto terrain or arching in the sky) to prevent threads from starting inside underground colliders.")]
+        [SerializeField] private bool _spawnFromSky = false;
+
+        [Tooltip("Height above the highest endpoint from which sky-spawn nodes or rays originate (meters).")]
+        [SerializeField] private float _skySpawnHeight = 8.0f;
+
         [Header("Severing & Cutting")]
         [Tooltip("When true, this thread can be severed by blades or cut needles. If false, it cannot be cut.")]
         [SerializeField] private bool _isCuttable = true;
 
         public event System.Action OnSevered;
+
+        public bool SpawnFromSky
+        {
+            get => _spawnFromSky;
+            set => _spawnFromSky = value;
+        }
+
+        public float SkySpawnHeight
+        {
+            get => _skySpawnHeight;
+            set => _skySpawnHeight = Mathf.Max(0f, value);
+        }
 
         public bool IsCuttable
         {
@@ -592,7 +611,8 @@ namespace ThailandHorrorJam.Systems.Needle
             {
                 float straightDist = Vector2.Distance(startPos, endPos);
                 float baseRest = restLengthBudget > 0f ? restLengthBudget : straightDist;
-                float targetRestLength = (baseRest * Mathf.Max(1.0f, _slackFactor)) + _extraSlackMeters;
+                float extraSlack = (restLengthBudget > 0f || _slackMode != SlackMode.FixedExtraLength) ? 0f : _extraSlackMeters;
+                float targetRestLength = (baseRest * Mathf.Max(1.0f, _slackFactor)) + extraSlack;
                 float perLinkRest = targetRestLength / linkCount;
                 for (int i = 0; i < linkCount; i++)
                 {
@@ -1255,25 +1275,30 @@ namespace ThailandHorrorJam.Systems.Needle
 
                     Vector2 pos = basePos;
 
-                    if (_enableGroundCollision)
+                    if (_spawnFromSky)
                     {
-                        // Check if ground surface exists above basePos (e.g. spanning over hills/platforms)
-                        float topRayY = Mathf.Max(pStart.y, pEnd.y) + 8f;
-                        RaycastHit2D groundHit = Physics2D.Raycast(new Vector2(basePos.x, topRayY), Vector2.down, topRayY - basePos.y + 10f, _collisionMask);
+                        // Spawn from the sky: raycast down to detect terrain surface from above, or arc high in the sky
+                        float topRayY = Mathf.Max(pStart.y, pEnd.y) + _skySpawnHeight;
+                        float rayLength = (topRayY - Mathf.Min(pStart.y, pEnd.y)) + 20f;
+                        RaycastHit2D groundHit = Physics2D.Raycast(new Vector2(basePos.x, topRayY), Vector2.down, rayLength, _collisionMask);
                         if (groundHit.collider != null && !ShouldIgnoreCollider(groundHit.collider) && groundHit.point.y > basePos.y)
                         {
                             pos.y = groundHit.point.y + _surfaceOffset;
                         }
                         else
                         {
-                            int hitCount = Physics2D.OverlapPoint(pos, _collisionFilter, _pointHitBuffer);
-                            for (int h = 0; h < hitCount; h++)
+                            pos.y = Mathf.Max(pos.y, Mathf.Lerp(pStart.y, pEnd.y, t) + (_skySpawnHeight * envelope));
+                        }
+                    }
+                    else if (_enableGroundCollision)
+                    {
+                        int hitCount = Physics2D.OverlapPoint(pos, _collisionFilter, _pointHitBuffer);
+                        for (int h = 0; h < hitCount; h++)
+                        {
+                            if (TryResolveColliderContact(_pointHitBuffer[h], pos, _surfaceOffset, out Vector2 resolved, out _))
                             {
-                                if (TryResolveColliderContact(_pointHitBuffer[h], pos, _surfaceOffset, out Vector2 resolved, out _))
-                                {
-                                    pos = resolved;
-                                    break;
-                                }
+                                pos = resolved;
+                                break;
                             }
                         }
                     }
