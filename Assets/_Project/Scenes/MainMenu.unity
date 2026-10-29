@@ -365,6 +365,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a89a8d7666fe4fa0968db1e74293761a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Gameplay.CutsceneController
+  _displayMode: 0
   _slides:
   - image: {fileID: 7558483355208372984, guid: cd73cb166a9c8794ca50f9c0f431e7f3, type: 3}
     subtitle: The scariest thing is a pale, dead fish.
@@ -379,7 +380,7 @@ MonoBehaviour:
     subtitle: Is it mad at me for not burying it? The more I think about it, the bigger and nastier it gets.
     duration: 6
   - image: {fileID: 2195803572015553215, guid: 0c4636fb877ec344993e7e54a7fac8db, type: 3}
-    subtitle: Damn it... when will it just go away?!
+    subtitle: ...when will it just go away?!
     duration: 3
   - image: {fileID: 5061194509309013868, guid: 0472e1a6b553c0f42af542d1afcc2073, type: 3}
     subtitle: If I close my eyes, will it all just disappear?
@@ -390,8 +391,9 @@ MonoBehaviour:
   _slideDuration: 4
   _typewriterSpeed: 0.04
   _fadeDuration: 0.45
-  _enableKenBurns: 1
-  _kenBurnsMaxScale: 1.04
+  _enableCameraDrift: 1
+  _driftAmplitude: 6
+  _driftSpeed: 0.8
   _typingStartPadding: 0.4
   _readingHoldPadding: 1
   _endAction: 1

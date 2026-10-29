@@ -1,3 +1,5 @@
+using ThailandHorrorJam.Core;
+using ThailandHorrorJam.Systems.Needle;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -234,6 +236,9 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 _endCardPanel.SetActive(false);
             }
 
+            // Lock player movement and needle interactions during cutscenes
+            LockPlayerAndNeedle(true);
+
             OnCutsceneStarted?.Invoke();
 
             if (_cutsceneRoutine != null)
@@ -296,6 +301,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     {
                         _endCardPanel.SetActive(true);
                     }
+                    LockPlayerAndNeedle(true);
                     break;
 
                 case CutsceneEndAction.LoadScene:
@@ -594,6 +600,26 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void SetEndAction(CutsceneEndAction endAction)
         {
             _endAction = endAction;
+        }
+
+        private void LockPlayerAndNeedle(bool locked)
+        {
+            PlayerController2D player = FindAnyObjectByType<PlayerController2D>();
+            if (player != null)
+            {
+                player.SetInputLocked(locked);
+                if (locked)
+                {
+                    player.StopHorizontalMovement();
+                }
+            }
+
+            NeedleController needle = FindAnyObjectByType<NeedleController>();
+            if (needle != null && locked)
+            {
+                needle.CancelStitching();
+                needle.ResetCutAimState();
+            }
         }
     }
 }
