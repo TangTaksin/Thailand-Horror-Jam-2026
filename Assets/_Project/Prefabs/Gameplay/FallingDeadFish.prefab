@@ -1,0 +1,202 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &8621927790336078358
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7656101676955619256}
+  - component: {fileID: 2139793006759239557}
+  - component: {fileID: 1867368066963275350}
+  - component: {fileID: 8461395167379538124}
+  m_Layer: 0
+  m_Name: FallingDeadFish
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7656101676955619256
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8621927790336078358}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &2139793006759239557
+SpriteRenderer:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8621927790336078358}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 6
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 2068383782226403057, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
+--- !u!58 &1867368066963275350
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8621927790336078358}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.28
+--- !u!114 &8461395167379538124
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8621927790336078358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd007bdf085412844b59f46a2bea529c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Gameplay.FallingFishHazard2D
+  _fallSpeed: 4.2
+  _deflectLateralSpeed: 5
+  _deflectUpwardSpeed: 1.8
+  _despawnY: -3.2
+  _knockbackHorizontalForce: 10
+  _knockbackVerticalForce: 2
+  _animationFrames:
+  - {fileID: 2068383782226403057, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 8496474534085782228, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 412163159176966241, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 2147769514071108475, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 6226113141487664364, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 5582231527880402562, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 3461298612245123540, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -398857343153692261, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -7710648553146542434, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -6201743539257820953, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 3665070360776985039, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -6129988066481630386, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 8496892910890724179, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 1086998380299223281, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 4791714562044991775, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -2331410317440734666, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -52696302093325413, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -8625305418112021340, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -952929304065566066, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -975269192536085952, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 2223072022496939171, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -8237065578011992897, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 749795097805612050, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -4265476834513182261, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  _fps: 16
+  _spriteRenderer: {fileID: 2139793006759239557}
+  _fallWiggleAngle: 9
+  _fallWiggleDuration: 0.28
+  _fallStretchScale: {x: 0.92, y: 1.08}
+  _deflectPunchScale: {x: 0.35, y: -0.25, z: 0}
+  _deflectSpinAngle: 140
+  _deflectTweenDuration: 0.45
+  _playerHitPunchScale: {x: 0.5, y: -0.42, z: 0}
+  _playerHitSpinAngle: 320
+  _playerHitTweenDuration: 0.5
+  _fishImpactSFXName: sfx_fish_impact
+  _fishImpactClips:
+  - {fileID: 8300000, guid: 20e87dcb2f39e5648ad9e65f18b702a0, type: 3}
+  - {fileID: 8300000, guid: 165f057c8adcb6946ade0e18a7420769, type: 3}
+  - {fileID: 8300000, guid: ac3dd0a7c99bdae43ad9f4a3b1e3de7b, type: 3}
+  _fishImpactVolume: 0.9
+  _fishNeedleHitSFXName: sfx_fish_needle_hit
+  _fishNeedleHitClip: {fileID: 8300000, guid: 79c4f976df298b942b0ac4e1f70fe56a, type: 3}
+  _fishNeedleHitVolume: 0.95
+  _harmPlayer: 1
+  _landAndFlopOnGround: 0
+  _groundLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  _groundRestOffset: 0.18
+  _groundFlopDuration: 16

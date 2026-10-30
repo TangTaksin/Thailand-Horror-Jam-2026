@@ -59,10 +59,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
             if (other == null) return;
 
             // 1. Check if the player collided with the hazard
-            if (other.CompareTag("Player") || other.TryGetComponent(out PlayerController2D _) || other.GetComponentInParent<PlayerController2D>() != null)
+            if (PlayerController2D.IsPlayer(other))
             {
                 if (CheckpointManager.Instance != null && !CheckpointManager.Instance.IsRespawning)
                 {
+                    Debug.Log($"[KillZone] Player triggered KillZone '{gameObject.name}' (HazardType: {_hazardType}).");
                     CheckpointManager.Instance.TriggerPlayerDeath(this);
                 }
                 return;
@@ -71,9 +72,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
             // 2. Check if a puzzle box / StitchableObject fell into the abyss
             if (_respawnBoxOnContact)
             {
-                if (other.TryGetComponent(out StitchableObject stitchable) || (stitchable = other.GetComponentInParent<StitchableObject>()) != null)
+                StitchableObject stitchable = other.GetComponentInParent<StitchableObject>();
+                if (stitchable != null)
                 {
-                    stitchable.ResetToInitialState();
+                    Debug.Log($"[KillZone] Resetting dropped StitchableObject '{stitchable.name}' back to initial state.");
+                    stitchable.ResetToInitialState(forceReset: true);
                 }
             }
         }

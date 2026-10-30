@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Needle
 {
@@ -31,6 +32,9 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private float _sweepRadius = 0.08f;
 
         [Header("Visual Orientation")]
+        [Tooltip("Optional custom needle sprite. If unassigned, uses SpriteRenderer's assigned sprite.")]
+        [SerializeField] private Sprite _customNeedleSprite;
+
         [Tooltip("Angular offset in degrees to align the needle tip with flight direction. Set to 0 if the sprite points right (--> like Needle_Sheet_0), or -90 if the sprite points up (^).")]
         [SerializeField] private float _spriteRotationOffset = 0f;
 
@@ -39,20 +43,18 @@ namespace ThailandHorrorJam.Systems.Needle
         private float _maxDistance;
         private float _traveledDistance;
         private Transform _returnTransform;
+        private Vector3 _returnOffset;
         private Transform _playerTransform;
         private ContactFilter2D _collisionFilter;
         private readonly RaycastHit2D[] _hitBuffer = new RaycastHit2D[8];
 
         private Action<Vector2, Vector2, Collider2D> _onHitCallback;
         private Action _onRewindCompleteCallback;
+        private Func<Vector2, Vector2, bool> _onStepSegmentCallback;
 
-        private static Sprite s_SharedNeedleSprite;
         private SpriteRenderer _spriteRenderer;
         private Transform _targetToIgnore;
 
-        public bool IsInFlight => _state == ProjectileState.Flying || _state == ProjectileState.Rewinding;
-        public bool IsFlying => _state == ProjectileState.Flying;
-        public bool IsRewinding => _state == ProjectileState.Rewinding;
         public bool IsEmbedded => _state == ProjectileState.Embedded;
         public float SweepRadius => _sweepRadius;
         public Vector2 CurrentPosition => transform.position;
@@ -73,10 +75,9 @@ namespace ThailandHorrorJam.Systems.Needle
                 }
             }
 
-            if (_spriteRenderer.sprite == null)
+            if (_spriteRenderer.sprite == null && _customNeedleSprite != null)
             {
-                _spriteRenderer.sprite = GenerateNeedleSprite();
-                _spriteRenderer.color = new Color(0.9f, 0.95f, 1f, 1f);
+                _spriteRenderer.sprite = _customNeedleSprite;
             }
 
             if (_spriteRenderer.sortingOrder < 10)
@@ -98,7 +99,9 @@ namespace ThailandHorrorJam.Systems.Needle
             ContactFilter2D collisionFilter,
             Action<Vector2, Vector2, Collider2D> onHit,
             Action onRewindComplete,
-            Transform playerTransform = null)
+            Transform playerTransform = null,
+            Vector3 returnOffset = default,
+            Func<Vector2, Vector2, bool> onStepSegment = null)
         {
             EnsureSpriteRenderer();
 
@@ -112,11 +115,13 @@ namespace ThailandHorrorJam.Systems.Needle
             _maxDistance = maxDistance;
             _traveledDistance = 0f;
             _returnTransform = returnTransform;
+            _returnOffset = returnOffset;
             _playerTransform = playerTransform;
             _targetToIgnore = targetToIgnore;
             _collisionFilter = collisionFilter;
             _onHitCallback = onHit;
             _onRewindCompleteCallback = onRewindComplete;
+            _onStepSegmentCallback = onStepSegment;
 
             _state = ProjectileState.Flying;
             gameObject.SetActive(true);
@@ -139,11 +144,21 @@ namespace ThailandHorrorJam.Systems.Needle
         private void StepFlight(float dt)
         {
             float stepDistance = _velocity.magnitude * dt;
+            if (stepDistance <= 0.0001f) return;
+
             Vector2 currentPos = transform.position;
             Vector2 stepDir = _velocity.normalized;
 
+            // Clamp step distance to remaining distance so we never overshoot _maxDistance
+            float remainingDistance = Mathf.Max(0f, _maxDistance - _traveledDistance);
+            float actualStep = Mathf.Min(stepDistance, remainingDistance);
+
+            Vector2 stepTarget = currentPos + stepDir * actualStep;
+
             // Swept circle cast to ensure thin colliders are never tunneled through
-            int hitCount = Physics2D.CircleCast(currentPos, _sweepRadius, stepDir, _collisionFilter, _hitBuffer, stepDistance);
+            int hitCount = Physics2D.CircleCast(currentPos, _sweepRadius, stepDir, _collisionFilter, _hitBuffer, actualStep);
+            RaycastHit2D validHit = default;
+            bool hasValidHit = false;
 
             for (int i = 0; i < hitCount; i++)
             {
@@ -160,9 +175,25 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     continue;
                 }
+                if (PlayerController2D.IsPlayer(hitCol))
+                {
+                    continue;
+                }
                 if (_targetToIgnore != null && (hitCol.transform == _targetToIgnore || hitCol.transform.IsChildOf(_targetToIgnore)))
                 {
                     continue;
+                }
+
+                // Check if hit entity responds to needle impacts (e.g. falling fish hazards)
+                INeedleHittable needleHittable = hitCol.GetComponentInParent<INeedleHittable>();
+                if (needleHittable != null)
+                {
+                    if (needleHittable.OnHitByNeedle(this, hit.point, stepDir))
+                    {
+                        transform.position = hit.point;
+                        StartRewind();
+                        return;
+                    }
                 }
 
                 // Trigger colliders are ignored unless they are an enabled NeedleAnchorPoint
@@ -175,19 +206,38 @@ namespace ThailandHorrorJam.Systems.Needle
                     }
                 }
 
-                // Hit a solid surface or valid anchor trigger!
-                transform.position = hit.point;
-                _state = ProjectileState.Embedded;
-                _onHitCallback?.Invoke(hit.point, hit.normal, hitCol);
+                validHit = hit;
+                hasValidHit = true;
+                stepTarget = hit.point;
+                break;
+            }
+
+            // ถ้ามี callback ตรวจการตัดเส้นด้าย ให้เช็คบนช่วงที่เคลื่อนที่จริงในเฟรมนี้ก่อนเสมอ (แก้ปัญหาด้ายหน้ากำแพง)
+            if (_onStepSegmentCallback != null && _onStepSegmentCallback.Invoke(currentPos, stepTarget))
+            {
+                transform.position = stepTarget;
+                _traveledDistance += Vector2.Distance(currentPos, stepTarget);
+                StartRewind();
                 return;
             }
 
-            // No obstacle hit in this step — move forward
-            Vector2 newPos = currentPos + _velocity * dt;
-            transform.position = newPos;
-            _traveledDistance += stepDistance;
+            if (hasValidHit)
+            {
+                transform.position = validHit.point;
+                _state = ProjectileState.Embedded;
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_needle_pin");
+                }
+                _onHitCallback?.Invoke(validHit.point, validHit.normal, validHit.collider);
+                return;
+            }
 
-            if (_traveledDistance >= _maxDistance)
+            // No obstacle hit in this step — move forward clamped to actualStep
+            transform.position = stepTarget;
+            _traveledDistance += actualStep;
+
+            if (_traveledDistance >= _maxDistance - 0.0001f)
             {
                 // Reached max allowed thread distance without hitting — auto-rewind!
                 StartRewind();
@@ -203,12 +253,12 @@ namespace ThailandHorrorJam.Systems.Needle
             }
 
             Vector2 currentPos = transform.position;
-            Vector2 returnPos = _returnTransform.position;
+            Vector2 returnPos = (Vector2)_returnTransform.position + (Vector2)_returnOffset;
             Vector2 toReturn = returnPos - currentPos;
             float dist = toReturn.magnitude;
             float step = _rewindSpeed * dt;
 
-            if (dist <= step || dist < 0.15f)
+            if (dist <= step || dist < 0.25f)
             {
                 // Reached origin target — rewind finished
                 Cancel();
@@ -239,6 +289,7 @@ namespace ThailandHorrorJam.Systems.Needle
         public void Cancel()
         {
             _state = ProjectileState.Idle;
+            _onStepSegmentCallback = null;
             if (_playerTransform != null)
             {
                 transform.SetParent(_playerTransform);
@@ -254,62 +305,6 @@ namespace ThailandHorrorJam.Systems.Needle
                 float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                 transform.rotation = Quaternion.Euler(0f, 0f, angle + _spriteRotationOffset);
             }
-        }
-
-        private static Sprite GenerateNeedleSprite()
-        {
-            if (s_SharedNeedleSprite != null) return s_SharedNeedleSprite;
-
-            const int width = 32;
-            const int height = 8;
-            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            {
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp
-            };
-
-            Color[] pixels = new Color[width * height];
-            Color needleBody = new Color(0.92f, 0.94f, 1f, 1f);
-            Color needleShade = new Color(0.6f, 0.65f, 0.78f, 1f);
-            Color eyeHole = new Color(0.15f, 0.15f, 0.22f, 0.9f);
-            Color clear = Color.clear;
-
-            for (int x = 0; x < width; x++)
-            {
-                float nx = (float)x / width;
-                // Tapered shape: sharp tip at right (x=31), eye at left (x=2..6)
-                float halfH = Mathf.Lerp(3.2f, 0.5f, Mathf.Pow(nx, 1.4f));
-
-                for (int y = 0; y < height; y++)
-                {
-                    float cy = Mathf.Abs((y + 0.5f) - (height * 0.5f));
-                    int idx = y * width + x;
-
-                    if (cy > halfH)
-                    {
-                        pixels[idx] = clear;
-                        continue;
-                    }
-
-                    // Needle eye hole at base (left)
-                    if (x >= 3 && x <= 7 && cy <= 0.8f)
-                    {
-                        pixels[idx] = eyeHole;
-                    }
-                    else
-                    {
-                        // Slight vertical shading for metallic 3D cylinder feel
-                        float shade = Mathf.Clamp01(1f - (cy / halfH) * 0.4f);
-                        pixels[idx] = Color.Lerp(needleShade, needleBody, shade);
-                    }
-                }
-            }
-
-            tex.SetPixels(pixels);
-            tex.Apply(false, true);
-
-            s_SharedNeedleSprite = Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.2f, 0.5f), 32);
-            return s_SharedNeedleSprite;
         }
     }
 }

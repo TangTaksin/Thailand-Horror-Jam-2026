@@ -19,6 +19,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public static CheckpointManager Instance { get; private set; }
 
         [Header("Limbo Transition Timings")]
+        [Tooltip("Delay before fade-out begins so the death animation is clearly visible (~0.45s).")]
+        [SerializeField] private float _deathAnimDelay = 0.45f;
         [Tooltip("Duration of the slow fade to black when dying (~0.6s).")]
         [SerializeField] private float _fadeOutDuration = 0.6f;
         [Tooltip("Duration to hold in total darkness while resetting world states (~0.3s).")]
@@ -40,6 +42,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         private PlayerController2D _playerController;
         private NeedleController _needleController;
         private Vector2 _initialPlayerPosition;
+        private bool _hasRecordedInitialSpawn;
         private bool _isRespawning;
         private Coroutine _activeRespawnRoutine;
         private readonly List<StitchableObject> _allLevelStitchables = new List<StitchableObject>();
@@ -84,17 +87,24 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 _needleController = FindAnyObjectByType<NeedleController>();
             }
 
-            if (_playerController != null)
+            // บันทึกจุดเกิดเริ่มต้นของด่านเพียงครั้งเดียวเท่านั้น ห้ามเขียนทับด้วยตำแหน่งตอนผู้เล่นตายเด็ดขาด
+            if (!_hasRecordedInitialSpawn)
             {
-                _initialPlayerPosition = _playerController.transform.position;
-            }
-            else if (_defaultSpawnPoint != null)
-            {
-                _initialPlayerPosition = _defaultSpawnPoint.position;
-            }
-            else
-            {
-                _initialPlayerPosition = transform.position;
+                if (_defaultSpawnPoint != null)
+                {
+                    _initialPlayerPosition = _defaultSpawnPoint.position;
+                    _hasRecordedInitialSpawn = true;
+                }
+                else if (_playerController != null)
+                {
+                    _initialPlayerPosition = _playerController.transform.position;
+                    _hasRecordedInitialSpawn = true;
+                }
+                else
+                {
+                    _initialPlayerPosition = transform.position;
+                    _hasRecordedInitialSpawn = true;
+                }
             }
         }
 
@@ -161,6 +171,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void TriggerPlayerDeath(KillZone killZone)
         {
             if (_isRespawning) return;
+            string killZoneName = killZone != null ? killZone.name : "null";
+            string killZoneType = killZone != null ? killZone.Type.ToString() : "null";
+            Vector3 playerPos = _playerController != null ? _playerController.transform.position : transform.position;
+            Debug.Log($"[CheckpointManager] Player death initiated by KillZone '{killZoneName}' (Type: {killZoneType}) | PlayerPos: {playerPos}");
+
+            _isRespawning = true;
 
             float shakeIntensity = killZone != null ? killZone.CameraShakeIntensity : 0.15f;
             float shakeDuration = killZone != null ? killZone.CameraShakeDuration : 0.3f;
@@ -178,6 +194,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public void TriggerPlayerDeath(float shakeIntensity = 0.15f, float shakeDuration = 0.3f)
         {
             if (_isRespawning) return;
+            Vector3 playerPos = _playerController != null ? _playerController.transform.position : transform.position;
+            Debug.Log($"[CheckpointManager] Player death initiated (Crush or code) | PlayerPos: {playerPos}");
+
+            _isRespawning = true;
 
             if (_activeRespawnRoutine != null)
             {
@@ -189,78 +209,106 @@ namespace ThailandHorrorJam.Systems.Gameplay
         private IEnumerator LimboRespawnSequence(float shakeIntensity, float shakeDuration)
         {
             _isRespawning = true;
-            OnPlayerDied?.Invoke();
-
-            EnsurePlayerReferences();
-
-            // 1. Visceral Impact: Camera shake, lock input, cancel needle
-            CameraController2D.Instance?.Shake(shakeIntensity, shakeDuration);
-
-            if (_playerController != null)
+            try
             {
-                _playerController.SetInputLocked(true);
-            }
+                OnPlayerDied?.Invoke();
 
-            if (_needleController != null)
+                EnsurePlayerReferences();
+
+                // 1. Visceral Impact: SFX, Camera shake, lock input, cancel needle
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_player_death_impact");
+                }
+                CameraController2D.Instance?.Shake(shakeIntensity, shakeDuration);
+
+                if (_playerController != null)
+                {
+                    _playerController.SetInputLocked(true);
+                    _playerController.ReleaseHaulingTether();
+                }
+
+                if (_needleController != null)
+                {
+                    _needleController.ResetAllNeedleStates();
+                }
+
+                // Wait for death animation frames to play out before fading screen to black
+                if (_deathAnimDelay > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(_deathAnimDelay);
+                }
+
+                // 2. Slow fade to black (atmospheric fainting feel)
+                yield return StartCoroutine(FadeRoutine(0f, 1f, _fadeOutDuration));
+
+                // 3. Pause in darkness to reposition & reset puzzle state
+                if (_blackoutPauseDuration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(_blackoutPauseDuration);
+                }
+
+                // Reset puzzle elements FIRST while in darkness so platforms are in place before ground-snapping player
+                ResetAssociatedOrAllStitchables();
+                Physics2D.SyncTransforms();
+
+                // Reposition & ground-snap player (stays in lying-down pose during wake-up fade-in)
+                Vector2 targetSpawn;
+                bool targetFacing;
+
+                if (_currentCheckpoint != null)
+                {
+                    targetSpawn = _currentCheckpoint.SpawnPosition;
+                    targetFacing = _currentCheckpoint.RespawnFacingRight;
+                }
+                else if (_defaultSpawnPoint != null)
+                {
+                    targetSpawn = _defaultSpawnPoint.position;
+                    targetFacing = _defaultFacingRight;
+                }
+                else
+                {
+                    targetSpawn = _initialPlayerPosition;
+                    targetFacing = _defaultFacingRight;
+                }
+
+                if (_playerController != null)
+                {
+                    _playerController.TeleportTo(targetSpawn, targetFacing, snapToGround: true);
+                }
+
+                // Snap camera immediately to ground-snapped player position before screen fades back in
+                CameraController2D.Instance?.SnapToTarget();
+
+                // 4. Slow wake-up fade in while character is lying down on the ground
+                yield return StartCoroutine(FadeRoutine(1f, 0f, _fadeInDuration));
+            }
+            finally
             {
-                _needleController.ResetAllNeedleStates();
+                // Always guarantee input is unlocked, overlay cleared, and character plays stand-up wake animation!
+                if (_playerController != null)
+                {
+                    _playerController.SetInputLocked(false);
+                    _playerController.ResetRespawnImmunity(2.0f);
+                }
+
+                if (_fadeCanvasGroup != null)
+                {
+                    _fadeCanvasGroup.alpha = 0f;
+                    _fadeCanvasGroup.blocksRaycasts = false;
+                }
+
+                _isRespawning = false;
+                _activeRespawnRoutine = null;
+                OnPlayerRespawned?.Invoke();
+                Debug.Log("[CheckpointManager] Respawn completed. Input unlocked and overlay cleared.");
             }
-
-            // 2. Slow fade to black (atmospheric fainting feel)
-            yield return FadeRoutine(0f, 1f, _fadeOutDuration);
-
-            // 3. Pause in darkness to reposition & reset puzzle state
-            if (_blackoutPauseDuration > 0f)
-            {
-                yield return new WaitForSecondsRealtime(_blackoutPauseDuration);
-            }
-
-            // Reposition player
-            Vector2 targetSpawn;
-            bool targetFacing;
-
-            if (_currentCheckpoint != null)
-            {
-                targetSpawn = _currentCheckpoint.SpawnPosition;
-                targetFacing = _currentCheckpoint.RespawnFacingRight;
-            }
-            else if (_defaultSpawnPoint != null)
-            {
-                targetSpawn = _defaultSpawnPoint.position;
-                targetFacing = _defaultFacingRight;
-            }
-            else
-            {
-                targetSpawn = _initialPlayerPosition;
-                targetFacing = _defaultFacingRight;
-            }
-
-            if (_playerController != null)
-            {
-                _playerController.TeleportTo(targetSpawn, targetFacing);
-            }
-
-            // Snap camera immediately to prevent awkward camera pan when screen fades back in
-            CameraController2D.Instance?.SnapToTarget();
-
-            // Reset puzzle elements
-            ResetAssociatedOrAllStitchables();
-
-            // 4. Slow wake-up fade in
-            yield return FadeRoutine(1f, 0f, _fadeInDuration);
-
-            // 5. Unlock player control
-            if (_playerController != null)
-            {
-                _playerController.SetInputLocked(false);
-            }
-
-            _isRespawning = false;
-            _activeRespawnRoutine = null;
-            OnPlayerRespawned?.Invoke();
         }
 
-        private void ResetAssociatedOrAllStitchables()
+        /// <summary>
+        /// Resets puzzle objects associated with the current checkpoint (or all active level stitchables).
+        /// </summary>
+        public void ResetAssociatedOrAllStitchables()
         {
             if (_currentCheckpoint != null && _currentCheckpoint.AssociatedStitchables != null && _currentCheckpoint.AssociatedStitchables.Count > 0)
             {
@@ -275,6 +323,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
             else
             {
+                if (_allLevelStitchables.Count == 0)
+                {
+                    EnsureAllStitchables();
+                }
+
                 for (int i = 0; i < _allLevelStitchables.Count; i++)
                 {
                     if (_allLevelStitchables[i] != null)
@@ -299,9 +352,15 @@ namespace ThailandHorrorJam.Systems.Gameplay
             float elapsed = 0f;
             _fadeCanvasGroup.blocksRaycasts = true;
 
-            while (elapsed < duration)
+            float maxTimeout = duration + 1.0f;
+            float totalTimer = 0f;
+
+            while (elapsed < duration && totalTimer < maxTimeout)
             {
-                elapsed += Time.unscaledDeltaTime;
+                float dt = Time.unscaledDeltaTime;
+                if (dt <= 0f) dt = 0.016f;
+                elapsed += dt;
+                totalTimer += dt;
                 float t = Mathf.Clamp01(elapsed / duration);
                 _fadeCanvasGroup.alpha = Mathf.Lerp(fromAlpha, toAlpha, t);
                 yield return null;

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d4d6a29c9156ee948a0a44b98b1f1da8
+timeCreated: 1447595173
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 366952
+  packageName: Dark Platformer World - 2D Environment Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/_Project/Art/Dark Platformer/Prefabs/Particles/DustMotesCalm.prefab
+  uploadId: 894870

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7e852de51e729d94fb8059f0c4c400ca
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Scenes/Lospec500/Lospec500.mat
+  uploadId: 648944

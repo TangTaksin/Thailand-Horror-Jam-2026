@@ -12,7 +12,7 @@ public class SceneTransition : MonoBehaviour
     [SerializeField] private Image transitionImage;
 
     [Header("Shader Settings")]
-    [SerializeField] private float transitionDuration = 1f;
+    [SerializeField] private float transitionDuration = 1.35f;
     [SerializeField] private string transitionName = "_TransValuePixel";
 
     [Header("Automation")]
@@ -83,7 +83,9 @@ public class SceneTransition : MonoBehaviour
         while (elapsedTime < transitionDuration)
         {
             elapsedTime += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsedTime / transitionDuration);
+            float rawT = Mathf.Clamp01(elapsedTime / transitionDuration);
+            // Cinematic smooth curve: slow start, ominous suction, gentle settle
+            float progress = Mathf.SmoothStep(0f, 1f, rawT);
             float finalValue = playForward ? progress : (1f - progress);
 
             UpdateShaderValue(finalValue);

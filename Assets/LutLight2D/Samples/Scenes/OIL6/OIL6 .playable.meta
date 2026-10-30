@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c8e2f864e67cb874199e58061916ce38
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Scenes/OIL6/OIL6 .playable
+  uploadId: 648944

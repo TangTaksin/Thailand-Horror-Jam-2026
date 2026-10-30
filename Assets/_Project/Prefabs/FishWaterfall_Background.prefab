@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6422367839905397858
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6457027878406764074}
+  - component: {fileID: 6550986988221986790}
+  m_Layer: 0
+  m_Name: FishWaterfall_Background
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6457027878406764074
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6422367839905397858}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6550986988221986790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6422367839905397858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f65fa5099814f44d98e56196b8aadae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ThailandHorrorJam.Runtime::ThailandHorrorJam.Systems.Gameplay.BackgroundFishWaterfall2D
+  _frames:
+  - {fileID: 2068383782226403057, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 8496474534085782228, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 412163159176966241, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 2147769514071108475, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 6226113141487664364, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 5582231527880402562, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 3461298612245123540, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -398857343153692261, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -7710648553146542434, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -6201743539257820953, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 3665070360776985039, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -6129988066481630386, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 8496892910890724179, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 1086998380299223281, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 4791714562044991775, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -2331410317440734666, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -52696302093325413, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -8625305418112021340, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -952929304065566066, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -975269192536085952, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 2223072022496939171, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -8237065578011992897, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: 749795097805612050, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  - {fileID: -4265476834513182261, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
+  _material: {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  _fps: 12
+  _sortingLayerName: Default
+  _sortingOrder: -10
+  _minX: -12
+  _maxX: 12
+  _spawnY: 8
+  _despawnY: -10
+  _spawnInterval: {x: 0.06, y: 0.14}
+  _maxFish: 60
+  _scaleRange: {x: 0.35, y: 0.7}
+  _fallSpeedRange: {x: 1.6, y: 3.2}
+  _driftRange: 0.25
+  _farTint: {r: 0.25, g: 0.28, b: 0.32, a: 0.55}
+  _nearTint: {r: 0.55, g: 0.58, b: 0.62, a: 0.85}
+  _wiggleAngle: 10
+  _parallax: {x: 0.3, y: 0.1}
+  _activeMinX: 124
+  _activeMaxX: 165

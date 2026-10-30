@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 27f40718ec81b2b4b8c19d11d39cbee4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Data/Torch On.anim
+  uploadId: 648944

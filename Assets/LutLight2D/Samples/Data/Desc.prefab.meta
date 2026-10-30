@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6e2ba55873c55444f91f55a42efba849
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Data/Desc.prefab
+  uploadId: 648944

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f93eaff43ecc0e14680d28ca981398ab
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/LutLight2D.unity
+  uploadId: 648944

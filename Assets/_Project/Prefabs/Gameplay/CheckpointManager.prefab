@@ -44,6 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d26715203da40b689b010cd02438edb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ThailandHorrorJam.Systems.Gameplay::CheckpointManager
+  _deathAnimDelay: 0.45
   _fadeOutDuration: 0.6
   _blackoutPauseDuration: 0.3
   _fadeInDuration: 0.6

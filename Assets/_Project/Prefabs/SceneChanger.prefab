@@ -46,7 +46,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SceneSwitcher
   eventChannel: {fileID: 11400000, guid: 2cb9dc7a617d12847999d404d98700e8, type: 2}
-  waitTimeBeforeLoad: 1
+  useAnimationDuration: 1
+  customWaitTime: 3
 --- !u!1 &3004865231934964052
 GameObject:
   m_ObjectHideFlags: 0
@@ -74,6 +75,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3004865231934964052}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0, y: 0, z: 0}
@@ -98,7 +100,7 @@ Canvas:
   serializedVersion: 3
   m_RenderMode: 1
   m_Camera: {fileID: 0}
-  m_PlaneDistance: 1
+  m_PlaneDistance: 2
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -165,9 +167,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   eventChannel: {fileID: 11400000, guid: 2cb9dc7a617d12847999d404d98700e8, type: 2}
   transitionImage: {fileID: 2746713865900743986}
-  transitionDuration: 1
+  transitionDuration: 3
   transitionName: _TransValuePixel
-  enableAutoPlay: 1
+  enableAutoPlay: 0
+  OnTransitionDone:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &5268494195520913760
 GameObject:
   m_ObjectHideFlags: 0
@@ -193,6 +198,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5268494195520913760}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}

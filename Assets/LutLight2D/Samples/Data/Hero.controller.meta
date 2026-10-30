@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0eccd64c2f0911046900d691b8ec9bbb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Data/Hero.controller
+  uploadId: 648944

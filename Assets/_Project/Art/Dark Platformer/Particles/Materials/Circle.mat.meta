@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 150aee38b5d848b42b75593618992bb7
+timeCreated: 1445700447
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 366952
+  packageName: Dark Platformer World - 2D Environment Pack
+  packageVersion: 1.0.1
+  assetPath: Assets/Dark Platformer/Particles/Materials/Circle.mat
+  uploadId: 894870
