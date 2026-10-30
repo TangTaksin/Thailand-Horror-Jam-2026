@@ -133,6 +133,13 @@ public class AudioManager : MonoBehaviour
         Debug.LogWarning($"[AudioManager] ไม่พบเสียงชื่อ: {soundName}");
     }
 
+    public void PlaySFX(AudioClip clip, float volumeMultiplier = 1.0f)
+    {
+        if (clip == null || sfxSource == null) return;
+        sfxSource.pitch = Random.Range(minPitch, maxPitch);
+        sfxSource.PlayOneShot(clip, volumeMultiplier);
+    }
+
     public void PlayLoopingSFX(string soundName, float pitch = 1.0f)
     {
         SoundClip soundClip = GetSoundClip(soundName);

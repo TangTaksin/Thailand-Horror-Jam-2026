@@ -196,20 +196,33 @@ MonoBehaviour:
   - name: Footstep
     clip: {fileID: 0}
     clips:
-    - {fileID: 8300000, guid: c333fcbedfc64874985cc986c067c098, type: 3}
-    - {fileID: 8300000, guid: 9502b5c2900434243bf58d458e8f3bd7, type: 3}
-    - {fileID: 8300000, guid: 013be95c7d5084142ae6603717dd72c3, type: 3}
-    - {fileID: 8300000, guid: 022ab766d673a9946ad533d6b60f4e8b, type: 3}
-    - {fileID: 8300000, guid: cd89e90360c790148b8f13aec897370d, type: 3}
-    - {fileID: 8300000, guid: 34ae3dc1865007842aa20eaa82deae3e, type: 3}
-    - {fileID: 8300000, guid: 4c08e56eaa8522f4581b8119b95b2a80, type: 3}
+    - {fileID: 8300000, guid: e9fc77a1d175f3e45bb02eec35a3c796, type: 3}
+    - {fileID: 8300000, guid: 97e5b22d1e460b54bba76db98dcdbd29, type: 3}
+    - {fileID: 8300000, guid: d40dbaeeea262564282175966736c822, type: 3}
+    - {fileID: 8300000, guid: ddf95e9026a3db747a1a2b6a81f2e635, type: 3}
+    - {fileID: 8300000, guid: a006433dbf601c046a4eb32b62b8a81b, type: 3}
+    - {fileID: 8300000, guid: e0c4681a46c61194d81d9ab59e953976, type: 3}
+    - {fileID: 8300000, guid: 96cf219b364e58343b4227af12f5044a, type: 3}
+    - {fileID: 8300000, guid: 8cd7659bcecbb724dad245bd8890f7d0, type: 3}
+    - {fileID: 8300000, guid: 8a2f65b3434414748bf1770f96367818, type: 3}
+    - {fileID: 8300000, guid: 7b62aed49b841a2488b7ee0384697ec8, type: 3}
+    - {fileID: 8300000, guid: 360de9fa894374f42a8368314dbd9dc9, type: 3}
+    - {fileID: 8300000, guid: d7dc1fa0706f5d242a424e998db0f622, type: 3}
+    - {fileID: 8300000, guid: 47376199e98c3bb47877a3d100e694b5, type: 3}
+    - {fileID: 8300000, guid: a1779d50aa685b24db9297703350eb93, type: 3}
+    - {fileID: 8300000, guid: f4a1d2f2a4f18f84db7ba994766738db, type: 3}
+    - {fileID: 8300000, guid: 2c859ea2455d414488abd02dcd3333fc, type: 3}
+    - {fileID: 8300000, guid: 8469510ffbdd63543a561ab40bf7d098, type: 3}
+    - {fileID: 8300000, guid: 569c7d312ce997f489e32212c9686288, type: 3}
+    - {fileID: 8300000, guid: 6ba4d2bb9e2ba724bbcaf0ad37e6a6a4, type: 3}
+    - {fileID: 8300000, guid: 2d1c490ed6189c640a78cd5ab12c9e8a, type: 3}
     volume: 1
   - name: sfx_player_jump
     clip: {fileID: 8300000, guid: f9fd690d1ddf4614e86d2dd446e79c2a, type: 3}
     clips: []
     volume: 1
   - name: sfx_player_jump_land
-    clip: {fileID: 8300000, guid: 2dd0dcfd250ddca41815755869c59d11, type: 3}
+    clip: {fileID: 8300000, guid: 5ef0d6bbfbd30a04a8d0ba4263318460, type: 3}
     clips: []
     volume: 1
   - name: sfx_needle_shoot
@@ -237,7 +250,7 @@ MonoBehaviour:
     clips: []
     volume: 1
   - name: sfx_thud_impact
-    clip: {fileID: 8300000, guid: 76627038f72c45348b88b7238592b507, type: 3}
+    clip: {fileID: 8300000, guid: 40d88a09e856cdc47b41b9d59233ddae, type: 3}
     clips: []
     volume: 1
   loopSFXSource: {fileID: 1269994080291057903}
