@@ -86,5 +86,5 @@ MonoBehaviour:
   _nearTint: {r: 0.55, g: 0.58, b: 0.62, a: 0.85}
   _wiggleAngle: 10
   _parallax: {x: 0.3, y: 0.1}
-  _activeMinX: -9999
-  _activeMaxX: 9999
+  _activeMinX: 124
+  _activeMaxX: 165

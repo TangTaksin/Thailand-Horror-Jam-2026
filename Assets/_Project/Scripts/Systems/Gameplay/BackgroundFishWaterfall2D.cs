@@ -1,10 +1,12 @@
 using UnityEngine;
+using ThailandHorrorJam.Core;
 
 namespace ThailandHorrorJam.Systems.Gameplay
 {
     /// <summary>
     /// Decor-only fish rain for background layers. No colliders, physics, or tweens:
     /// each fish is a SpriteRenderer driven by this single script. Fake depth + camera parallax.
+    /// Activates only when the player is within [_activeMinX, _activeMaxX], matching FishWaterfallSpawner2D.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class BackgroundFishWaterfall2D : MonoBehaviour
@@ -35,9 +37,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Header("Parallax (0 = fixed in world, 1 = moves with camera)")]
         [SerializeField] private Vector2 _parallax = new Vector2(0.3f, 0.1f);
 
-        [Header("Activation (camera world X)")]
-        [SerializeField] private float _activeMinX = -9999f;
-        [SerializeField] private float _activeMaxX = 9999f;
+        [Header("Optimization / Proximity")]
+        [Tooltip("Minimum player X position to activate spawner.")]
+        [SerializeField] private float _activeMinX = 124.0f;
+
+        [Tooltip("Maximum player X position to activate spawner.")]
+        [SerializeField] private float _activeMaxX = 165.0f;
 
         private struct Fish
         {
@@ -51,16 +56,24 @@ namespace ThailandHorrorJam.Systems.Gameplay
         private Fish[] _fish;
         private Transform _layer;
         private Transform _cam;
+        private Transform _playerTransform;
         private Vector3 _camStart;
         private bool _camStartSet;
         private float _timer;
         private float _nextSpawn;
 
         public int ActiveCount { get; private set; }
+        public float ActiveMinX => _activeMinX;
+        public float ActiveMaxX => _activeMaxX;
 
         private void Awake()
         {
             EnsureInitialized();
+        }
+
+        private void Start()
+        {
+            FindPlayer();
         }
 
         private void EnsureInitialized()
@@ -104,28 +117,50 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private void Update()
         {
+            if (!IsPlayerInProximity())
+            {
+                return;
+            }
+
             EnsureInitialized();
             float dt = Time.deltaTime;
 
-            bool inRange = true;
-            if (TryCacheCamera())
+            _timer += dt;
+            if (_timer >= _nextSpawn)
             {
-                float cx = _cam.position.x;
-                inRange = cx >= _activeMinX && cx <= _activeMaxX;
-            }
-
-            if (inRange)
-            {
-                _timer += dt;
-                if (_timer >= _nextSpawn)
-                {
-                    _timer = 0f;
-                    _nextSpawn = Random.Range(_spawnInterval.x, _spawnInterval.y);
-                    SpawnOne();
-                }
+                _timer = 0f;
+                _nextSpawn = Random.Range(_spawnInterval.x, _spawnInterval.y);
+                SpawnOne();
             }
 
             TickFish(dt);
+        }
+
+        private bool IsPlayerInProximity()
+        {
+            if (_playerTransform == null)
+            {
+                FindPlayer();
+                if (_playerTransform == null) return true; // fallback
+            }
+
+            float px = _playerTransform.position.x;
+            return px >= _activeMinX && px <= _activeMaxX;
+        }
+
+        private void FindPlayer()
+        {
+            if (PlayerController2D.Instance != null)
+            {
+                _playerTransform = PlayerController2D.Instance.transform;
+                return;
+            }
+
+            PlayerController2D player = FindAnyObjectByType<PlayerController2D>();
+            if (player != null)
+            {
+                _playerTransform = player.transform;
+            }
         }
 
         private void TickFish(float dt)
@@ -202,7 +237,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private void LateUpdate()
         {
-            if (_layer == null || !TryCacheCamera()) return;
+            if (_layer == null || !IsPlayerInProximity() || !TryCacheCamera()) return;
 
             Vector3 d = _cam.position - _camStart;
             _layer.localPosition = new Vector3(d.x * _parallax.x, d.y * _parallax.y, 0f);
@@ -213,6 +248,27 @@ namespace ThailandHorrorJam.Systems.Gameplay
             Gizmos.color = new Color(0.4f, 0.6f, 0.8f, 0.6f);
             Vector3 c = transform.TransformPoint(new Vector3((_minX + _maxX) * 0.5f, (_spawnY + _despawnY) * 0.5f, 0f));
             Gizmos.DrawWireCube(c, new Vector3(_maxX - _minX, Mathf.Abs(_spawnY - _despawnY), 0.1f));
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            // Draw Player Active Proximity Bounds (Green zone), matching FishWaterfallSpawner2D
+            if (_activeMinX < _activeMaxX)
+            {
+                float activeWidth = _activeMaxX - _activeMinX;
+                float activeHeight = 16f;
+                float worldSpawnY = transform.position.y + _spawnY;
+                Vector3 activeCenter = new Vector3((_activeMinX + _activeMaxX) * 0.5f, worldSpawnY - (activeHeight * 0.5f) + 3f, 0f);
+
+                Gizmos.color = new Color(0.2f, 1f, 0.35f, 0.08f);
+                Gizmos.DrawCube(activeCenter, new Vector3(activeWidth, activeHeight, 0.1f));
+
+                Gizmos.color = new Color(0.2f, 1f, 0.35f, 0.75f);
+                Gizmos.DrawWireCube(activeCenter, new Vector3(activeWidth, activeHeight, 0.1f));
+
+                Gizmos.DrawLine(new Vector3(_activeMinX, activeCenter.y - activeHeight * 0.5f, 0f), new Vector3(_activeMinX, activeCenter.y + activeHeight * 0.5f, 0f));
+                Gizmos.DrawLine(new Vector3(_activeMaxX, activeCenter.y - activeHeight * 0.5f, 0f), new Vector3(_activeMaxX, activeCenter.y + activeHeight * 0.5f, 0f));
+            }
         }
     }
 }
