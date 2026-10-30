@@ -180,6 +180,7 @@ MonoBehaviour:
   musicSource: {fileID: 579321607855361387}
   sfxSource: {fileID: 7799966030440228392}
   defaultMusicClip: {fileID: 8300000, guid: d0fda10fb8a6cf941b4412d4e4d6b8a6, type: 3}
+  endingMusicClip: {fileID: 8300000, guid: f9151b58f44e46e40a36b8201e27238d, type: 3}
   minPitch: 0.8
   maxPitch: 1.2
   fadeOutDuration: 0.5

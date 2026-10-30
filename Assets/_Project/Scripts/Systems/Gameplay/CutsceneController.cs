@@ -102,6 +102,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("Play SFX every N characters to avoid audio overload.")]
         [SerializeField] protected int _sfxCharInterval = 2;
 
+        [Header("Music (Ending / Custom)")]
+        [Tooltip("Optional music clip to play when this cutscene starts. If unassigned on an Ending cutscene, AudioManager.endingMusicClip is used.")]
+        [SerializeField] protected AudioClip _cutsceneMusicClip;
+
         protected Coroutine _cutsceneRoutine;
         protected Coroutine _typewriterRoutine;
         protected int _currentSlideIndex = -1;
@@ -248,6 +252,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 DeactivateGameplaySectors();
             }
+
+            PlayCutsceneMusic();
 
             OnCutsceneStarted?.Invoke();
 
@@ -592,10 +598,29 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
         }
 
+        protected virtual void PlayCutsceneMusic()
+        {
+            if (AudioManager.Instance == null) return;
+
+            if (_cutsceneMusicClip != null)
+            {
+                AudioManager.Instance.PlayMusic(_cutsceneMusicClip);
+            }
+            else if (_displayMode == CutsceneDisplayMode.FullScreenCinematicMovie || _endAction == CutsceneEndAction.ShowEndCard)
+            {
+                AudioManager.Instance.PlayEndingMusic();
+            }
+        }
+
         protected virtual void OnReenterLoopClicked()
         {
             if (_isReenteringLoop) return;
             _isReenteringLoop = true;
+
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayDefaultMusic();
+            }
 
             if (_reenterLoopButton != null)
             {

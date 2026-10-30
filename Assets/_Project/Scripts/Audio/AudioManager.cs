@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class AudioManager : MonoBehaviour
 {
@@ -12,6 +13,7 @@ public class AudioManager : MonoBehaviour
 
     [Header("Music Settings")]
     public AudioClip defaultMusicClip;
+    public AudioClip endingMusicClip;
 
     [Header("Pitch Randomization (SFX)")]
     [SerializeField] private float minPitch = 0.95f;
@@ -52,6 +54,16 @@ public class AudioManager : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
     private void Start()
     {
         // เล่นเพลงเริ่มต้นถ้ามีการใส่ไฟล์ไว้
@@ -59,7 +71,31 @@ public class AudioManager : MonoBehaviour
             PlayMusic(defaultMusicClip);
     }
 
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (Instance != this) return;
+
+        if (scene.name == "MainMenu")
+        {
+            PlayDefaultMusic();
+        }
+    }
+
     // ─── Music Logic ───
+
+    public void PlayDefaultMusic(float volume = 0.5f)
+    {
+        if (defaultMusicClip == null || musicSource == null) return;
+        if (musicSource.clip == defaultMusicClip && musicSource.isPlaying) return;
+        PlayMusic(defaultMusicClip, volume);
+    }
+
+    public void PlayEndingMusic(float volume = 0.5f)
+    {
+        if (endingMusicClip == null || musicSource == null) return;
+        if (musicSource.clip == endingMusicClip && musicSource.isPlaying) return;
+        PlayMusic(endingMusicClip, volume);
+    }
 
     public void PlayMusic(AudioClip clip, float volume = 0.5f)
     {
