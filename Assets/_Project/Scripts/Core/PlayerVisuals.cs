@@ -1,8 +1,10 @@
+using System.Collections;
 using UnityEngine;
 using DG.Tweening;
 using TMPro;
 using ThailandHorrorJam.Systems.Needle;
 using ThailandHorrorJam.Systems.Gameplay;
+using ThailandHorrorJam.Systems.UI;
 
 namespace ThailandHorrorJam.Core
 {
@@ -292,7 +294,7 @@ namespace ThailandHorrorJam.Core
                 }
 
                 CacheAndHideHintMovement();
-                StartWakeUpSequence(_startLieDownDuration, OnGameStartWakeUpCompleted);
+                StartCoroutine(LimboWakeUpRoutine());
             }
             else
             {
@@ -408,9 +410,12 @@ namespace ThailandHorrorJam.Core
 
             if (_isWakingUp)
             {
-                bool hasMoveInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.05f;
+                // When holding lying down (timer > 0 or in limbo routine), NEVER allow cancellation into Idle/Fall.
+                // Only allow early cancellation once the stand-up animation is actively playing AND player gives explicit input.
+                bool hasMoveInput = _controller != null && Mathf.Abs(_controller.HorizontalInput) > 0.2f;
                 bool isAimingNow = _needleController != null && _needleController.IsAiming;
-                bool canCancel = _wakeUpHoldTimer <= 0f && (!_controller.IsGrounded || hasMoveInput || isAimingNow);
+                bool canCancel = _wakeUpHoldTimer <= 0f && (hasMoveInput || isAimingNow);
+
                 if (canCancel)
                 {
                     _isWakingUp = false;
@@ -1111,6 +1116,53 @@ namespace ThailandHorrorJam.Core
                 }
                 _hintMovement.SetActive(false);
             }
+        }
+
+        private IEnumerator LimboWakeUpRoutine()
+        {
+            // 1. Immediately flag waking up and lock hold timer to float.PositiveInfinity
+            // This prevents UpdateVisualState / AnimateCurrentFrame from touching or swapping state!
+            _isWakingUp = true;
+            _wakeUpHoldTimer = float.PositiveInfinity;
+            _scaleModifier = Vector3.one;
+            _recoilOffset = Vector3.zero;
+            _currentTiltAngle = 0f;
+
+            if (_controller != null)
+            {
+                _controller.SetInputLocked(true);
+            }
+            if (_aimNeedleObj != null) _aimNeedleObj.SetActive(false);
+
+            Sprite[] wakeClip = GetSpritesForState(VisualState.WakeUp);
+            SetState(VisualState.WakeUp, forceRestart: true);
+            _currentFrame = 0;
+            if (_spriteRenderer != null && wakeClip != null && wakeClip.Length > 0)
+            {
+                _spriteRenderer.sprite = wakeClip[0];
+            }
+
+            // 2. Fade in screen smoothly from pitch black (Limbo style)
+            if (ScreenFader.Instance != null)
+            {
+                ScreenFader.Instance.SetAlpha(1f);
+
+                bool fadeFinished = false;
+                ScreenFader.Instance.FadeIn(2.2f, () => fadeFinished = true);
+
+                while (!fadeFinished)
+                {
+                    yield return null;
+                }
+            }
+
+            // 3. Pause while lying peacefully in the clear world
+            float pauseAfterFade = _startLieDownDuration > 0f ? _startLieDownDuration : 1.2f;
+            yield return new WaitForSeconds(pauseAfterFade);
+
+            // 4. Release hold timer to 0 so WakeUp animation smoothly plays to standing position
+            _wakeUpHoldTimer = 0f;
+            _onWakeUpCompletedCallback = OnGameStartWakeUpCompleted;
         }
 
         private void OnGameStartWakeUpCompleted()

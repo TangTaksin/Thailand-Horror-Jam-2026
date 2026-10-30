@@ -245,7 +245,15 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 _currentVelocity = new Vector2(_activeHorizontalDrift, -_activeFallSpeed);
             }
 
+            Vector2 prevFishPos = transform.position;
             Vector3 stepMove = (Vector3)(_currentVelocity * dt);
+            Vector2 nextFishPos = prevFishPos + (Vector2)stepMove;
+
+            // ตรวจสอบว่าปลาตกตัดผ่านเส้นด้ายที่ผูกกับตัวผู้เล่น (Player Tether) หรือไม่
+            if (_harmPlayer && !_isDeflected && !_isCaughtOnShield)
+            {
+                CheckTetherSlice(prevFishPos, nextFishPos);
+            }
 
             // ตรวจจับการกระทบพื้นเฉพาะเมื่อเปิดโหมด _landAndFlopOnGround
             if (_landAndFlopOnGround && !_isDeflected && !_isCaughtOnShield)
@@ -414,6 +422,58 @@ namespace ThailandHorrorJam.Systems.Gameplay
         /// <summary>
         /// 3. เมื่อหล่นใส่ตัวผู้เล่น
         /// </summary>
+        private void CheckTetherSlice(Vector2 prevPos, Vector2 nextPos)
+        {
+            PlayerController2D player = PlayerController2D.Instance;
+            if (player == null) return;
+
+            bool isTethered = player.IsHauling || (player.NeedleController != null && player.NeedleController.IsTetheredToPlayer);
+            if (!isTethered) return;
+
+            IStitchable crate = (player.NeedleController != null && player.NeedleController.IsTetheredToPlayer)
+                ? player.NeedleController.TetheredStitchable
+                : player.CurrentStitchable;
+
+            if (crate == null || crate.ObjectTransform == null) return;
+
+            Vector2 playerPos = player.transform.position;
+            Vector2 cratePos = crate.CurrentPosition;
+
+            if (SutureThread.SegmentsIntersect(prevPos, nextPos, playerPos, cratePos) ||
+                SqrDistToSegment(prevPos, playerPos, cratePos) <= 0.09f ||
+                SqrDistToSegment(nextPos, playerPos, cratePos) <= 0.09f)
+            {
+                player.ReleaseHaulingTether();
+                if (player.NeedleController != null && player.NeedleController.IsTetheredToPlayer)
+                {
+                    player.NeedleController.ReleasePlayerTether();
+                }
+
+                _isDeflected = true;
+                float bounceX = UnityEngine.Random.Range(-1.6f, 1.6f);
+                if (Mathf.Abs(bounceX) < 0.5f) bounceX = 1.0f;
+                _currentVelocity = new Vector2(bounceX, 1.5f);
+                if (_collider != null) _collider.enabled = false;
+                PlayPlayerHitTween(Mathf.Sign(bounceX));
+
+                CameraController2D.Instance?.Shake(0.04f, 0.1f);
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX("sfx_thread_cut");
+                }
+            }
+        }
+
+        private static float SqrDistToSegment(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float l2 = ab.sqrMagnitude;
+            if (l2 < 1e-6f) return (p - a).sqrMagnitude;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / l2);
+            Vector2 proj = a + t * ab;
+            return (p - proj).sqrMagnitude;
+        }
+
         private void PlayPlayerHitTween(float bounceDir)
         {
             StopFallingLoopTweens();

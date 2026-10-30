@@ -143,6 +143,7 @@ namespace ThailandHorrorJam.Core
         public Vector2 RelativeVelocity => Velocity - PlatformVelocity;
         public StitchableObject CurrentStitchable => _currentStitchable;
         public bool IsVentSuperJumping => _ventSuperJumpTimer > 0f;
+        public NeedleController NeedleController => _needleController;
 
         public static PlayerController2D Instance { get; private set; }
 
@@ -201,6 +202,24 @@ namespace ThailandHorrorJam.Core
             _knockbackVelocity = impulse;
             _rb.linearVelocity = impulse;
             CameraController2D.Instance?.Shake(0.035f, 0.1f);
+
+            // เมื่อโดนกระแทกจาก Hazard (เช่น โดนปลาตกใส่) ด้ายที่ผูกติดอยู่กับตัวผู้เล่น (Tether) ต้องขาดหลุดทันที
+            if (_isHauling)
+            {
+                ReleaseHaulingTether();
+            }
+
+            if (_needleController != null)
+            {
+                if (_needleController.IsTetheredToPlayer)
+                {
+                    _needleController.ReleasePlayerTether();
+                }
+                if (_needleController.IsAiming)
+                {
+                    _needleController.CancelStitchingOrTether();
+                }
+            }
         }
 
         public void SetHazardKnockbackCooldown(float duration = 0.28f)
@@ -499,8 +518,15 @@ namespace ThailandHorrorJam.Core
 
             ApplyAimLeashConstraint();
 
-            // เก็บค่าความเร็วแกน Y ไว้ท้ายสุด เพื่อใช้วัดแรงกระแทกก่อนที่ Physics Step รอบถัดไปจะปรับเป็น 0
-            _lastVerticalVelocity = _rb.linearVelocity.y;
+            // แคชความเร็วแนวดิ่งขณะลอยตัว ถ้าความเร็วเป็นลบ (กำลังตก) ให้เก็บค่าตกสูงสุดไว้ก่อนที่จะถูก Physics Solver ปรับเป็น 0
+            if (!_isGrounded && _rb.linearVelocity.y < -0.1f)
+            {
+                _lastVerticalVelocity = _rb.linearVelocity.y;
+            }
+            else if (_isGrounded)
+            {
+                _lastVerticalVelocity = Mathf.Min(_lastVerticalVelocity, _rb.linearVelocity.y);
+            }
         }
 
         private void ApplyPlatformMovement()
@@ -611,18 +637,7 @@ namespace ThailandHorrorJam.Core
 
             if (_jumpBufferCounter > 0f && _coyoteTimeCounter > 0f && !_isAiming)
             {
-                // ขณะกำลังลากวัตถุ (Hauling) หากผู้เล่นกดกระโดด จะปลดเชือกหลุดอัตโนมัติแล้วกระโดดได้อย่างคล่องตัว
-                // ยกเว้นกรณีที่ยืนอยู่บนวัตถุที่ผูกเชือกอยู่ จะไม่ปลดเชือก เพื่อให้ดีดตัวพร้อมกล่องได้
-                if (_isHauling)
-                {
-                    bool standingOnTethered = (_currentStitchable != null && _currentStitchable.IsTetheredToPlayer && IsStandingOn(_currentStitchable))
-                        || (_needleController != null && _needleController.IsTetheredToPlayer && _needleController.TetheredStitchable != null && IsStandingOn(_needleController.TetheredStitchable.ObjectTransform));
-
-                    if (!standingOnTethered)
-                    {
-                        ReleaseHaulingTether();
-                    }
-                }
+                // การปลดสายจูงถูกย้ายไปทำใน ExecuteJump() เพื่อให้คำนวณโบนัส Super Jump จากท่อก๊าซให้เรียบร้อยก่อนปลด
 
                 _jumpRequested = true;
                 _jumpBufferCounter = 0f;
@@ -685,6 +700,13 @@ namespace ThailandHorrorJam.Core
             }
 
             _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, _jumpForce + extraBounce);
+
+            // ปลดสายจูงที่ผูกกับตัวผู้เล่นทันทีเมื่อกระโดด (ทั้งกระโดดจากพื้นหรือกระโดดออกจากกล่อง) เพื่อไม่ให้ Joint ดึงรั้งตัวผู้เล่นกลับลงมา
+            if (_isHauling || (_needleController != null && _needleController.IsTetheredToPlayer))
+            {
+                ReleaseHaulingTether();
+            }
+
             _isGrounded = false;
             _isOnSlope = false;
             _slopeNormal = Vector2.up;
@@ -838,21 +860,26 @@ namespace ThailandHorrorJam.Core
             float colBottomY = _col != null ? _col.bounds.min.y : transform.position.y - 0.5f;
             float bodyWidth = _col != null ? _col.bounds.size.x : 0.5f;
 
+            // Predictive landing probe: เมื่อตัวละครกำลังลอยตกมาจากอากาศ (velY <= 0)
+            // ยื่นกล่องตรวจจับลงต่ำกว่าระดับฝ่าเท้าเล็กน้อย (0.12m) เพื่อให้ตรวจจับการแลนดิ้งได้ทันทีในเฟรมแรก
+            // ป้องกัน Physics step delay ที่ทำให้เกิดอาการ Player land delay
+            float probeDown = (!_isGrounded && _rb.linearVelocity.y <= 0.1f) ? 0.12f : 0.04f;
+
             if (_feetCollider != null)
             {
-                // ผสานขนาด FeetCollider เข้ากับ Capsule เพื่อไม่ให้เกิด Dead Zone ด้านข้าง และครอบคลุมทั้งเท้าซ้าย/ขวา
                 colWidth = Mathf.Max(_feetCollider.bounds.size.x, bodyWidth * 0.85f);
                 feetBottomY = Mathf.Min(_feetCollider.bounds.min.y, colBottomY);
-                float checkHeight = Mathf.Max(_feetCollider.bounds.size.y, 0.16f);
-                checkPos = new Vector2(transform.position.x, feetBottomY + checkHeight * 0.5f);
+                float checkHeight = Mathf.Max(_feetCollider.bounds.size.y, 0.16f) + probeDown;
+                checkPos = new Vector2(transform.position.x, feetBottomY + checkHeight * 0.5f - probeDown);
                 effectiveCheckSize = new Vector2(colWidth, checkHeight);
             }
             else
             {
                 colWidth = bodyWidth * 0.85f;
                 feetBottomY = colBottomY;
-                checkPos = new Vector2(transform.position.x, feetBottomY + 0.08f);
-                effectiveCheckSize = new Vector2(colWidth, 0.16f);
+                float checkHeight = 0.16f + probeDown;
+                checkPos = new Vector2(transform.position.x, feetBottomY + 0.08f - (probeDown * 0.5f));
+                effectiveCheckSize = new Vector2(colWidth, checkHeight);
             }
 
             bool wasGrounded = _isGrounded;
@@ -884,12 +911,13 @@ namespace ThailandHorrorJam.Core
                 }
             }
 
-            // Downward Ground Snapping: เมื่อเดินลงทางลาดหรือขอบเตี้ย (และเฟรมก่อนอยู่บนพื้น)
-            // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก และไม่ดูดติด Trigger colliders
+            // Downward Ground Snapping: ตรวจสอบทั้งกรณีเดินลงทางลาดเตี้ย และกรณีแลนดิ้งลงพื้นใกล้ถึง
+            // ยิง Raycast ลงไปในระยะสั้นเพื่อดูดเท้าติดพื้นทันที ป้องกันตัวลอยกระตุก/ดีเลย์
             float lastGroundVelY = _currentStitchable != null ? _currentStitchable.CurrentVelocity.y : 0f;
             float relSnapVelY = _rb.linearVelocity.y - lastGroundVelY;
             float minSlopeNormalY = Mathf.Cos(_maxSlopeAngle * Mathf.Deg2Rad);
-            if (_enableGroundSnapping && detectedGround == null && wasGrounded && !_jumpRequested && (relSnapVelY <= 0.2f || _currentStitchable != null))
+            bool canSnapLanding = !wasGrounded && relSnapVelY <= -0.5f;
+            if (_enableGroundSnapping && detectedGround == null && !_jumpRequested && ((wasGrounded && (relSnapVelY <= 0.2f || _currentStitchable != null)) || canSnapLanding))
             {
                 Vector2 rayStart = new Vector2(checkPos.x, feetBottomY + 0.05f);
                 float snapDist = _groundSnapDistance + 0.05f;
@@ -1132,11 +1160,11 @@ namespace ThailandHorrorJam.Core
             float impactSpeed = Mathf.Abs(_lastVerticalVelocity);
             OnLanded?.Invoke(impactSpeed);
 
-            if (impactSpeed > 1.8f)
+            if (impactSpeed > 1.0f)
             {
                 if (AudioManager.Instance != null)
                 {
-                    float vol = Mathf.Clamp(impactSpeed / 10f, 0.4f, 1.0f);
+                    float vol = Mathf.Clamp(impactSpeed / 8f, 0.4f, 1.0f);
                     AudioManager.Instance.PlaySFX("sfx_player_jump_land", vol);
                 }
 

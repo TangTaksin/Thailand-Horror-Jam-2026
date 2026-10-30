@@ -146,7 +146,7 @@ MonoBehaviour:
   _deflectLateralSpeed: 5
   _deflectUpwardSpeed: 1.8
   _despawnY: -3.2
-  _knockbackHorizontalForce: 20
+  _knockbackHorizontalForce: 10
   _knockbackVerticalForce: 2
   _animationFrames:
   - {fileID: 2068383782226403057, guid: fd6182abf6b7e3c489368769444e8d93, type: 3}
