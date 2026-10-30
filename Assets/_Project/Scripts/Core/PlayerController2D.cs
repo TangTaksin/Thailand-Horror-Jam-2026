@@ -28,6 +28,9 @@ namespace ThailandHorrorJam.Core
         [SerializeField] private bool _canMoveWhileAiming = false;
         [Tooltip("Speed multiplier applied to player horizontal velocity while aiming/pinning needle (ย่องเล็ง) when _canMoveWhileAiming is true.")]
         [SerializeField] private float _aimingSpeedMultiplier = 0f;
+        [Tooltip("SFX name for hauling/dragging crate loop (Slide_lp).")]
+        [SerializeField] private string _haulingDragSFXName = "sfx_crate_drag_loop";
+        [SerializeField] [Range(0f, 1f)] private float _haulingDragVolume = 0.75f;
 
         [Header("Jump & Gravity Settings")]
         [SerializeField] private float _jumpForce = 12f;
@@ -113,6 +116,7 @@ namespace ThailandHorrorJam.Core
         private float _footstepTimer;
         private bool _isHauling;
         private float _haulingAirborneTimer;
+        private bool _isDraggingAudioPlaying;
         private bool _isAiming;
         private bool _isInputLocked;
         private Vector2? _aimLeashAnchor;
@@ -517,6 +521,7 @@ namespace ThailandHorrorJam.Core
             }
 
             ApplyAimLeashConstraint();
+            UpdateHaulingAudio();
 
             // แคชความเร็วแนวดิ่งขณะลอยตัว ถ้าความเร็วเป็นลบ (กำลังตก) ให้เก็บค่าตกสูงสุดไว้ก่อนที่จะถูก Physics Solver ปรับเป็น 0
             if (!_isGrounded && _rb.linearVelocity.y < -0.1f)
@@ -1162,10 +1167,16 @@ namespace ThailandHorrorJam.Core
 
             if (impactSpeed > 1.0f)
             {
+                int stitchableLayer = LayerMask.NameToLayer("Stitchable");
+                bool isStitchableLand = _currentStitchable != null
+                    || (_currentGroundCollider != null && (stitchableLayer != -1 && _currentGroundCollider.gameObject.layer == stitchableLayer))
+                    || (_currentGroundCollider != null && _currentGroundCollider.GetComponentInParent<StitchableObject>() != null);
+
                 if (AudioManager.Instance != null)
                 {
                     float vol = Mathf.Clamp(impactSpeed / 8f, 0.4f, 1.0f);
-                    AudioManager.Instance.PlaySFX("sfx_player_jump_land", vol);
+                    string sfx = isStitchableLand ? "sfx_player_land_wood" : "sfx_player_jump_land";
+                    AudioManager.Instance.PlaySFX(sfx, vol);
                 }
 
                 if (_currentStitchable != null)
@@ -1267,7 +1278,63 @@ namespace ThailandHorrorJam.Core
 
         private void OnDisable()
         {
+            StopHaulingAudio();
             RestoreIgnoredCrushColliders();
+        }
+
+        private void UpdateHaulingAudio()
+        {
+            if (AudioManager.Instance == null || string.IsNullOrEmpty(_haulingDragSFXName)) return;
+
+            // เช็ค Layer ของพื้นใต้เท้าโดยตรง: ถ้าเหยียบวัตถุ Layer "Stitchable" (layer 7) หรือ _currentStitchable ไม่เป็น null จะไม่เล่นเสียงลาก
+            int stitchableLayer = LayerMask.NameToLayer("Stitchable");
+            bool isStandingOnStitchable = _currentStitchable != null
+                || (_currentGroundCollider != null && (stitchableLayer != -1 && _currentGroundCollider.gameObject.layer == stitchableLayer))
+                || (_currentGroundCollider != null && _currentGroundCollider.GetComponentInParent<StitchableObject>() != null);
+
+            // เช็คว่ากล่องที่ Tether อยู่มีการเคลื่อนที่ในแกน X จริงหรือไม่
+            bool isCrateMoving = false;
+            IStitchable tethered = (_needleController != null && _needleController.TetheredStitchable != null)
+                ? _needleController.TetheredStitchable
+                : _currentStitchable;
+            if (tethered != null && tethered.ObjectTransform != null)
+            {
+                Rigidbody2D crateRb = tethered.ObjectTransform.GetComponent<Rigidbody2D>();
+                if (crateRb != null)
+                {
+                    isCrateMoving = Mathf.Abs(crateRb.linearVelocity.x) > 0.15f;
+                }
+            }
+
+            // กำลังลากของอยู่บนพื้น (ไม่ได้ยืนอยู่บน Stitchable), ผู้เล่นกำลังเดิน และกล่องขยับตามจริง
+            bool isDragging = _isHauling && _isGrounded && !isStandingOnStitchable
+                && Mathf.Abs(_horizontalInput) > 0.1f && Mathf.Abs(_rb.linearVelocity.x) > 0.2f
+                && isCrateMoving;
+
+            if (isDragging)
+            {
+                if (!_isDraggingAudioPlaying)
+                {
+                    _isDraggingAudioPlaying = true;
+                    AudioManager.Instance.PlayLoopingSFX(_haulingDragSFXName, 1.0f);
+                }
+            }
+            else if (_isDraggingAudioPlaying)
+            {
+                StopHaulingAudio();
+            }
+        }
+
+        private void StopHaulingAudio()
+        {
+            if (_isDraggingAudioPlaying)
+            {
+                _isDraggingAudioPlaying = false;
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.StopLoopingSFX();
+                }
+            }
         }
 
         private void OnCollisionEnter2D(Collision2D collision)
