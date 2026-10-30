@@ -194,6 +194,22 @@ namespace ThailandHorrorJam.Systems.Gameplay
         }
 
         /// <summary>
+        /// Deactivates all sectors immediately (e.g. when ending cutscene plays).
+        /// </summary>
+        public void DeactivateAllSectors()
+        {
+            _currentSectorIndex = -1;
+            for (int i = 0; i < _sectors.Count; i++)
+            {
+                SectorEntry sector = _sectors[i];
+                if (sector?.rootObject != null)
+                {
+                    sector.rootObject.SetActive(false);
+                }
+            }
+        }
+
+        /// <summary>
         /// Called during the blackout phase of death: switches the active sector
         /// to the one containing the active checkpoint so that the scene is fully ready before fade in.
         /// </summary>

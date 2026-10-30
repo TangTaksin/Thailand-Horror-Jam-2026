@@ -92,6 +92,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("If true, pressing Space, Escape, or Tab on keyboard will also skip (for fast debugging).")]
         [SerializeField] protected bool _allowKeyboardSkip = true;
 
+        [Header("Ending Optimization")]
+        [Tooltip("Deactivate all gameplay sectors and actors when this cutscene begins (recommended for ending cutscene).")]
+        [SerializeField] protected bool _deactivateGameplaySectors = false;
+
         [Header("Audio SFX (Typewriter)")]
         [SerializeField] protected bool _playTypewriterSFX = true;
         [SerializeField] protected string[] _typewriterSFXNames = new[] { "Typewriter_1", "Typewriter_2" };
@@ -239,6 +243,12 @@ namespace ThailandHorrorJam.Systems.Gameplay
             // Lock player movement and needle interactions during cutscenes
             LockPlayerAndNeedle(true);
 
+            // Deactivate all gameplay sectors if requested or in full-screen ending movie mode
+            if (_deactivateGameplaySectors || _displayMode == CutsceneDisplayMode.FullScreenCinematicMovie)
+            {
+                DeactivateGameplaySectors();
+            }
+
             OnCutsceneStarted?.Invoke();
 
             if (_cutsceneRoutine != null)
@@ -280,6 +290,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
             _isCompleted = true;
             _isPlaying = false;
+
+            if (_deactivateGameplaySectors || _displayMode == CutsceneDisplayMode.FullScreenCinematicMovie)
+            {
+                DeactivateGameplaySectors();
+            }
 
             if (_subtitleText != null)
             {
@@ -553,6 +568,20 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         protected virtual void ExecuteSceneTransition()
         {
+            StartCoroutine(FadeOutAndLoadSceneRoutine());
+        }
+
+        private IEnumerator FadeOutAndLoadSceneRoutine()
+        {
+            // 1. Ensure screen transitions to pitch black
+            if (ThailandHorrorJam.Systems.UI.ScreenFader.Instance != null)
+            {
+                bool fadeDone = false;
+                ThailandHorrorJam.Systems.UI.ScreenFader.Instance.FadeOut(0.6f, () => fadeDone = true);
+                while (!fadeDone) yield return null;
+            }
+
+            // 2. Load next scene
             if (_sceneSwitcher != null)
             {
                 _sceneSwitcher.LoadNextScene();
@@ -619,6 +648,64 @@ namespace ThailandHorrorJam.Systems.Gameplay
             {
                 needle.CancelStitching();
                 needle.ResetCutAimState();
+            }
+        }
+
+        /// <summary>
+        /// Deactivates all gameplay sectors and actors so the ending cutscene plays smoothly in isolation.
+        /// </summary>
+        public virtual void DeactivateGameplaySectors()
+        {
+            // 1. Deactivate all sector roots via LevelSeamlessManager
+            if (LevelSeamlessManager.Instance != null)
+            {
+                LevelSeamlessManager.Instance.DeactivateAllSectors();
+            }
+            else
+            {
+                // Fallback: search any sector roots in the scene
+                var rootGos = gameObject.scene.GetRootGameObjects();
+                for (int i = 0; i < rootGos.Length; i++)
+                {
+                    if (rootGos[i] != null && (rootGos[i].name.StartsWith("Sector_") || rootGos[i].name.Contains("Sector")))
+                    {
+                        rootGos[i].SetActive(false);
+                    }
+                }
+            }
+
+            // 2. Hide / deactivate Player and clean up tether
+            PlayerController2D player = FindAnyObjectByType<PlayerController2D>();
+            if (player != null)
+            {
+                player.ReleaseHaulingTether();
+                player.SetInputLocked(true);
+                player.StopHorizontalMovement();
+                player.gameObject.SetActive(false);
+            }
+
+            // 3. Release and deactivate NeedleController
+            NeedleController needle = FindAnyObjectByType<NeedleController>();
+            if (needle != null)
+            {
+                needle.ReleasePlayerTether();
+                needle.CancelStitching();
+                needle.ResetCutAimState();
+                needle.gameObject.SetActive(false);
+            }
+
+            // 4. Deactivate any active falling fish hazards
+            var fish = FindObjectsByType<FallingFishHazard2D>(FindObjectsInactive.Exclude);
+            for (int i = 0; i < fish.Length; i++)
+            {
+                if (fish[i] != null) fish[i].gameObject.SetActive(false);
+            }
+
+            // 5. Hide any active world hints or prompts
+            var hints = FindObjectsByType<WorldHintTrigger2D>(FindObjectsInactive.Exclude);
+            for (int i = 0; i < hints.Length; i++)
+            {
+                if (hints[i] != null) hints[i].HideHint();
             }
         }
     }

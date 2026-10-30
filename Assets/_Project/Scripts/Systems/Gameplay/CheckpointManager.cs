@@ -225,6 +225,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 if (_playerController != null)
                 {
                     _playerController.SetInputLocked(true);
+                    _playerController.ReleaseHaulingTether();
                 }
 
                 if (_needleController != null)

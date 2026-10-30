@@ -86,6 +86,9 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             yield return new WaitForSeconds(_transitionDelay);
 
+            // Deactivate all gameplay sectors when entering the ending sequence
+            LevelSeamlessManager.Instance?.DeactivateAllSectors();
+
             if (_endingCutscene != null)
             {
                 _endingCutscene.StartCutscene();

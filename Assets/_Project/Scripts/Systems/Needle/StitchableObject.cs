@@ -225,6 +225,10 @@ namespace ThailandHorrorJam.Systems.Needle
         public void OnPlayerJumpedOff(Vector2 contactPoint)
         {
             PluckIfLooping(contactPoint, _jumpKickImpulse, 1.5f);
+            if (_currentState == StitchState.PlayerHarness)
+            {
+                ReleasePlayerTether();
+            }
         }
 
         public void OnPlayerWalkingStep(Vector2 contactPoint)

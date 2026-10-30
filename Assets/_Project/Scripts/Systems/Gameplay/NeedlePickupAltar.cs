@@ -121,10 +121,26 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Header("Checkpoint")]
         [SerializeField] private Checkpoint _altarCheckpoint;
 
-        [Header("Audio (Optional)")]
-        [SerializeField] private AudioSource _audioSource;
+        [Header("Audio (AudioManager Integration)")]
+        [Tooltip("ชื่อ SFX ใน AudioManager สำหรับเสียงดึงเนื้อ/ขยับเข็มช่วงแรก")]
+        [SerializeField] private string _fleshTugSFXName = "sfx_thread_cut";
+        [Tooltip("ระดับความดังของเสียงดึงเนื้อ")]
+        [SerializeField] [Range(0f, 1f)] private float _fleshTugVolume = 1.0f;
+        [Tooltip("AudioClip สำรองกรณีไม่ได้ระบุชื่อ SFX ใน AudioManager")]
         [SerializeField] private AudioClip _fleshTugSfx;
+
+        [Tooltip("ชื่อ SFX ใน AudioManager สำหรับเสียงกระชากเข็มหลุด")]
+        [SerializeField] private string _needleExtractSFXName = "sfx_needle_pin";
+        [Tooltip("ระดับความดังของเสียงกระชากเข็มหลุด")]
+        [SerializeField] [Range(0f, 1f)] private float _needleExtractVolume = 1.0f;
+        [Tooltip("AudioClip สำรองกรณีไม่ได้ระบุชื่อ SFX ใน AudioManager")]
         [SerializeField] private AudioClip _needleExtractSfx;
+
+        [Tooltip("ชื่อ SFX ใน AudioManager สำหรับเสียงเผยชื่อเกม (ถ้ามี)")]
+        [SerializeField] private string _titleRevealSFXName = "";
+        [Tooltip("ระดับความดังของเสียงเผยชื่อเกม")]
+        [SerializeField] [Range(0f, 1f)] private float _titleRevealVolume = 1.0f;
+        [Tooltip("AudioClip สำรองกรณีไม่ได้ระบุชื่อ SFX ใน AudioManager")]
         [SerializeField] private AudioClip _titleRevealSfx;
 
         private Transform _playerTransform;
@@ -419,10 +435,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             // 1.1 Zoom in close to focus on the grotesque struggle
             CameraController2D.Instance?.ZoomTo(_pullZoomInOrthoSize, _pullZoomInDuration, Ease.OutQuad);
 
-            if (_audioSource != null && _fleshTugSfx != null)
-            {
-                _audioSource.PlayOneShot(_fleshTugSfx);
-            }
+            PlaySFX(_fleshTugSFXName, _fleshTugSfx, _fleshTugVolume);
 
             // Player crouches / leans slightly forward towards the altar
             Vector3 originalPlayerScale = _playerTransform.localScale;
@@ -437,10 +450,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             yield return new WaitForSeconds(0.32f);
 
             // 1.2 Violent yank: needle wrenches free into an arc towards player's hand position
-            if (_audioSource != null && _needleExtractSfx != null)
-            {
-                _audioSource.PlayOneShot(_needleExtractSfx);
-            }
+            PlaySFX(_needleExtractSFXName, _needleExtractSfx, _needleExtractVolume);
 
             CameraController2D.Instance?.Shake(0.28f, 0.35f);
             CameraController2D.Instance?.Punch(faceRight ? Vector2.left : Vector2.right, 0.18f);
@@ -519,10 +529,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
             // =========================================================
             // PHASE 2: Slow Zoom Out & Title Reveal (ได้เข็มแล้ว ค่อยๆ ซูมออกช้าๆ แสดงโลโก้)
             // =========================================================
-            if (_audioSource != null && _titleRevealSfx != null)
-            {
-                _audioSource.PlayOneShot(_titleRevealSfx);
-            }
+            PlaySFX(_titleRevealSFXName, _titleRevealSfx, _titleRevealVolume);
 
             // Camera slowly zooms out to wide perspective and shifts upwards in Y
             CameraController2D.Instance?.ZoomTo(_zoomOutOrthoSize, _zoomOutDuration, Ease.InOutCubic);
@@ -642,6 +649,19 @@ namespace ThailandHorrorJam.Systems.Gameplay
         {
             Gizmos.color = new Color(0.9f, 0.3f, 0.4f, 0.5f);
             Gizmos.DrawWireSphere(transform.position, _interactionRadius);
+        }
+        private void PlaySFX(string sfxName, AudioClip fallbackClip, float volume = 1.0f)
+        {
+            if (AudioManager.Instance == null) return;
+
+            if (!string.IsNullOrEmpty(sfxName))
+            {
+                AudioManager.Instance.PlaySFX(sfxName, volume);
+            }
+            else if (fallbackClip != null)
+            {
+                AudioManager.Instance.PlaySFX(fallbackClip, volume);
+            }
         }
     }
 }
