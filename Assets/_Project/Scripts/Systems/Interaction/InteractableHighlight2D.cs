@@ -4,7 +4,8 @@ namespace ThailandHorrorJam.Systems.Interaction
 {
     /// <summary>
     /// Renders a subtle rim/silhouette outline behind a 2D <see cref="SpriteRenderer"/> when the object
-    /// is focused by <see cref="PlayerInteractor"/>. Preserves URP 2D lighting on the primary sprite.
+    /// is focused by <see cref="PlayerInteractor"/>. Preserves URP 2D lighting on the primary sprite while
+    /// ensuring pure silhouette contrast even if the target sprite has pitch black pixels.
     /// </summary>
     public sealed class InteractableHighlight2D : MonoBehaviour
     {
@@ -14,13 +15,18 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         [Header("Outline Appearance")]
         [Tooltip("Subtle rim color shown when the object is focused in close range.")]
-        [SerializeField] private Color _outlineColor = new Color(1f, 0.98f, 0.9f, 0.65f);
+        [SerializeField] private Color _outlineColor = new Color(1f, 1f, 1f, 0.85f);
+
+        [Tooltip("Optional custom material for silhouette outline. If unassigned, automatically loads or instantiates Universal Render Pipeline/2D/SpriteSilhouette.")]
+        [SerializeField] private Material _outlineMaterial;
 
         [Tooltip("Uniform scale multiplier for the silhouette rim sprite relative to the target sprite.")]
         [SerializeField] private Vector2 _outlineScaleMultiplier = new Vector2(1.08f, 1.05f);
 
         [Tooltip("Fade transition duration in seconds (~0.12s).")]
         [SerializeField] private float _fadeDuration = 0.12f;
+
+        private static Material s_CachedSilhouetteMaterial;
 
         private SpriteRenderer _outlineRenderer;
         private GameObject _outlineObject;
@@ -101,12 +107,40 @@ namespace ThailandHorrorJam.Systems.Interaction
 
             _outlineObject.transform.localScale = new Vector3(_outlineScaleMultiplier.x, _outlineScaleMultiplier.y, 1f);
 
-            if (_targetRenderer.sharedMaterial != null)
+            Material outlineMat = ResolveOutlineMaterial();
+            if (outlineMat != null)
+            {
+                _outlineRenderer.sharedMaterial = outlineMat;
+            }
+            else if (_targetRenderer.sharedMaterial != null)
             {
                 _outlineRenderer.sharedMaterial = _targetRenderer.sharedMaterial;
             }
 
             SyncSpriteWithTarget();
+        }
+
+        private Material ResolveOutlineMaterial()
+        {
+            if (_outlineMaterial != null)
+            {
+                return _outlineMaterial;
+            }
+
+            if (s_CachedSilhouetteMaterial == null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/2D/SpriteSilhouette");
+                if (shader != null)
+                {
+                    s_CachedSilhouetteMaterial = new Material(shader)
+                    {
+                        name = "SpriteSilhouette_RuntimeInstance",
+                        hideFlags = HideFlags.DontSave
+                    };
+                }
+            }
+
+            return s_CachedSilhouetteMaterial;
         }
 
         /// <summary>
