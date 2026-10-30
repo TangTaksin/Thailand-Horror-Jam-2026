@@ -117,6 +117,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public bool LandAndFlopOnGround => _landAndFlopOnGround;
         public Vector2 CurrentVelocity => _currentVelocity;
         public float FallSpeed => _fallSpeed;
+        public float DespawnY => _despawnY;
         public Transform PoolParent => _originalPoolParent;
         public int CurrentFrame => _currentFrame;
 
