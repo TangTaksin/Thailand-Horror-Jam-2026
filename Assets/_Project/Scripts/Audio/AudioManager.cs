@@ -88,7 +88,7 @@ public class AudioManager : MonoBehaviour
 
     // ─── SFX Logic ───
 
-    private SoundClip GetSoundClip(string soundName)
+    public SoundClip GetSoundClip(string soundName)
     {
         if (string.IsNullOrEmpty(soundName)) return null;
 

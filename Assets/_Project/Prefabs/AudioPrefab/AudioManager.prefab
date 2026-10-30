@@ -224,7 +224,7 @@ MonoBehaviour:
   - name: sfx_player_jump_land
     clip: {fileID: 8300000, guid: 5ef0d6bbfbd30a04a8d0ba4263318460, type: 3}
     clips: []
-    volume: 1
+    volume: 0.7
   - name: sfx_needle_shoot
     clip: {fileID: 8300000, guid: d2e675c7d71c5aa4483e4f1d943ec9e1, type: 3}
     clips: []
@@ -251,6 +251,25 @@ MonoBehaviour:
     volume: 1
   - name: sfx_thud_impact
     clip: {fileID: 8300000, guid: 40d88a09e856cdc47b41b9d59233ddae, type: 3}
+    clips: []
+    volume: 1
+  - name: sfx_fish_impact
+    clip: {fileID: 8300000, guid: 20e87dcb2f39e5648ad9e65f18b702a0, type: 3}
+    clips:
+    - {fileID: 8300000, guid: 20e87dcb2f39e5648ad9e65f18b702a0, type: 3}
+    - {fileID: 8300000, guid: 165f057c8adcb6946ade0e18a7420769, type: 3}
+    - {fileID: 8300000, guid: ac3dd0a7c99bdae43ad9f4a3b1e3de7b, type: 3}
+    volume: 0.95
+  - name: sfx_fish_needle_hit
+    clip: {fileID: 8300000, guid: 79c4f976df298b942b0ac4e1f70fe56a, type: 3}
+    clips: []
+    volume: 0.95
+  - name: sfx_crate_drag_loop
+    clip: {fileID: 8300000, guid: 17a98919b53b4b94d96c4bccddfc4ee1, type: 3}
+    clips: []
+    volume: 0.75
+  - name: sfx_player_land_wood
+    clip: {fileID: 8300000, guid: e0a9e72805776f945835617d8431cf78, type: 3}
     clips: []
     volume: 1
   loopSFXSource: {fileID: 1269994080291057903}
