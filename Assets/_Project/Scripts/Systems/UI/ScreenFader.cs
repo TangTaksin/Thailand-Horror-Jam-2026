@@ -32,7 +32,7 @@ namespace ThailandHorrorJam.Systems.UI
 
         private Canvas _canvas;
         private CanvasGroup _canvasGroup;
-        private Image _blackImage;
+        private Image _overlayImage;
         private Coroutine _fadeRoutine;
 
         public float CurrentAlpha => _canvasGroup != null ? _canvasGroup.alpha : 0f;
@@ -71,8 +71,8 @@ namespace ThailandHorrorJam.Systems.UI
             _canvasGroup.blocksRaycasts = false;
             _canvasGroup.interactable = false;
 
-            // 4. Black fullscreen Image
-            GameObject imgObj = new GameObject("BlackOverlay");
+            // 4. Fullscreen overlay Image
+            GameObject imgObj = new GameObject("ScreenOverlay");
             imgObj.transform.SetParent(transform, false);
 
             RectTransform rect = imgObj.AddComponent<RectTransform>();
@@ -81,13 +81,25 @@ namespace ThailandHorrorJam.Systems.UI
             rect.sizeDelta = Vector2.zero;
             rect.anchoredPosition = Vector2.zero;
 
-            _blackImage = imgObj.AddComponent<Image>();
-            _blackImage.color = Color.black;
-            _blackImage.raycastTarget = false;
+            _overlayImage = imgObj.AddComponent<Image>();
+            _overlayImage.color = Color.black;
+            _overlayImage.raycastTarget = false;
         }
 
         /// <summary>
-        /// Immediately sets black overlay opacity.
+        /// Sets the color of the screen overlay (e.g. Color.black, Color.white).
+        /// </summary>
+        public void SetColor(Color color)
+        {
+            if (_canvasGroup == null) BuildUI();
+            if (_overlayImage != null)
+            {
+                _overlayImage.color = color;
+            }
+        }
+
+        /// <summary>
+        /// Immediately sets overlay opacity.
         /// </summary>
         public void SetAlpha(float alpha)
         {
@@ -106,6 +118,16 @@ namespace ThailandHorrorJam.Systems.UI
         /// </summary>
         public void FadeOut(float duration, Action onComplete = null)
         {
+            SetColor(Color.black);
+            FadeTo(1f, duration, onComplete);
+        }
+
+        /// <summary>
+        /// Fades the screen overlay to white (alpha -> 1.0).
+        /// </summary>
+        public void FadeOutWhite(float duration, Action onComplete = null)
+        {
+            SetColor(Color.white);
             FadeTo(1f, duration, onComplete);
         }
 

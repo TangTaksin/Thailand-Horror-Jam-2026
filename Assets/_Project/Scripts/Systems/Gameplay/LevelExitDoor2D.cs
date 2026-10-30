@@ -2,13 +2,14 @@ using System;
 using System.Collections;
 using UnityEngine;
 using ThailandHorrorJam.Core;
+using ThailandHorrorJam.Systems.UI;
 
 namespace ThailandHorrorJam.Systems.Gameplay
 {
     /// <summary>
     /// The final exit portal (The Suture Gate) at the climax of Sector 06.
     /// When the player crosses the crate bridge and walks through this gate, it locks
-    /// input, triggers the screen pixel transition, and activates the automatic ending cutscene.
+    /// input, triggers a blinding white fade transition, and activates the automatic ending cutscene.
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public sealed class LevelExitDoor2D : MonoBehaviour
@@ -17,8 +18,21 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [SerializeField] private TransitionEventChannelSO _transitionEventChannel;
         [SerializeField] private CutsceneController _endingCutscene;
 
+        [Header("White Fade Transition")]
+        [Tooltip("If true, performs a white screen fade transition before the ending cutscene begins.")]
+        [SerializeField] private bool _fadeWhiteBeforeCutscene = true;
+
+        [Tooltip("Duration of the fade to solid white (seconds).")]
+        [SerializeField] private float _whiteFadeDuration = 1.0f;
+
+        [Tooltip("Hold duration in pure white screen before cutscene begins (seconds).")]
+        [SerializeField] private float _whiteHoldDuration = 0.35f;
+
+        [Tooltip("Duration to fade in from white into the ending cutscene (seconds).")]
+        [SerializeField] private float _whiteFadeInDuration = 0.75f;
+
         [Header("Timing")]
-        [Tooltip("Delay in seconds after entering doorway before the ending cutscene starts.")]
+        [Tooltip("Delay in seconds after entering doorway before the transition sequence starts.")]
         [SerializeField] private float _transitionDelay = 0.85f;
 
         private Collider2D _doorCollider;
@@ -84,20 +98,44 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private IEnumerator StartEndingSequenceRoutine()
         {
-            yield return new WaitForSeconds(_transitionDelay);
+            if (_transitionDelay > 0f)
+            {
+                yield return new WaitForSeconds(_transitionDelay);
+            }
 
-            // Deactivate all gameplay sectors when entering the ending sequence
+            // 1. Fade to blinding white before cutscene
+            if (_fadeWhiteBeforeCutscene && ScreenFader.Instance != null)
+            {
+                bool fadeOutDone = false;
+                ScreenFader.Instance.FadeOutWhite(_whiteFadeDuration, () => fadeOutDone = true);
+                while (!fadeOutDone)
+                {
+                    yield return null;
+                }
+
+                if (_whiteHoldDuration > 0f)
+                {
+                    yield return new WaitForSeconds(_whiteHoldDuration);
+                }
+            }
+
+            // 2. Deactivate all gameplay sectors when entering the ending sequence
             LevelSeamlessManager.Instance?.DeactivateAllSectors();
 
-            if (_endingCutscene != null)
+            // 3. Start ending cutscene while screen is fully white
+            CutsceneController cutscene = _endingCutscene != null
+                ? _endingCutscene
+                : FindAnyObjectByType<CutsceneController>();
+
+            if (cutscene != null)
             {
-                _endingCutscene.StartCutscene();
+                cutscene.StartCutscene();
             }
-            else
+
+            // 4. Fade smoothly from white to reveal the ending cutscene
+            if (_fadeWhiteBeforeCutscene && ScreenFader.Instance != null)
             {
-                // Fallback: locate CutsceneController in scene if not directly wired
-                CutsceneController found = FindAnyObjectByType<CutsceneController>();
-                found?.StartCutscene();
+                ScreenFader.Instance.FadeIn(_whiteFadeInDuration);
             }
         }
 
