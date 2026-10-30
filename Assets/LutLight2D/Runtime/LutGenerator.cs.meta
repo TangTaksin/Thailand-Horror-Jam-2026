@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: dfe9a439533f4ce43a23e401f72a5576
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Runtime/LutGenerator.cs
+  uploadId: 648944

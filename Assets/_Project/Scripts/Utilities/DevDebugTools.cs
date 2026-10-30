@@ -87,8 +87,18 @@ namespace ThailandHorrorJam.Utilities
         private PlayerController2D _playerController;
         private bool _isGodMode;
 
+        public static bool IsDevBuildAllowed => Application.isEditor || Debug.isDebugBuild;
+
         private void Awake()
         {
+            if (!IsDevBuildAllowed)
+            {
+                _enableDebugTools = false;
+                enabled = false;
+                gameObject.SetActive(false);
+                return;
+            }
+
             if (Instance != null && Instance != this)
             {
                 Destroy(gameObject);
@@ -109,6 +119,8 @@ namespace ThailandHorrorJam.Utilities
 
         private void Update()
         {
+            if (!IsDevBuildAllowed) return;
+
             if (Keyboard.current != null && Keyboard.current[_toggleKey].wasPressedThisFrame)
             {
                 _enableDebugTools = !_enableDebugTools;
@@ -335,7 +347,7 @@ namespace ThailandHorrorJam.Utilities
 
         private void OnGUI()
         {
-            if (!_enableDebugTools || !_showWatermark) return;
+            if (!IsDevBuildAllowed || !_enableDebugTools || !_showWatermark) return;
 
             string modText = _teleportModifier == TeleportModifier.None ? "Left-Click" : $"{_teleportModifier} + Left-Click";
             string godText = _isGodMode ? " [GOD MODE]" : "";

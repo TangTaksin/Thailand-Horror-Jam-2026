@@ -118,6 +118,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
         public bool IsCompleted => _isCompleted;
         public int CurrentSlideIndex => _currentSlideIndex;
         public int TotalSlides => _slides != null ? _slides.Length : 0;
+        protected static bool IsDevBuildAllowed => Application.isEditor || Debug.isDebugBuild;
 
         public event Action OnCutsceneStarted;
         public event Action<int> OnSlideChanged;
@@ -137,7 +138,14 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
             if (_skipButton != null)
             {
-                _skipButton.onClick.AddListener(SkipCutscene);
+                if (IsDevBuildAllowed)
+                {
+                    _skipButton.onClick.AddListener(SkipCutscene);
+                }
+                else
+                {
+                    _skipButton.gameObject.SetActive(false);
+                }
             }
 
             // Initially hide the cutscene canvas if not active
@@ -266,7 +274,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         protected virtual void Update()
         {
-            if (!_isPlaying || !_allowKeyboardSkip) return;
+            if (!_isPlaying || !_allowKeyboardSkip || !IsDevBuildAllowed) return;
 
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null && (kb.spaceKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame))

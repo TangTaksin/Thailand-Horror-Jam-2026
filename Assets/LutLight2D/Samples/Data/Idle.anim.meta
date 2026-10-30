@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 007212295f3e8954c8cb81d9f97f861d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Samples/Data/Idle.anim
+  uploadId: 648944

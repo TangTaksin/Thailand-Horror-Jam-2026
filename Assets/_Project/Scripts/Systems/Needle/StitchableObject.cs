@@ -918,6 +918,11 @@ namespace ThailandHorrorJam.Systems.Needle
             _targetFramePosition = _initialPosition;
             FrameDelta = Vector2.zero;
             _currentVelocity = Vector2.zero;
+
+            if (TryGetComponent(out HangingObject2D hanging))
+            {
+                hanging.ResetToInitialState();
+            }
         }
 
         private void OnDisable()

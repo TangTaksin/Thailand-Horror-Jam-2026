@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 76700fb4da1540d4af6b49a1ddb0c713
+timeCreated: 1663569993
+AssetOrigin:
+  serializedVersion: 1
+  productId: 267033
+  packageName: LutLight2D
+  packageVersion: 1.0
+  assetPath: Assets/LutLight2D/Runtime/Utils.cs
+  uploadId: 648944

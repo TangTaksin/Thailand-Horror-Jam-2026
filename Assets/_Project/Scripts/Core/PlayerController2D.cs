@@ -1226,7 +1226,7 @@ namespace ThailandHorrorJam.Core
 
         private void CheckCrushHazard()
         {
-            if (!_enableCrushDeath || !_isGrounded || _isInputLocked || _respawnImmunityTimer > 0f || (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning))
+            if (!_enableCrushDeath || _isInputLocked || _respawnImmunityTimer > 0f || (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning))
             {
                 _crushTimer = 0f;
                 return;
@@ -1235,9 +1235,56 @@ namespace ThailandHorrorJam.Core
             // 1. ตรวจสอบความสูงและตำแหน่งของผู้เล่น
             float feetBottomY = _col != null ? _col.bounds.min.y : transform.position.y - 0.5f;
             float playerHeight = _col != null ? _col.bounds.size.y : 1.0f;
+            float headTopY = _col != null ? _col.bounds.max.y : transform.position.y + 0.5f;
+            float colWidth = _col != null ? _col.bounds.size.x : 0.5f;
             Vector2 headCenter = _col != null
                 ? new Vector2(_col.bounds.center.x, _col.bounds.center.y)
                 : (Vector2)transform.position;
+
+            // 1.1 ตรวจสอบวัตถุ CrushHazard ที่กำลังร่วงหล่นลงมาทับด้านบนศีรษะโดยตรง (ทำงานทั้งตอนยืนบนพื้นและตอนกระโดดกลางอากาศ!)
+            Vector2 overheadBoxCenter = new Vector2(headCenter.x, headTopY + 0.04f);
+            Vector2 overheadBoxSize = new Vector2(colWidth * 0.82f, 0.22f);
+            int overheadCount = Physics2D.OverlapBox(overheadBoxCenter, overheadBoxSize, 0f, _groundFilter, _groundHitBuffer);
+            for (int i = 0; i < overheadCount; i++)
+            {
+                Collider2D hitCol = _groundHitBuffer[i];
+                if (hitCol == null || IsSelfCollider(hitCol) || hitCol.isTrigger || hitCol == _currentGroundCollider) continue;
+
+                // ต้องอยู่เหนือระดับอก/คอของผู้เล่น (ไม่ใช่การเดินชนด้านข้างกล่องที่วางอยู่บนพื้น)
+                if (hitCol.bounds.min.y < headCenter.y - 0.05f) continue;
+
+                if (CrushHazard.IsCrushHazard(hitCol.gameObject, out CrushHazard hazardComp) && (hazardComp == null || hazardComp.CanCrushFalling))
+                {
+                    HangingObject2D hanging = hitCol.GetComponentInParent<HangingObject2D>();
+                    bool isFreeFalling = hanging != null && hanging.IsFreeFalling;
+
+                    float downSpeed = 0f;
+                    if (hitCol.attachedRigidbody != null)
+                    {
+                        downSpeed = Mathf.Max(downSpeed, -hitCol.attachedRigidbody.linearVelocity.y);
+                    }
+                    StitchableObject hitSo = hitCol.GetComponentInParent<StitchableObject>();
+                    if (hitSo != null)
+                    {
+                        downSpeed = Mathf.Max(downSpeed, -hitSo.CurrentVelocity.y);
+                    }
+
+                    float lethal = hazardComp != null ? hazardComp.LethalImpactSpeed : _crushImpactVelocityThreshold;
+                    if (isFreeFalling || downSpeed >= lethal || (!_isGrounded && _rb.linearVelocity.y > 0.5f && downSpeed > 0.2f))
+                    {
+                        ExecuteCrushDeath(
+                            $"Overhead CrushHazard '{hitCol.name}' (freeFall={isFreeFalling}, downSpeed={downSpeed:F2}, grounded={_isGrounded})",
+                            hitCol);
+                        return;
+                    }
+                }
+            }
+
+            if (!_isGrounded)
+            {
+                _crushTimer = 0f;
+                return;
+            }
 
             // ยิง Raycast ตรงขึ้นด้านบนจากกึ่งกลางลำตัวผู้เล่น เพื่อวัดระยะเพดานเหนือศีรษะ
             // (ใช้แกน X กึ่งกลางลำตัว เพื่อไม่ให้โดนขอบกำแพงหรือกล่องที่ยืนชิดด้านข้างหลอกเป็น False Positive)
@@ -1383,28 +1430,34 @@ namespace ThailandHorrorJam.Core
             {
                 objDownSpeed = Mathf.Max(objDownSpeed, -collision.rigidbody.linearVelocity.y);
             }
+            if (isEnter && collision.relativeVelocity.y < 0f)
+            {
+                objDownSpeed = Mathf.Max(objDownSpeed, -collision.relativeVelocity.y);
+            }
             StitchableObject so = collision.collider.GetComponentInParent<StitchableObject>();
             if (so != null)
             {
                 objDownSpeed = Mathf.Max(objDownSpeed, -so.CurrentVelocity.y);
             }
+            HangingObject2D hanging = collision.collider.GetComponentInParent<HangingObject2D>();
+            bool isActiveFreeFall = hanging != null && hanging.IsFreeFalling;
 
-            // คำนวณขอบเขตศีรษะของผู้เล่น
-            float playerHeadY = _col != null ? _col.bounds.max.y - 0.08f : transform.position.y + 0.5f;
+            // คำนวณขอบเขตศีรษะของผู้เล่น (เผื่อระยะ 0.25f รองรับจังหวะกระโดดสวนขึ้นไปชนใต้กล่อง)
+            float playerHeadY = _col != null ? _col.bounds.max.y - 0.25f : transform.position.y + 0.3f;
 
             for (int i = 0; i < collision.contactCount; i++)
             {
                 ContactPoint2D contact = collision.GetContact(i);
 
-                // ต้องเป็นจุดสัมผัสที่อยู่บริเวณศีรษะ และ Normal ต้องกดลงล่างชัดเจน (normal.y <= -0.7f)
+                // ต้องเป็นจุดสัมผัสที่อยู่บริเวณศีรษะ และ Normal ต้องกดลงล่างชัดเจน (normal.y <= -0.65f)
                 // เพื่อคัดกรองการเดินชนด้านข้างของกล่องออก 100%
-                if (contact.point.y >= playerHeadY && contact.normal.y <= -0.7f)
+                if (contact.point.y >= playerHeadY && contact.normal.y <= -0.65f)
                 {
-                    // กรณีร่วงตกจากที่สูงกระแทกหัว (Falling Impact)
-                    if (isEnter && objDownSpeed >= lethalSpeed && _isGrounded)
+                    // กรณีร่วงตกจากที่สูงกระแทกหัว (Falling Impact หรือกำลังอยู่ในสถานะ FreeFall) — ตายทันที 100% ทั้งตอนยืนบนพื้นและตอนกระโดดกลางอากาศ
+                    if (isActiveFreeFall || objDownSpeed >= lethalSpeed)
                     {
                         ExecuteCrushDeath(
-                            $"Crushed by falling hazard '{collision.gameObject.name}' (downSpeed={objDownSpeed:F2} >= {lethalSpeed:F2})",
+                            $"Crushed by falling hazard '{collision.gameObject.name}' (downSpeed={objDownSpeed:F2} >= {lethalSpeed:F2}, freeFall={isActiveFreeFall}, grounded={_isGrounded})",
                             collision.collider);
                         return;
                     }
@@ -1424,6 +1477,15 @@ namespace ThailandHorrorJam.Core
                     }
                 }
             }
+        }
+
+        public void ForceCrushByFallingObject(Collider2D crushingCollider)
+        {
+            if (!_enableCrushDeath || _isInputLocked || (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning)) return;
+
+            ExecuteCrushDeath(
+                $"Force-crushed by falling object '{(crushingCollider != null ? crushingCollider.name : "null")}' (grounded={_isGrounded})",
+                crushingCollider);
         }
 
         private void ExecuteCrushDeath(string reason = "Unknown crush", Collider2D crushingCollider = null)
@@ -1508,6 +1570,10 @@ namespace ThailandHorrorJam.Core
             bool isRightSolidCeiling = hitRight.collider != null && !IsSelfCollider(hitRight.collider) && !hitRight.collider.isTrigger && hitRight.normal.y < -0.3f;
             bool isLeftSolidCeiling = hitLeft.collider != null && !IsSelfCollider(hitLeft.collider) && !hitLeft.collider.isTrigger && hitLeft.normal.y < -0.3f;
 
+            // ห้ามเบี่ยงตัวหลบถ้าเพดานเหนือศีรษะเป็น CrushHazard ที่กำลังร่วงหล่นลงมาทับ!
+            if (isRightSolidCeiling && CrushHazard.IsCrushHazard(hitRight.collider.gameObject, out _)) return;
+            if (isLeftSolidCeiling && CrushHazard.IsCrushHazard(hitLeft.collider.gameObject, out _)) return;
+
             // ขวาชนเพดาน แต่ซ้ายโล่ง -> ดันหลบไปทางซ้ายให้พ้นมุมเพดาน
             if (isRightSolidCeiling && !isLeftSolidCeiling)
             {
@@ -1561,6 +1627,11 @@ namespace ThailandHorrorJam.Core
 
             if (hitLower.collider != null && !IsSelfCollider(hitLower.collider) && !hitLower.collider.isTrigger)
             {
+                // ห้ามทำ Ledge Step-up ปีนขึ้นไปบนกล่องที่กำลังร่วงหล่น (FreeFall)
+                HangingObject2D lowerHanging = hitLower.collider.GetComponentInParent<HangingObject2D>();
+                if (lowerHanging != null && lowerHanging.IsFreeFalling) return;
+                if (hitLower.collider.attachedRigidbody != null && hitLower.collider.attachedRigidbody.linearVelocity.y < -1.0f) return;
+
                 // คำนวณจุด probe ด้านบนของวัตถุโดยตรงจาก Bounds ของ Collider หรือตำแหน่งที่ชน
                 float topBoundY = hitLower.collider.bounds.max.y;
                 float currentFeetY = transform.position.y - extentsY;

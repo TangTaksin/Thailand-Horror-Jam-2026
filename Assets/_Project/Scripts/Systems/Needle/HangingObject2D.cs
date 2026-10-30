@@ -67,8 +67,29 @@ namespace ThailandHorrorJam.Systems.Needle
         [Tooltip("Gravity scale applied to the Rigidbody2D when falling after being cut.")]
         [SerializeField] private float _freeFallGravityScale = 1.5f;
 
+        [Tooltip("Initial downward speed (m/s) applied immediately when FreeFall starts (0 = fall from rest).")]
+        [Min(0f)]
+        [SerializeField] private float _freeFallInitialDownwardSpeed = 0f;
+
         [Tooltip("Lock the object as Static ground once it lands on the floor (useful for static platforms/steps). Ignored if a StitchableObject is attached.")]
         [SerializeField] private bool _lockAsStaticOnLanding = false;
+
+        [Header("Player Trigger Drop (Ambush Trap)")]
+        [Tooltip("Automatically sever the hanging thread when the player enters the trigger zone below.")]
+        [SerializeField] private bool _dropOnPlayerTrigger = false;
+
+        [Tooltip("Size of the player detection box in world units (relative to initial hanging position).")]
+        [SerializeField] private Vector2 _triggerBoxSize = new Vector2(1.6f, 4.2f);
+
+        [Tooltip("Offset of the player detection box from initial hanging position.")]
+        [SerializeField] private Vector2 _triggerBoxOffset = new Vector2(-0.5f, -2.1f);
+
+        [Tooltip("Optional delay (seconds) between player entering the trigger zone and the thread snapping.")]
+        [Min(0f)]
+        [SerializeField] private float _dropDelay = 0f;
+
+        [Tooltip("SFX played via AudioManager when the thread snaps from the player trigger.")]
+        [SerializeField] private string _snapSFXName = "sfx_thread_cut";
 
         [Header("Landing Impact FX")]
         [Tooltip("Trigger camera screen shake when bridge reaches flat resting position or freefall object lands.")]
@@ -90,13 +111,17 @@ namespace ThailandHorrorJam.Systems.Needle
         private bool _isRotatingDown;
         private bool _isFreeFalling;
         private bool _isLockedAtRest;
+        private bool _isTriggerDropPending;
+        private float _triggerDropTimer;
 
         private Vector3 _initialPosition;
         private Quaternion _initialRotation;
 
         public HangingMode Mode => _mode;
         public bool IsSuspended => _isSuspended;
+        public bool IsFreeFalling => _isFreeFalling;
         public bool IsLockedAtRest => _isLockedAtRest;
+        public bool DropOnPlayerTrigger => _dropOnPlayerTrigger;
         public bool IsHintDismissed => !_isSuspended;
         public Transform CeilingAnchor => _ceilingAnchor;
         public Transform ObjectAnchor => _objectAnchor;
@@ -319,15 +344,110 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void Update()
         {
+            if (_isSuspended && _dropOnPlayerTrigger)
+            {
+                UpdatePlayerTriggerDrop(Time.deltaTime);
+            }
+
             if (_isRotatingDown && _mode == HangingMode.Drawbridge)
             {
                 StepDrawbridgeRotation(Time.deltaTime);
             }
         }
 
+        private void FixedUpdate()
+        {
+            if (_isFreeFalling)
+            {
+                CheckFallingCrushPlayer();
+            }
+        }
+
+        private void CheckFallingCrushPlayer()
+        {
+            if (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning) return;
+
+            PlayerController2D player = PlayerController2D.Instance;
+            if (player == null || player.IsInputLocked) return;
+
+            if (!CrushHazard.IsCrushHazard(gameObject, out CrushHazard hazardComp)) return;
+            if (hazardComp != null && !hazardComp.CanCrushFalling) return;
+
+            Collider2D myCol = GetComponent<Collider2D>();
+            Collider2D playerCol = player.MainCollider;
+            if (myCol == null || playerCol == null) return;
+
+            Bounds bCrate = myCol.bounds;
+            Bounds bPlayer = playerCol.bounds;
+
+            // Check horizontal overlap between crate and player body
+            bool overlapX = bPlayer.max.x > (bCrate.min.x + 0.04f) && bPlayer.min.x < (bCrate.max.x - 0.04f);
+            if (!overlapX) return;
+
+            // Check if the bottom of the falling crate has reached or penetrated the top of the player's head,
+            // while the crate center is still above the player's feet
+            bool hitPlayerTop = bCrate.min.y <= (bPlayer.max.y + 0.08f) && bCrate.max.y >= bPlayer.center.y;
+            if (hitPlayerTop)
+            {
+                player.ForceCrushByFallingObject(myCol);
+            }
+        }
+
+        private void UpdatePlayerTriggerDrop(float dt)
+        {
+            if (CheckpointManager.Instance != null && CheckpointManager.Instance.IsRespawning) return;
+
+            if (_isTriggerDropPending)
+            {
+                _triggerDropTimer -= dt;
+                if (_triggerDropTimer <= 0f)
+                {
+                    _isTriggerDropPending = false;
+                    ExecuteTriggeredSnap();
+                }
+                return;
+            }
+
+            PlayerController2D player = PlayerController2D.Instance;
+            if (player == null || player.IsInputLocked) return;
+
+            Vector2 center = (Vector2)_initialPosition + _triggerBoxOffset;
+            Vector2 halfExtents = _triggerBoxSize * 0.5f;
+            Vector2 playerPos = player.transform.position;
+
+            if (Mathf.Abs(playerPos.x - center.x) <= halfExtents.x &&
+                Mathf.Abs(playerPos.y - center.y) <= halfExtents.y)
+            {
+                if (_dropDelay > 0.001f)
+                {
+                    _isTriggerDropPending = true;
+                    _triggerDropTimer = _dropDelay;
+                }
+                else
+                {
+                    ExecuteTriggeredSnap();
+                }
+            }
+        }
+
+        private void ExecuteTriggeredSnap()
+        {
+            if (!_isSuspended) return;
+
+            if (!string.IsNullOrEmpty(_snapSFXName) && AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX(_snapSFXName);
+            }
+
+            SeverHangingThread();
+        }
+
         private void OnCollisionEnter2D(Collision2D collision)
         {
             if (!_isFreeFalling || _isLockedAtRest) return;
+
+            // Ignore player collision so landing on the player's head in mid-air does not stop FreeFall
+            if (PlayerController2D.IsPlayer(collision.collider)) return;
 
             // FreeFall landing detection: collision with floor/ground
             if (collision.relativeVelocity.magnitude > 1.2f || (collision.contacts.Length > 0 && collision.contacts[0].normal.y > 0.5f))
@@ -445,6 +565,10 @@ namespace ThailandHorrorJam.Systems.Needle
                 {
                     _rb.bodyType = RigidbodyType2D.Dynamic;
                     _rb.gravityScale = _freeFallGravityScale;
+                    if (_freeFallInitialDownwardSpeed > 0f)
+                    {
+                        _rb.linearVelocity = new Vector2(0f, -_freeFallInitialDownwardSpeed);
+                    }
                     if (_stitchableTarget != null && _stitchableTarget.IsTetheredToPlayer)
                     {
                         _rb.mass = Mathf.Max(0.1f, _stitchableTarget.OriginalMass * _stitchableTarget.TetheredMassMultiplier);
@@ -498,6 +622,8 @@ namespace ThailandHorrorJam.Systems.Needle
             _isRotatingDown = false;
             _isFreeFalling = false;
             _isLockedAtRest = false;
+            _isTriggerDropPending = false;
+            _triggerDropTimer = 0f;
 
             transform.position = _initialPosition;
             transform.rotation = _initialRotation;
@@ -558,6 +684,14 @@ namespace ThailandHorrorJam.Systems.Needle
             // Object attachment anchor (Cyan)
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(objPos, 0.1f);
+
+            if (_dropOnPlayerTrigger)
+            {
+                Vector3 basePos = Application.isPlaying ? _initialPosition : transform.position;
+                Vector3 triggerCenter = basePos + (Vector3)_triggerBoxOffset;
+                Gizmos.color = new Color(1f, 0.35f, 0.15f, 0.75f);
+                Gizmos.DrawWireCube(triggerCenter, (Vector3)_triggerBoxSize);
+            }
 
             if (_mode == HangingMode.Drawbridge)
             {
