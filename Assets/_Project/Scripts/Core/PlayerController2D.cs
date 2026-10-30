@@ -125,6 +125,8 @@ namespace ThailandHorrorJam.Core
         private float _respawnImmunityTimer;
         private float _throwSlowdownTimer;
         private float _throwSlowdownMultiplier = 1f;
+        private float _environmentSlowTimer;
+        private float _environmentSlowMultiplier = 1f;
         private float _knockbackTimer;
         private float _hazardKnockbackCooldownTimer;
         private Vector2 _knockbackVelocity;
@@ -249,6 +251,18 @@ namespace ThailandHorrorJam.Core
         {
             _throwSlowdownTimer = duration;
             _throwSlowdownMultiplier = multiplier;
+        }
+
+        /// <summary>
+        /// Slows horizontal movement from the environment (e.g. wading through a pile of dead fish).
+        /// Call every physics step while inside the zone; multiple callers keep the strongest slow.
+        /// </summary>
+        public void ApplyEnvironmentSlow(float multiplier, float duration = 0.12f)
+        {
+            _environmentSlowMultiplier = _environmentSlowTimer > 0f
+                ? Mathf.Min(_environmentSlowMultiplier, multiplier)
+                : multiplier;
+            _environmentSlowTimer = Mathf.Max(_environmentSlowTimer, duration);
         }
 
         public void StopHorizontalMovement()
@@ -745,6 +759,12 @@ namespace ThailandHorrorJam.Core
             {
                 _throwSlowdownTimer -= Time.fixedDeltaTime;
                 speed *= _throwSlowdownMultiplier;
+            }
+
+            if (_environmentSlowTimer > 0f)
+            {
+                _environmentSlowTimer -= Time.fixedDeltaTime;
+                speed *= _environmentSlowMultiplier;
             }
 
             if (_isAiming)

@@ -92,6 +92,23 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("Duration in seconds that fish flop on ground before recycling (0 = infinite).")]
         [SerializeField] private float _groundFlopDuration = 16f;
 
+        [Header("Fish Pile Slowdown (needs Land And Flop On Ground)")]
+        [Tooltip("Slow the player while walking through fish flopping on the ground.")]
+        [SerializeField] private bool _slowPlayerInPile = true;
+
+        [Tooltip("Horizontal distance from the player within which landed fish count as part of the pile.")]
+        [SerializeField] private float _pileRadiusX = 0.9f;
+
+        [Tooltip("Max vertical distance from the player for a landed fish to count.")]
+        [SerializeField] private float _pileRadiusY = 0.9f;
+
+        [Tooltip("Number of nearby landed fish at which the slowdown reaches its maximum.")]
+        [SerializeField] private int _pileFullCount = 6;
+
+        [Tooltip("Player speed multiplier at full pile density (1 = no slowdown).")]
+        [Range(0.1f, 1f)]
+        [SerializeField] private float _pileMinSpeedMultiplier = 0.45f;
+
         public FishSpawnMode SpawnMode => _spawnMode;
         public float RainMinX => _rainMinX;
         public float RainMaxX => _rainMaxX;
@@ -161,6 +178,45 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     SpawnWave();
                 }
             }
+        }
+
+        private void FixedUpdate()
+        {
+            if (_slowPlayerInPile && _landAndFlopOnGround)
+            {
+                ApplyPileSlowdown();
+            }
+        }
+
+        /// <summary>
+        /// Counts landed (flopping) fish around the player and slows the player by pile density.
+        /// Reads fish positions only, so landed fish need no collider.
+        /// </summary>
+        private void ApplyPileSlowdown()
+        {
+            PlayerController2D player = PlayerController2D.Instance;
+            if (player == null) return;
+
+            Vector2 p = player.transform.position;
+            if (p.x < _activeMinX || p.x > _activeMaxX) return;
+
+            int count = 0;
+            for (int i = 0; i < _allSpawned.Count; i++)
+            {
+                FallingFishHazard2D fish = _allSpawned[i];
+                if (fish == null || !fish.IsFloppingOnGround) continue;
+
+                Vector3 fp = fish.transform.position;
+                if (Mathf.Abs(fp.x - p.x) <= _pileRadiusX && Mathf.Abs(fp.y - p.y) <= _pileRadiusY)
+                {
+                    count++;
+                }
+            }
+
+            if (count == 0) return;
+
+            float density = Mathf.Clamp01(count / (float)Mathf.Max(1, _pileFullCount));
+            player.ApplyEnvironmentSlow(Mathf.Lerp(1f, _pileMinSpeedMultiplier, density));
         }
 
         /// <summary>
@@ -310,15 +366,64 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         private void OnDrawGizmos()
         {
-            if (_laneXPositions == null) return;
+            float despawnY = _fishPrefab != null ? _fishPrefab.DespawnY : -3.2f;
 
-            Gizmos.color = new Color(0.2f, 0.85f, 0.95f, 0.65f);
-            for (int i = 0; i < _laneXPositions.Length; i++)
+            if (_spawnMode == FishSpawnMode.DiscreteLanes)
             {
-                Vector3 top = new Vector3(_laneXPositions[i], _spawnHeightY, 0f);
-                Vector3 btm = new Vector3(_laneXPositions[i], -3.2f, 0f);
-                Gizmos.DrawLine(top, btm);
-                Gizmos.DrawWireSphere(top, 0.25f);
+                if (_laneXPositions != null)
+                {
+                    Gizmos.color = new Color(0.2f, 0.85f, 0.95f, 0.75f);
+                    for (int i = 0; i < _laneXPositions.Length; i++)
+                    {
+                        Vector3 top = new Vector3(_laneXPositions[i], _spawnHeightY, 0f);
+                        Vector3 btm = new Vector3(_laneXPositions[i], despawnY, 0f);
+                        Gizmos.DrawLine(top, btm);
+                        Gizmos.DrawWireSphere(top, 0.25f);
+                        Gizmos.DrawWireCube(btm, new Vector3(0.35f, 0.1f, 0f));
+                    }
+                }
+            }
+            else if (_spawnMode == FishSpawnMode.ContinuousRain)
+            {
+                // Draw Continuous Rain spawn zone (top line) & falling volume
+                Gizmos.color = new Color(0.35f, 0.8f, 1f, 0.85f);
+                Vector3 rainLeft = new Vector3(_rainMinX, _spawnHeightY, 0f);
+                Vector3 rainRight = new Vector3(_rainMaxX, _spawnHeightY, 0f);
+                Gizmos.DrawLine(rainLeft, rainRight);
+                Gizmos.DrawWireSphere(rainLeft, 0.25f);
+                Gizmos.DrawWireSphere(rainRight, 0.25f);
+
+                // Rain volume box
+                float width = _rainMaxX - _rainMinX;
+                float height = Mathf.Abs(_spawnHeightY - despawnY);
+                Vector3 center = new Vector3((_rainMinX + _rainMaxX) * 0.5f, (_spawnHeightY + despawnY) * 0.5f, 0f);
+
+                Gizmos.color = new Color(0.2f, 0.6f, 1f, 0.2f);
+                Gizmos.DrawCube(center, new Vector3(width, height, 0.1f));
+
+                Gizmos.color = new Color(0.3f, 0.8f, 1f, 0.65f);
+                Gizmos.DrawWireCube(center, new Vector3(width, height, 0.1f));
+            }
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            // Draw Player Active Proximity Bounds (Green zone)
+            if (_activeMinX < _activeMaxX)
+            {
+                float activeWidth = _activeMaxX - _activeMinX;
+                float activeHeight = 16f;
+                Vector3 activeCenter = new Vector3((_activeMinX + _activeMaxX) * 0.5f, _spawnHeightY - (activeHeight * 0.5f) + 3f, 0f);
+
+                Gizmos.color = new Color(0.2f, 1f, 0.35f, 0.08f);
+                Gizmos.DrawCube(activeCenter, new Vector3(activeWidth, activeHeight, 0.1f));
+
+                Gizmos.color = new Color(0.2f, 1f, 0.35f, 0.75f);
+                Gizmos.DrawWireCube(activeCenter, new Vector3(activeWidth, activeHeight, 0.1f));
+
+                // Left & Right boundary lines
+                Gizmos.DrawLine(new Vector3(_activeMinX, activeCenter.y - activeHeight * 0.5f, 0f), new Vector3(_activeMinX, activeCenter.y + activeHeight * 0.5f, 0f));
+                Gizmos.DrawLine(new Vector3(_activeMaxX, activeCenter.y - activeHeight * 0.5f, 0f), new Vector3(_activeMaxX, activeCenter.y + activeHeight * 0.5f, 0f));
             }
         }
     }
