@@ -142,5 +142,19 @@ namespace ThailandHorrorJam.Editor.Tests
             float centerX = LevelSeamlessManager.GetSectorCenterX(entry);
             Assert.AreEqual(60f, centerX, 0.01f);
         }
+
+        [Test]
+        public void DeactivateAllSectors_DeactivatesAllSectorRoots()
+        {
+            _manager.SetCurrentSector(2);
+            Assert.IsTrue(_sectorGos[2].activeSelf);
+
+            _manager.DeactivateAllSectors();
+
+            for (int i = 0; i < _sectorGos.Count; i++)
+            {
+                Assert.IsFalse(_sectorGos[i].activeSelf, $"Sector {i} must be deactivated when calling DeactivateAllSectors.");
+            }
+        }
     }
 }

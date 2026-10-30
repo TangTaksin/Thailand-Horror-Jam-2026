@@ -139,6 +139,8 @@ namespace ThailandHorrorJam.Editor.Tests
                 "LevelSeamless: Transition To SectorObject Finds Correct Index");
             RunTest(() => { t6.SetUp(); t6.GetSectorCenterX_ComputesCenterFromChildren_WhenRootAtZero(); t6.TearDown(); },
                 "LevelSeamless: GetSectorCenterX Computes Center From Children When Root At Zero");
+            RunTest(() => { t6.SetUp(); t6.DeactivateAllSectors_DeactivatesAllSectorRoots(); t6.TearDown(); },
+                "LevelSeamless: DeactivateAllSectors Deactivates Every Sector Root");
 
             // 7. FishWaterfallHazardTests
             var t7 = new FishWaterfallHazardTests();
@@ -179,6 +181,23 @@ namespace ThailandHorrorJam.Editor.Tests
                 "Sector06: Ground Landing Disables Collider & Enters Bouncing Flopping State");
             RunTest(() => { t8.SetUp(); t8.FishSpawner_ContinuousRain_SpawnsAcrossFullSectorRange_UpToGate(); t8.TearDown(); },
                 "Sector06: Fish Spawner Continuous Rain Covers Sector Up To Gate");
+            RunTest(() => { t8.SetUp(); t8.EndingCutscene_WhenStarted_DeactivatesAllGameplaySectorsAndPlayer(); t8.TearDown(); },
+                "Sector06: Ending Cutscene Deactivates All Gameplay Sectors & Hides Player");
+
+            // 9. PlayerTetherJumpAndHazardTests
+            var t9 = new PlayerTetherJumpAndHazardTests();
+            RunTest(() => { t9.SetUp(); t9.ExecuteJump_WhenTetheredOnCrate_ReleasesTetherAndAppliesFullUpwardVelocity(); t9.TearDown(); },
+                "TetherJump: ExecuteJump On Tethered Crate Releases Tether & Delivers Full Upward Force");
+            RunTest(() => { t9.SetUp(); t9.ExecuteJump_WhenHaulingFromGround_ReleasesTetherAndAppliesFullUpwardVelocity(); t9.TearDown(); },
+                "TetherJump: ExecuteJump While Hauling From Ground Releases Tether & Jumps Freely");
+            RunTest(() => { t9.SetUp(); t9.OnPlayerJumpedOff_WhenTetheredToCrate_ImmediatelyReleasesTetherAndJoint(); t9.TearDown(); },
+                "TetherJump: OnPlayerJumpedOff Immediately Clears Tether & Disables DistanceJoint2D");
+            RunTest(() => { t9.SetUp(); t9.ApplyKnockback_WhenHaulingTetheredCrate_ReleasesTetherImmediately(); t9.TearDown(); },
+                "TetherJump: Hazard Knockback Severely Snaps Tether From Player Body");
+            RunTest(() => { t9.SetUp(); t9.CheckTetherSlice_WhenFallingFishCrossesTether_CutsTetherAndDeflectsFish(); t9.TearDown(); },
+                "TetherJump: Falling Fish Slices Tether Thread & Deflects Fish");
+            RunTest(() => { t9.SetUp(); t9.CorpseGasVentSuperJump_WhenTetheredOnCrateOverVent_GrantsFullSuperJumpBoostAndReleasesTether(); t9.TearDown(); },
+                "TetherJump: Gas Vent Super Jump Grants Full Boost Velocity Without Joint Damping");
 
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();

@@ -261,5 +261,59 @@ namespace ThailandHorrorJam.Editor.Tests
             Assert.AreEqual(136.0f, spawner.RainMinX);
             Assert.AreEqual(160.5f, spawner.RainMaxX);
         }
+
+        [Test]
+        public void EndingCutscene_WhenStarted_DeactivatesAllGameplaySectorsAndPlayer()
+        {
+            // 1. Setup mock sectors
+            var sector1 = new GameObject("TestSector_1");
+            var sector2 = new GameObject("TestSector_2");
+            _spawnedObjects.Add(sector1);
+            _spawnedObjects.Add(sector2);
+
+            var managerGo = new GameObject("TestLevelSeamlessManager");
+            _spawnedObjects.Add(managerGo);
+            var manager = managerGo.AddComponent<LevelSeamlessManager>();
+
+            var sectorsList = new List<LevelSeamlessManager.SectorEntry>
+            {
+                new LevelSeamlessManager.SectorEntry { name = "Sector 1", rootObject = sector1 },
+                new LevelSeamlessManager.SectorEntry { name = "Sector 2", rootObject = sector2 }
+            };
+
+            typeof(LevelSeamlessManager)
+                .GetField("_sectors", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(manager, sectorsList);
+
+            typeof(LevelSeamlessManager)
+                .GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.Invoke(manager, null);
+
+            manager.SetCurrentSector(0);
+            Assert.IsTrue(sector1.activeSelf);
+
+            // 2. Setup player
+            var playerGo = new GameObject("TestPlayer");
+            _spawnedObjects.Add(playerGo);
+            var player = playerGo.AddComponent<PlayerController2D>();
+            typeof(PlayerController2D).GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(player, null);
+
+            // 3. Setup Ending Cutscene in FullScreenCinematicMovie mode
+            var cutsceneGo = new GameObject("TestEndingCutscene");
+            _spawnedObjects.Add(cutsceneGo);
+            var cutscene = cutsceneGo.AddComponent<CutsceneController>();
+
+            typeof(CutsceneController)
+                .GetField("_displayMode", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(cutscene, CutsceneDisplayMode.FullScreenCinematicMovie);
+
+            // 4. Act: Start ending cutscene
+            cutscene.StartCutscene();
+
+            // 5. Assert: All sectors deactivated, player hidden
+            Assert.IsFalse(sector1.activeSelf, "Sector 1 root must be deactivated.");
+            Assert.IsFalse(sector2.activeSelf, "Sector 2 root must be deactivated.");
+            Assert.IsFalse(playerGo.activeSelf, "Player GameObject must be hidden during ending cutscene.");
+        }
     }
 }
