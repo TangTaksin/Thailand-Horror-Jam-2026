@@ -368,26 +368,26 @@ MonoBehaviour:
   _displayMode: 0
   _slides:
   - image: {fileID: 7558483355208372984, guid: cd73cb166a9c8794ca50f9c0f431e7f3, type: 3}
-    subtitle: The scariest thing is a pale, dead fish.
+    subtitle: Nothing scares me quite like a pale, dead fish.
     duration: 4
   - image: {fileID: 1868394592586302558, guid: 1ea03e03572abe14f847615c705c1947, type: 3}
-    subtitle: Why? Because it's just like a bloated carcass, and the smell is unbearable.
+    subtitle: 'The soggy, decaying, bloated body, reeking with an unbearable, foul stench. '
     duration: 5
   - image: {fileID: 8145176009762406553, guid: 28a13820c501e2c49a18e51c11db1c68, type: 3}
-    subtitle: I don't even want to touch it. Is it going to haunt me from up on the wall?
+    subtitle: "I couldn\u2019t bring myself to touch it. Would those lifeless eyes be staring at me from up on the wall?"
     duration: 5
   - image: {fileID: 7348965404668142345, guid: 1ca130af9c9b3f747a1a62d7a7613476, type: 3}
-    subtitle: Is it mad at me for not burying it? The more I think about it, the bigger and nastier it gets.
+    subtitle: Was it mad at me for not burying it? The more I think about it, the bigger and nastier it gets in my head.
     duration: 6
   - image: {fileID: 2195803572015553215, guid: 0c4636fb877ec344993e7e54a7fac8db, type: 3}
-    subtitle: ...when will it just go away?!
+    subtitle: "I\u2019m scared... Why won\u2019t it just go away already!?"
     duration: 3
   - image: {fileID: 5061194509309013868, guid: 0472e1a6b553c0f42af542d1afcc2073, type: 3}
-    subtitle: If I close my eyes, will it all just disappear?
-    duration: 4
+    subtitle: If I close my eyes, will it disappear?
+    duration: 3
   - image: {fileID: -5006648806169119934, guid: 016eae50ebfe239479e391d6bf0af2c5, type: 3}
     subtitle: 
-    duration: 1
+    duration: 0
   _slideDuration: 4
   _typewriterSpeed: 0.04
   _fadeDuration: 0.45
