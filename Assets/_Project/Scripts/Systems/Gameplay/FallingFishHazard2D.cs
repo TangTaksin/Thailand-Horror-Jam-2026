@@ -57,6 +57,19 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [SerializeField] private float _playerHitSpinAngle = 320f;
         [SerializeField] private float _playerHitTweenDuration = 0.5f;
 
+        [Header("Audio SFX (AudioManager / Fallback Clips)")]
+        [Tooltip("SFX name registered in AudioManager for player collision knockback (DieSlug 0-2).")]
+        [SerializeField] private string _fishImpactSFXName = "sfx_fish_impact";
+        [Tooltip("Direct audio clips for random knockback sounds (DieSlug 0-2). Played if AudioManager sound name is missing or as fallback.")]
+        [SerializeField] private AudioClip[] _fishImpactClips;
+        [SerializeField] [Range(0f, 1f)] private float _fishImpactVolume = 0.9f;
+
+        [Tooltip("SFX name registered in AudioManager for needle projectile hitting fish (DieSkin_03).")]
+        [SerializeField] private string _fishNeedleHitSFXName = "sfx_fish_needle_hit";
+        [Tooltip("Fallback clip for needle hitting fish if AudioManager is unavailable.")]
+        [SerializeField] private AudioClip _fishNeedleHitClip;
+        [SerializeField] [Range(0f, 1f)] private float _fishNeedleHitVolume = 0.95f;
+
         [Header("Hazard vs Ambient Ground Flop Mode")]
         [Tooltip("If false, fish will not knockback or harm the player on contact (e.g. Sector 06 ambient fish rain).")]
         [SerializeField] private bool _harmPlayer = true;
@@ -499,6 +512,38 @@ namespace ThailandHorrorJam.Systems.Gameplay
             }
         }
 
+        private void PlayFishImpactSound()
+        {
+            if (AudioManager.Instance == null) return;
+
+            if (!string.IsNullOrEmpty(_fishImpactSFXName) && AudioManager.Instance.GetSoundClip(_fishImpactSFXName) != null)
+            {
+                AudioManager.Instance.PlaySFX(_fishImpactSFXName, _fishImpactVolume);
+            }
+            else if (_fishImpactClips != null && _fishImpactClips.Length > 0)
+            {
+                AudioClip clip = _fishImpactClips[UnityEngine.Random.Range(0, _fishImpactClips.Length)];
+                if (clip != null)
+                {
+                    AudioManager.Instance.PlaySFX(clip, _fishImpactVolume);
+                }
+            }
+        }
+
+        private void PlayFishNeedleHitSound()
+        {
+            if (AudioManager.Instance == null) return;
+
+            if (!string.IsNullOrEmpty(_fishNeedleHitSFXName) && AudioManager.Instance.GetSoundClip(_fishNeedleHitSFXName) != null)
+            {
+                AudioManager.Instance.PlaySFX(_fishNeedleHitSFXName, _fishNeedleHitVolume);
+            }
+            else if (_fishNeedleHitClip != null)
+            {
+                AudioManager.Instance.PlaySFX(_fishNeedleHitClip, _fishNeedleHitVolume);
+            }
+        }
+
         private void StopFallingLoopTweens()
         {
             _fallRotateTween?.Kill();
@@ -599,6 +644,8 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
             PlayNeedleDeflectTween(lateralDir);
 
+            PlayFishNeedleHitSound();
+
             CameraController2D.Instance?.Shake(0.02f, 0.05f);
 
             if (_collider != null)
@@ -641,6 +688,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 if (_collider != null) _collider.enabled = false;
 
                 PlayPlayerHitTween(Mathf.Sign(randomBounceX));
+                PlayFishImpactSound();
             }
         }
 

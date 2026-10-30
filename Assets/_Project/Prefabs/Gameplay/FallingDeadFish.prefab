@@ -184,6 +184,15 @@ MonoBehaviour:
   _playerHitPunchScale: {x: 0.5, y: -0.42, z: 0}
   _playerHitSpinAngle: 320
   _playerHitTweenDuration: 0.5
+  _fishImpactSFXName: sfx_fish_impact
+  _fishImpactClips:
+  - {fileID: 8300000, guid: 20e87dcb2f39e5648ad9e65f18b702a0, type: 3}
+  - {fileID: 8300000, guid: 165f057c8adcb6946ade0e18a7420769, type: 3}
+  - {fileID: 8300000, guid: ac3dd0a7c99bdae43ad9f4a3b1e3de7b, type: 3}
+  _fishImpactVolume: 0.9
+  _fishNeedleHitSFXName: sfx_fish_needle_hit
+  _fishNeedleHitClip: {fileID: 8300000, guid: 79c4f976df298b942b0ac4e1f70fe56a, type: 3}
+  _fishNeedleHitVolume: 0.95
   _harmPlayer: 1
   _landAndFlopOnGround: 0
   _groundLayerMask:
