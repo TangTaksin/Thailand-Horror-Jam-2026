@@ -1,5 +1,6 @@
 using ThailandHorrorJam.Core;
 using ThailandHorrorJam.Systems.Needle;
+using SimpleLocalization;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -68,11 +69,11 @@ namespace ThailandHorrorJam.Systems.Gameplay
         [Tooltip("Speed frequency of the organic drift motion.")]
         [SerializeField] protected float _driftSpeed = 0.8f;
 
-        [Header("Pacing & Readability Padding")]
+        [Header("Pacing & Readability Padding (Intro / Subtitles)")]
         [Tooltip("Delay in seconds after image appears before typewriter text starts typing.")]
         [SerializeField] protected float _typingStartPadding = 0.4f;
-        [Tooltip("Hold duration in seconds after typing completes to allow comfortable reading before moving to next slide.")]
-        [SerializeField] protected float _readingHoldPadding = 1.0f;
+        [Tooltip("Hold duration in seconds after typing completes to allow comfortable reading before moving to next slide (Intro subtitles only).")]
+        [SerializeField] protected float _readingHoldPadding = 2.2f;
 
         [Header("End Behavior")]
         [SerializeField] protected CutsceneEndAction _endAction = CutsceneEndAction.ShowEndCard;
@@ -354,9 +355,6 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     string subtitle = slide.subtitle;
                     float duration = slide.duration > 0f ? slide.duration : _slideDuration;
 
-                    float estimatedTypingTime = !string.IsNullOrEmpty(subtitle) ? subtitle.Length * _typewriterSpeed : 0f;
-                    float actualSlideDuration = Mathf.Max(duration, estimatedTypingTime + _readingHoldPadding);
-
                     // 1. Assign image & lock scale to exact 1.0 while completely black
                     if (_slideImage != null)
                     {
@@ -371,7 +369,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                     // 2. Play slide with Static Film Dissolve + organic subtle camera drift
                     bool isLast = (i == total - 1);
                     bool shouldHoldFinalImage = isLast && (_endAction == CutsceneEndAction.ShowEndCard);
-                    yield return StartCoroutine(PlaySingleSlideLifecycle(slideSprite, subtitle, actualSlideDuration, i, shouldHoldFinalImage));
+                    yield return StartCoroutine(PlaySingleSlideLifecycle(slideSprite, subtitle, duration, i, shouldHoldFinalImage));
                 }
 
                 // Only clear to blackness if we are transitioning away (LoadScene); otherwise keep last slide visible behind End Card
@@ -408,38 +406,40 @@ namespace ThailandHorrorJam.Systems.Gameplay
         }
 
         /// <summary>
-        /// Plays a single slide with perfectly smooth continuous Ken Burns zoom from start to finish.
-        /// Scales continuously across FadeIn -> HeadPadding -> Typing -> Hold -> FadeOut.
+        /// Plays a single slide, automatically delegating to either Full-Screen Movie lifecycle (Ending)
+        /// or Windowed Subtitled lifecycle (Intro) based on the configured display mode.
         /// </summary>
         protected virtual IEnumerator PlaySingleSlideLifecycle(Sprite sprite, string subtitle, float contentDuration, int slideIndex, bool isLastSlide)
+        {
+            if (_displayMode == CutsceneDisplayMode.FullScreenCinematicMovie)
+            {
+                yield return StartCoroutine(PlayMovieSlideLifecycle(sprite, contentDuration, slideIndex, isLastSlide));
+            }
+            else
+            {
+                yield return StartCoroutine(PlaySubtitledSlideLifecycle(sprite, subtitle, contentDuration, slideIndex, isLastSlide));
+            }
+        }
+
+        /// <summary>
+        /// Plays a full-screen borderless movie slide without subtitles, strictly preserving the exact
+        /// original timing and audio synchronization (e.g. Ending cutscene music).
+        /// </summary>
+        protected virtual IEnumerator PlayMovieSlideLifecycle(Sprite sprite, float contentDuration, int slideIndex, bool isLastSlide)
         {
             float fadeInTime = _fadeDuration * 0.5f;
             float fadeOutTime = _fadeDuration * 0.5f;
             float totalLifeTime = fadeInTime + _typingStartPadding + contentDuration + fadeOutTime;
 
             float elapsed = 0f;
-            bool typewriterStarted = false;
             float seed = slideIndex * 13.37f;
 
             while (elapsed < totalLifeTime)
             {
                 elapsed += Time.deltaTime;
+                UpdateSlideDrift(elapsed, seed);
 
-                // A. Static Scale (1.0) with subtle organic horror camera drift (Smooth Lissajous / Perlin float)
-                if (_slideImage != null)
-                {
-                    _slideImage.rectTransform.localScale = Vector3.one;
-
-                    if (_enableCameraDrift)
-                    {
-                        float driftTime = (elapsed + seed) * _driftSpeed;
-                        float offsetX = Mathf.Sin(driftTime) * _driftAmplitude;
-                        float offsetY = Mathf.Cos(driftTime * 0.73f) * (_driftAmplitude * 0.65f);
-                        _slideImage.rectTransform.anchoredPosition = _slideBaseAnchoredPos + new Vector2(offsetX, offsetY);
-                    }
-                }
-
-                // B. Fade In phase
+                // A. Fade In phase
                 if (elapsed <= fadeInTime)
                 {
                     float alphaProgress = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, fadeInTime));
@@ -450,7 +450,7 @@ namespace ThailandHorrorJam.Systems.Gameplay
                         _slideImage.color = c;
                     }
                 }
-                // C. Active display phase
+                // B. Active display phase
                 else if (elapsed <= totalLifeTime - fadeOutTime)
                 {
                     if (_slideImage != null && _slideImage.color.a < 1f)
@@ -459,34 +459,10 @@ namespace ThailandHorrorJam.Systems.Gameplay
                         c.a = 1f;
                         _slideImage.color = c;
                     }
-
-                    // Start typewriter after HeadPadding has elapsed
-                    if (!typewriterStarted && elapsed >= (fadeInTime + _typingStartPadding))
-                    {
-                        typewriterStarted = true;
-                        if (_displayMode == CutsceneDisplayMode.WindowedWithSubtitles && _subtitleText != null)
-                        {
-                            if (_typewriterRoutine != null) StopCoroutine(_typewriterRoutine);
-                            if (!string.IsNullOrEmpty(subtitle))
-                            {
-                                _typewriterRoutine = StartCoroutine(TypewriterRoutine(subtitle));
-                            }
-                            else
-                            {
-                                _subtitleText.text = string.Empty;
-                            }
-                        }
-                    }
                 }
-                // D. Fade Out phase (at the end of slide life)
+                // C. Fade Out phase
                 else
                 {
-                    // Clear subtitle text as fade out begins for clean transition
-                    if (_subtitleText != null && !string.IsNullOrEmpty(_subtitleText.text))
-                    {
-                        _subtitleText.text = string.Empty;
-                    }
-
                     if (!isLastSlide)
                     {
                         float fadeOutElapsed = elapsed - (totalLifeTime - fadeOutTime);
@@ -510,17 +486,176 @@ namespace ThailandHorrorJam.Systems.Gameplay
                 yield return null;
             }
 
-            // Slide finished: only zero-out alpha if not holding the final image
             if (!isLastSlide && _slideImage != null)
             {
                 Color c = _slideImage.color;
                 c.a = 0f;
+                _slideImage.color = c;
+                _slideImage.rectTransform.anchoredPosition = _slideBaseAnchoredPos;
+            }
+        }
+
+        /// <summary>
+        /// Plays a windowed slide with bottom typewriter subtitles (Intro cutscene), sequentially guaranteeing:
+        /// FadeIn -> Head Padding -> Typewriter completion -> Dedicated Reading Hold -> FadeOut.
+        /// </summary>
+        protected virtual IEnumerator PlaySubtitledSlideLifecycle(Sprite sprite, string subtitle, float contentDuration, int slideIndex, bool isLastSlide)
+        {
+            float fadeInTime = _fadeDuration * 0.5f;
+            float fadeOutTime = _fadeDuration * 0.5f;
+            float seed = slideIndex * 13.37f;
+            float elapsed = 0f;
+
+            // Phase 1: Fade In
+            float t = 0f;
+            while (t < fadeInTime)
+            {
+                t += Time.deltaTime;
+                elapsed += Time.deltaTime;
+                UpdateSlideDrift(elapsed, seed);
+
+                float alphaProgress = Mathf.Clamp01(t / Mathf.Max(0.01f, fadeInTime));
+                if (_slideImage != null)
+                {
+                    Color c = _slideImage.color;
+                    c.a = Mathf.SmoothStep(0f, 1f, alphaProgress);
+                    _slideImage.color = c;
+                }
+                yield return null;
+            }
+
+            if (_slideImage != null)
+            {
+                Color c = _slideImage.color;
+                c.a = 1f;
+                _slideImage.color = c;
+            }
+
+            // Phase 2: Typing Start Padding (brief moment to absorb the artwork)
+            t = 0f;
+            while (t < _typingStartPadding)
+            {
+                t += Time.deltaTime;
+                elapsed += Time.deltaTime;
+                UpdateSlideDrift(elapsed, seed);
+                yield return null;
+            }
+
+            // Phase 3: Typewriter Typing
+            string trimmed = !string.IsNullOrEmpty(subtitle) ? subtitle.Trim() : string.Empty;
+            bool hasSubtitle = !string.IsNullOrEmpty(trimmed);
+            float typingStartTime = Time.time;
+
+            if (hasSubtitle && _subtitleText != null)
+            {
+                string textToType = SimpleLocalization.LocalizationManager.HasKey(trimmed)
+                    ? trimmed.Localize()
+                    : subtitle;
+
+                if (_typewriterRoutine != null)
+                {
+                    StopCoroutine(_typewriterRoutine);
+                }
+                _typewriterRoutine = StartCoroutine(TypewriterRoutine(textToType));
+
+                // Wait until typewriter completely finishes displaying every character
+                while (_typewriterRoutine != null)
+                {
+                    elapsed += Time.deltaTime;
+                    UpdateSlideDrift(elapsed, seed);
+                    yield return null;
+                }
+            }
+            else if (_subtitleText != null)
+            {
+                _subtitleText.text = string.Empty;
+            }
+
+            // Phase 4: Reading Hold (pauses after typing completes to allow comfortable reading)
+            float typingDuration = Time.time - typingStartTime;
+            float holdDuration;
+
+            if (hasSubtitle)
+            {
+                float remainingContentTime = contentDuration - (typingDuration + _typingStartPadding);
+                holdDuration = Mathf.Max(_readingHoldPadding, remainingContentTime);
+            }
+            else
+            {
+                holdDuration = Mathf.Max(0.5f, contentDuration);
+            }
+
+            t = 0f;
+            while (t < holdDuration)
+            {
+                t += Time.deltaTime;
+                elapsed += Time.deltaTime;
+                UpdateSlideDrift(elapsed, seed);
+                yield return null;
+            }
+
+            // Phase 5: Fade Out
+            if (_subtitleText != null && !string.IsNullOrEmpty(_subtitleText.text))
+            {
+                _subtitleText.text = string.Empty;
+            }
+
+            if (!isLastSlide)
+            {
+                t = 0f;
+                while (t < fadeOutTime)
+                {
+                    t += Time.deltaTime;
+                    elapsed += Time.deltaTime;
+                    UpdateSlideDrift(elapsed, seed);
+
+                    float alphaProgress = Mathf.Clamp01(t / Mathf.Max(0.01f, fadeOutTime));
+                    if (_slideImage != null)
+                    {
+                        Color c = _slideImage.color;
+                        c.a = Mathf.SmoothStep(1f, 0f, alphaProgress);
+                        _slideImage.color = c;
+                    }
+                    yield return null;
+                }
+
+                if (_slideImage != null)
+                {
+                    Color c = _slideImage.color;
+                    c.a = 0f;
+                    _slideImage.color = c;
+                    _slideImage.rectTransform.anchoredPosition = _slideBaseAnchoredPos;
+                }
+            }
+            else if (_slideImage != null)
+            {
+                // Hold final image at 100% opacity for the End Card presentation
+                Color c = _slideImage.color;
+                c.a = 1f;
                 _slideImage.color = c;
             }
 
             if (_subtitleText != null)
             {
                 _subtitleText.text = string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Updates the subtle organic horror camera drift on the slide illustration.
+        /// </summary>
+        protected virtual void UpdateSlideDrift(float elapsed, float seed)
+        {
+            if (_slideImage == null) return;
+
+            _slideImage.rectTransform.localScale = Vector3.one;
+
+            if (_enableCameraDrift)
+            {
+                float driftTime = (elapsed + seed) * _driftSpeed;
+                float offsetX = Mathf.Sin(driftTime) * _driftAmplitude;
+                float offsetY = Mathf.Cos(driftTime * 0.73f) * (_driftAmplitude * 0.65f);
+                _slideImage.rectTransform.anchoredPosition = _slideBaseAnchoredPos + new Vector2(offsetX, offsetY);
             }
         }
 
@@ -546,6 +681,15 @@ namespace ThailandHorrorJam.Systems.Gameplay
 
         protected virtual IEnumerator TypewriterRoutine(string fullText)
         {
+            if (_subtitleText != null)
+            {
+                var font = SimpleLocalization.LocalizationManager.GetFont(SimpleLocalization.LocalizationManager.CurrentLanguage);
+                if (font != null && _subtitleText.font != font)
+                {
+                    _subtitleText.font = font;
+                }
+            }
+
             _subtitleText.text = string.Empty;
             int soundCharCounter = 0;
 
