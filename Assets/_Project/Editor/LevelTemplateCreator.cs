@@ -2053,7 +2053,7 @@ namespace ThailandHorrorJam.Editor
             }
 
             // 2. Locate Checkpoints by proximity
-            Checkpoint[] allCps = Object.FindObjectsByType<Checkpoint>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Checkpoint[] allCps = Object.FindObjectsByType<Checkpoint>(FindObjectsInactive.Include);
             Checkpoint FindNearestCheckpoint(float targetX)
             {
                 Checkpoint best = null;
