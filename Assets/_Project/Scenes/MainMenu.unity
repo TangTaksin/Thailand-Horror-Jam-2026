@@ -172,10 +172,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a110ca0000014000b000000000000006, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SimpleLocalization.Runtime::SimpleLocalization.LanguageToggleUI
-  toggleLanguages: 0a00000024000000i
-  labelText: {fileID: 961002067}
-  localizationKey: 
-  showNextLanguageOnButton: 0
+  _toggleLanguages: 0a00000024000000i
+  _labelText: {fileID: 961002067}
+  _localizationKey: 
+  _showNextLanguageOnButton: 0
 --- !u!114 &104738628
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1244,7 +1244,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a110ca0000014000b000000000000005, type: 3}
   m_Name: 
   m_EditorClassIdentifier: SimpleLocalization.Runtime::SimpleLocalization.LocalizedText
-  key: ui_click_to_start
+  _key: ui_click_to_start
 --- !u!1 &1383324773
 GameObject:
   m_ObjectHideFlags: 0
@@ -1706,9 +1706,9 @@ MonoBehaviour:
   m_fontSize: 32
   m_fontSizeBase: 32
   m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_enableAutoSizing: 1
+  m_fontSizeMin: 32
+  m_fontSizeMax: 52
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 256

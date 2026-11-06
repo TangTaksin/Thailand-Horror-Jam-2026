@@ -42,9 +42,9 @@ ui_thank_you,Thank you for playing!,ขอบคุณที่เล่นจ�
 ui_menu,Menu,เมนูหลัก
 ,,
 # Intro Cutscene (Short Keys),,
-cutscene_intro_1,"Nothing scares me quite like a pale, dead fish.",ไม่มีอะไรทำให้ฉันกลัวได้เท่ากับปลาที่ซีดเผือดและไร้ชีวิตตัวนั้น...
-cutscene_intro_2,"The soggy, decaying, bloated body, reeking with an unbearable, foul stench.",ร่างที่เปียกชุ่ม เน่าเปื่อย บวมอืด และส่งกลิ่นเหม็นเน่าจนแทบทนไม่ไหว...
-cutscene_intro_3,I couldn't bring myself to touch it. Would those lifeless eyes be staring at me from up on the wall?,ฉันไม่กล้าแม้แต่จะเอื้อมมือไปแตะมัน ดวงตาที่ไร้แววนั่น... กำลังจ้องมองฉันอยู่จากบนกำแพงใช่ไหม?
-cutscene_intro_4,"Was it mad at me for not burying it? The more I think about it, the bigger and nastier it gets in my head.",มันโกรธที่ฉันไม่ยอมฝังมันงั้นเหรอ? ยิ่งคิดถึงมัน ภาพในหัวก็ยิ่งใหญ่โตและน่าขยะแขยงขึ้นเรื่อยๆ...
-cutscene_intro_5,I'm scared... Why won't it just go away already!?,ฉันกลัว... ทำไมมันถึงไม่ยอมหายไปสักที!?
-cutscene_intro_6,"If I close my eyes, will it disappear?",ถ้าฉันหลับตาลง... มันจะหายไปไหมนะ?
+cutscene_intro_1,"Nothing scares me quite like a pale, dead fish.",สิ่งที่น่ากลัวที่สุดคือปลาตายที่ซีดจาง 
+cutscene_intro_2,"The soggy, decaying, bloated body, reeking with an unbearable, foul stench.",เพราะอะไร? เพราะมันไม่ต่างกับซากสัตว์ขึ้นอืด และ มันกลิ่นเหม็นมาก 
+cutscene_intro_3,I couldn't bring myself to touch it. Would those lifeless eyes be staring at me from up on the wall?,ไม่แม้แต่จะอยากจะแตะมันเลย มันจะตามมาหลอกจากด้านบนผนังบ้านหรือเปล่า? 
+cutscene_intro_4,"Was it mad at me for not burying it? The more I think about it, the bigger and nastier it gets in my head.",มันแค้นฉันหรือเปล่าที่ไม่พามันไปฝัง? ยิ่งคิด ตัวมันก็ยิ่งใหญ่และน่ากลัวขึ้นเรื่อยๆ 
+cutscene_intro_5,I'm scared... Why won't it just go away already!?,!!!!!! เมื่อไหร่มันจะไปซักที 
+cutscene_intro_6,"If I close my eyes, will it disappear?",ถ้าหลับตาลง... พวกมันจะหายไปไหมนะ?
