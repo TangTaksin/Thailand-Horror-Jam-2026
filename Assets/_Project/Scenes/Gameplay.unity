@@ -9746,6 +9746,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7551492123778735826, guid: 0475748a48db60945afdf0ca7aa703a7, type: 3}
+      propertyPath: m_LightVolumeIntensity
+      value: 0.01
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -12233,7 +12237,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u0E02\u0E2D\u0E1A\u0E04\u0E38\u0E13\u0E17\u0E35\u0E48\u0E23\u0E48\u0E27\u0E21\u0E40\u0E25\u0E48\u0E19!"
+  m_text: "\u0E02\u0E2D\u0E1A\u0E04\u0E38\u0E13\u0E17\u0E35\u0E48\u0E40\u0E25\u0E48\u0E19\u0E08\u0E19\u0E08\u0E1A"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 158c67cd35e698741ba8551544e9a34d, type: 2}
   m_sharedMaterial: {fileID: -8706423687555920365, guid: 158c67cd35e698741ba8551544e9a34d, type: 2}
@@ -18487,7 +18491,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u0E2D\u0E27\u0E2A\u0E32\u0E19"
+  m_text: "\u0E08\u0E1A\u0E1A\u0E23\u0E34\u0E1A\u0E39\u0E23\u0E13\u0E4C"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 158c67cd35e698741ba8551544e9a34d, type: 2}
   m_sharedMaterial: {fileID: -8706423687555920365, guid: 158c67cd35e698741ba8551544e9a34d, type: 2}
@@ -23378,6 +23382,10 @@ MonoBehaviour:
   _outlineMaterial: {fileID: 0}
   _outlineScaleMultiplier: {x: 1.08, y: 1.05}
   _fadeDuration: 0.12
+  _loopColor: {r: 1, g: 1, b: 1, a: 0.95}
+  _pulseWhileLooping: 1
+  _pulseSpeed: 4
+  _pulseMinAlpha: 0.65
 --- !u!114 &1958486654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23448,6 +23456,8 @@ MonoBehaviour:
   _autoStartOnAwake: 0
   _initialLoopMode: 0
   _initialWaypoints: []
+  _loopHighlight: {fileID: 0}
+  _enableLoopHighlight: 1
 --- !u!50 &1958486657
 Rigidbody2D:
   serializedVersion: 5
@@ -28755,6 +28765,8 @@ MonoBehaviour:
   _autoStartOnAwake: 0
   _initialLoopMode: 0
   _initialWaypoints: []
+  _loopHighlight: {fileID: 0}
+  _enableLoopHighlight: 1
 --- !u!114 &1443309658426089467
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28923,6 +28935,10 @@ MonoBehaviour:
   _outlineMaterial: {fileID: 0}
   _outlineScaleMultiplier: {x: 1.08, y: 1.05}
   _fadeDuration: 0.12
+  _loopColor: {r: 1, g: 1, b: 1, a: 0.95}
+  _pulseWhileLooping: 1
+  _pulseSpeed: 4
+  _pulseMinAlpha: 0.65
 --- !u!1 &1874310569883218437
 GameObject:
   m_ObjectHideFlags: 0
@@ -29359,6 +29375,8 @@ MonoBehaviour:
   _autoStartOnAwake: 0
   _initialLoopMode: 0
   _initialWaypoints: []
+  _loopHighlight: {fileID: 0}
+  _enableLoopHighlight: 1
 --- !u!212 &3265808356312791923
 SpriteRenderer:
   serializedVersion: 3
@@ -30656,6 +30674,8 @@ MonoBehaviour:
   _autoStartOnAwake: 0
   _initialLoopMode: 0
   _initialWaypoints: []
+  _loopHighlight: {fileID: 0}
+  _enableLoopHighlight: 1
 --- !u!4 &6184263512093544937
 Transform:
   m_ObjectHideFlags: 0
@@ -31294,6 +31314,10 @@ MonoBehaviour:
   _outlineMaterial: {fileID: 0}
   _outlineScaleMultiplier: {x: 1.08, y: 1.05}
   _fadeDuration: 0.12
+  _loopColor: {r: 1, g: 1, b: 1, a: 0.95}
+  _pulseWhileLooping: 1
+  _pulseSpeed: 4
+  _pulseMinAlpha: 0.65
 --- !u!4 &7769464704148376190
 Transform:
   m_ObjectHideFlags: 0

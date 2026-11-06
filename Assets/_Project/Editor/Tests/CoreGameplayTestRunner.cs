@@ -61,6 +61,9 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t1.SetUp(); t1.ResetToInitialState_WhenForceReset_ResetsEvenIfPreserveLoopTrue(); t1.TearDown(); },
                 "StitchableState: Force Reset Resets Crate To Alcove Even If Preserve Loop True");
 
+            RunTest(() => { t1.SetUp(); t1.StartLoopAlongWaypoints_ActivatesLoopHighlight_AndCutThreadDeactivatesIt(); t1.TearDown(); },
+                "StitchableState: StartLoop Activates Loop Highlight & CutThread Deactivates");
+
             // 2. StitchableWaypointNavigationTests
             var t2 = new StitchableWaypointNavigationTests();
 

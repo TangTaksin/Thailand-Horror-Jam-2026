@@ -26,14 +26,30 @@ namespace ThailandHorrorJam.Systems.Interaction
         [Tooltip("Fade transition duration in seconds (~0.12s).")]
         [SerializeField] private float _fadeDuration = 0.12f;
 
+        [Header("Loop Appearance")]
+        [Tooltip("Rim color shown when the object is actively looping.")]
+        [SerializeField] private Color _loopColor = new Color(1f, 1f, 1f, 0.95f);
+
+        [Tooltip("Optional subtle pulsing effect for the white highlight while looping.")]
+        [SerializeField] private bool _pulseWhileLooping = true;
+
+        [Tooltip("Speed of the breathing pulse while looping.")]
+        [SerializeField] private float _pulseSpeed = 4f;
+
+        [Tooltip("Minimum alpha for the breathing pulse while looping.")]
+        [SerializeField] private float _pulseMinAlpha = 0.65f;
+
         private static Material s_CachedSilhouetteMaterial;
 
         private SpriteRenderer _outlineRenderer;
         private GameObject _outlineObject;
         private float _currentAlpha;
         private float _targetAlpha;
+        private bool _isFocusHighlighted;
+        private bool _isLoopHighlighted;
 
-        public bool IsHighlighted => _targetAlpha > 0.001f;
+        public bool IsHighlighted => _targetAlpha > 0.001f || _currentAlpha > 0.001f;
+        public bool IsLoopHighlighted => _isLoopHighlighted;
 
         private void Awake()
         {
@@ -52,6 +68,8 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         private void OnDisable()
         {
+            _isFocusHighlighted = false;
+            _isLoopHighlighted = false;
             _targetAlpha = 0f;
             ApplyAlphaImmediate(0f);
         }
@@ -60,7 +78,15 @@ namespace ThailandHorrorJam.Systems.Interaction
         {
             if (_outlineRenderer == null || _targetRenderer == null) return;
 
-            if (Mathf.Abs(_currentAlpha - _targetAlpha) > 0.001f)
+            if (_isLoopHighlighted && _pulseWhileLooping)
+            {
+                float pulse = (Mathf.Sin(Time.time * _pulseSpeed) + 1f) * 0.5f;
+                float pulsedTargetAlpha = Mathf.Lerp(_pulseMinAlpha, _loopColor.a, pulse);
+                float speed = _fadeDuration > 0.001f ? (1f / _fadeDuration) : 20f;
+                _currentAlpha = Mathf.MoveTowards(_currentAlpha, pulsedTargetAlpha, speed * Time.deltaTime);
+                UpdateOutlineVisuals();
+            }
+            else if (Mathf.Abs(_currentAlpha - _targetAlpha) > 0.001f)
             {
                 float speed = _fadeDuration > 0.001f ? (1f / _fadeDuration) : 20f;
                 _currentAlpha = Mathf.MoveTowards(_currentAlpha, _targetAlpha, speed * Time.deltaTime);
@@ -78,8 +104,28 @@ namespace ThailandHorrorJam.Systems.Interaction
         /// </summary>
         public void SetHighlighted(bool highlighted)
         {
-            _targetAlpha = highlighted ? _outlineColor.a : 0f;
-            if (highlighted && _outlineObject != null && !_outlineObject.activeSelf)
+            _isFocusHighlighted = highlighted;
+            UpdateTargetState();
+        }
+
+        /// <summary>
+        /// Enables or disables the loop highlight with a white outline.
+        /// </summary>
+        public void SetLoopHighlighted(bool highlighted)
+        {
+            _isLoopHighlighted = highlighted;
+            UpdateTargetState();
+        }
+
+        private void UpdateTargetState()
+        {
+            EnsureOutlineRenderer();
+
+            bool active = _isLoopHighlighted || _isFocusHighlighted;
+            Color activeColor = _isLoopHighlighted ? _loopColor : _outlineColor;
+            _targetAlpha = active ? activeColor.a : 0f;
+
+            if (active && _outlineObject != null && !_outlineObject.activeSelf)
             {
                 _outlineObject.SetActive(true);
                 SyncSpriteWithTarget();
@@ -88,6 +134,15 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         private void EnsureOutlineRenderer()
         {
+            if (_targetRenderer == null)
+            {
+                _targetRenderer = GetComponent<SpriteRenderer>();
+                if (_targetRenderer == null)
+                {
+                    _targetRenderer = GetComponentInChildren<SpriteRenderer>();
+                }
+            }
+
             if (_targetRenderer == null || _outlineRenderer != null) return;
 
             Transform existing = _targetRenderer.transform.Find("[FocusOutline]");
@@ -215,7 +270,8 @@ namespace ThailandHorrorJam.Systems.Interaction
             if (_outlineRenderer == null) return;
 
             SyncSpriteWithTarget();
-            Color c = _outlineColor;
+            Color baseColor = _isLoopHighlighted ? _loopColor : _outlineColor;
+            Color c = baseColor;
             c.a = _currentAlpha;
             _outlineRenderer.color = c;
 

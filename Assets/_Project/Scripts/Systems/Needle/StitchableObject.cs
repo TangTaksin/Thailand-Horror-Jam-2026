@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using ThailandHorrorJam.Core;
+using ThailandHorrorJam.Systems.Interaction;
 
 namespace ThailandHorrorJam.Systems.Needle
 {
@@ -64,6 +65,11 @@ namespace ThailandHorrorJam.Systems.Needle
         [SerializeField] private LoopPlaybackMode _initialLoopMode = LoopPlaybackMode.PingPong;
         [SerializeField] private Vector2[] _initialWaypoints;
 
+        [Header("Loop Visual Feedback")]
+        [Tooltip("Optional highlight component to show a white silhouette outline while looping. Auto-resolved or added at runtime if SpriteRenderer exists.")]
+        [SerializeField] private InteractableHighlight2D _loopHighlight;
+        [SerializeField] private bool _enableLoopHighlight = true;
+
         private Rigidbody2D _rb;
         private RigidbodyType2D _originalBodyType;
         private RigidbodyConstraints2D _originalConstraints;
@@ -110,6 +116,12 @@ namespace ThailandHorrorJam.Systems.Needle
             get => _preserveLoopOnRespawn;
             set => _preserveLoopOnRespawn = value;
         }
+        public InteractableHighlight2D LoopHighlight => _loopHighlight;
+        public bool EnableLoopHighlight
+        {
+            get => _enableLoopHighlight;
+            set => _enableLoopHighlight = value;
+        }
 
         private void Awake()
         {
@@ -136,6 +148,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 _tetherJoint.enabled = false;
             }
 
+            EnsureHighlightComponent();
             EnsureSutureThreadInstance();
         }
 
@@ -144,6 +157,35 @@ namespace ThailandHorrorJam.Systems.Needle
             if (_autoStartOnAwake && _initialWaypoints != null && _initialWaypoints.Length >= 2)
             {
                 StartLoopAlongWaypoints(_initialWaypoints, _initialLoopMode);
+            }
+        }
+
+        public void SetLoopHighlight(bool active)
+        {
+            if (!_enableLoopHighlight) return;
+
+            if (_loopHighlight == null)
+            {
+                EnsureHighlightComponent();
+            }
+
+            if (_loopHighlight != null)
+            {
+                _loopHighlight.SetLoopHighlighted(active);
+            }
+        }
+
+        private void EnsureHighlightComponent()
+        {
+            if (_loopHighlight != null) return;
+
+            if (!TryGetComponent(out _loopHighlight))
+            {
+                var sr = GetComponentInChildren<SpriteRenderer>();
+                if (sr != null)
+                {
+                    _loopHighlight = gameObject.AddComponent<InteractableHighlight2D>();
+                }
             }
         }
 
@@ -429,6 +471,7 @@ namespace ThailandHorrorJam.Systems.Needle
                 DisableTetherJointAndClearPlayerRefs();
             }
 
+            SetLoopHighlight(false);
             _currentState = StitchState.Tethered;
             _waypoints.Clear();
             _waypoints.Add(CurrentPosition);
@@ -544,6 +587,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 float maxTravel = Mathf.Max(0.1f, segDist - frontExtent);
                 _waypoints[_waypoints.Count - 1] = p0 + dir * maxTravel;
             }
+
+            SetLoopHighlight(true);
         }
 
         private void TraverseWaypoints()
@@ -628,6 +673,8 @@ namespace ThailandHorrorJam.Systems.Needle
         public void StartPlayerTether(Transform playerTransform, Rigidbody2D playerRb)
         {
             if (playerTransform == null) return;
+
+            SetLoopHighlight(false);
 
             _tetheredPlayerTransform = playerTransform;
             _tetheredPlayerRb = playerRb;
@@ -871,6 +918,8 @@ namespace ThailandHorrorJam.Systems.Needle
                 return;
             }
 
+            SetLoopHighlight(false);
+
             _currentState = StitchState.Idle;
             _waypoints.Clear();
             _isReversing = false;
@@ -927,6 +976,7 @@ namespace ThailandHorrorJam.Systems.Needle
 
         private void OnDisable()
         {
+            SetLoopHighlight(false);
             if (_currentState == StitchState.PlayerHarness)
             {
                 ReleasePlayerTether();
