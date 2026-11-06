@@ -1,0 +1,50 @@
+key,English,Thai
+# Main Menu & General UI,,
+ui_click_to_start,- CLICK TO START -,- คลิกเพื่อเริ่มเกม -
+ui_play,PLAY,เริ่มเกม
+ui_settings,SETTINGS,ตั้งค่า
+ui_quit,QUIT,ออกเกม
+ui_resume,RESUME,เล่นต่อ
+ui_restart,RESTART,เริ่มใหม่
+ui_back,BACK,ย้อนกลับ
+ui_language,Language: {0},ภาษา: {0}
+ui_language_btn,EN / TH,ไทย / EN
+ui_audio,Audio Settings,ตั้งค่าเสียง
+ui_music,Music,เพลง
+ui_sfx,SFX,เอฟเฟกต์
+ui_ambient,Ambient,บรรยากาศ
+,,
+# Gameplay Prompts & Hints,,
+hint_interact,Press {0} to interact,กด {0} เพื่อมีปฏิสัมพันธ์
+hint_prompt_shoot_cancel,Shoot        Cancel,ยิง        ยกเลิก
+hint_prompt_stitch_drag,Stitch        Drag,เย็บ        ลาก
+hint_stitch,Stitch Target,เย็บยึดวัตถุ
+hint_move,Use A / D to Move,กด A / D เพื่อเดิน
+hint_jump,Press Space to Jump,กด Space เพื่อกระโดด
+hint_throw_needle,"Right Click to Aim, Left Click to Throw",คลิกขวาเพื่อเล็ง คลิกซ้ายเพื่อปักเข็ม
+hint_tether,Hold to Pull Tether,กดค้างเพื่อดึงเส้นด้าย
+msg_checkpoint,Checkpoint Saved,บันทึกจุดตรวจแล้ว
+msg_loop_counter,Loop #{0},รอบที่ {0}
+msg_death,You succumbed to the loop...,คุณถูกกลืนกินโดยลูป...
+,,
+# World Tutorial Texts,,
+tut_move,Move,เดิน
+tut_tap_jump,Tap Jump,กระโดด
+tut_space,Space,Space
+tut_long_jump,Long Jump,กระโดดสูง
+tut_hold_space,Hold Space,กด Space ค้าง
+tut_aim,Aim,เล็ง
+tut_pin,Pin,ปักเข็ม
+,,
+# End Game UI,,
+ui_the_end,THE END,จบบริบูรณ์ 
+ui_thank_you,Thank you for playing!,ขอบคุณที่เล่นจนจบ
+ui_menu,Menu,เมนูหลัก
+,,
+# Intro Cutscene (Short Keys),,
+cutscene_intro_1,"Nothing scares me quite like a pale, dead fish.",สิ่งที่น่ากลัวที่สุดคือปลาตายที่ซีดจาง 
+cutscene_intro_2,"The soggy, decaying, bloated body, reeking with an unbearable, foul stench.",เพราะอะไร? เพราะมันไม่ต่างกับซากสัตว์ขึ้นอืด และ มันกลิ่นเหม็นมาก 
+cutscene_intro_3,I couldn't bring myself to touch it. Would those lifeless eyes be staring at me from up on the wall?,ไม่แม้แต่จะอยากจะแตะมันเลย มันจะตามมาหลอกจากด้านบนผนังบ้านหรือเปล่า? 
+cutscene_intro_4,"Was it mad at me for not burying it? The more I think about it, the bigger and nastier it gets in my head.",มันแค้นฉันหรือเปล่าที่ไม่พามันไปฝัง? ยิ่งคิด ตัวมันก็ยิ่งใหญ่และน่ากลัวขึ้นเรื่อยๆ 
+cutscene_intro_5,I'm scared... Why won't it just go away already!?,!!!!!! เมื่อไหร่มันจะไปซักที 
+cutscene_intro_6,"If I close my eyes, will it disappear?",ถ้าหลับตาลง... พวกมันจะหายไปไหมนะ?

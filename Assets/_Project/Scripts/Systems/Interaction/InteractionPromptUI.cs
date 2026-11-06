@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ThailandHorrorJam.Systems.Needle;
+using SimpleLocalization;
 
 namespace ThailandHorrorJam.Systems.Interaction
 {
@@ -56,6 +57,8 @@ namespace ThailandHorrorJam.Systems.Interaction
         private void OnEnable()
         {
             ResetDefaultLayout();
+            LocalizationManager.OnLanguageChanged += HandleLanguageChanged;
+            UpdateHintLabels();
             if (_interactionChannel == null) return;
             _interactionChannel.FocusChanged += HandleFocusChanged;
             HandleFocusChanged(_interactionChannel.LastFocusData);
@@ -111,8 +114,14 @@ namespace ThailandHorrorJam.Systems.Interaction
 
         private void OnDisable()
         {
+            LocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
             if (_interactionChannel == null) return;
             _interactionChannel.FocusChanged -= HandleFocusChanged;
+        }
+
+        private void HandleLanguageChanged()
+        {
+            UpdateHintLabels();
         }
 
         private void OnDestroy()
@@ -163,16 +172,22 @@ namespace ThailandHorrorJam.Systems.Interaction
         {
             if (_actionHintText == null) return;
 
+            var font = LocalizationManager.GetFont(LocalizationManager.CurrentLanguage);
+            if (font != null && _actionHintText.font != font)
+            {
+                _actionHintText.font = font;
+            }
+
             if (_targetStage == PromptStage.AimingPrompt)
             {
                 // เล็งเข็มอยู่: ซ้าย=ยิง, ขวา=ออก
-                _actionHintText.text = "Shoot        Cancel";
+                _actionHintText.text = "hint_prompt_shoot_cancel".Localize();
                 _actionHintText.enabled = true;
             }
             else if (_targetStage == PromptStage.InteractIcon)
             {
                 // หน้ากล่อง: ซ้าย=เย็บ, ขวา=ลาก
-                _actionHintText.text = "Stitch        Drag";
+                _actionHintText.text = "hint_prompt_stitch_drag".Localize();
                 _actionHintText.enabled = true;
             }
             else

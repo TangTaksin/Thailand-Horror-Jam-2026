@@ -204,5 +204,23 @@ namespace ThailandHorrorJam.Editor.Tests
 
             Object.DestroyImmediate(playerObj);
         }
+
+        [Test]
+        public void StartLoopAlongWaypoints_ActivatesLoopHighlight_AndCutThreadDeactivatesIt()
+        {
+            _go.AddComponent<SpriteRenderer>();
+
+            var waypoints = new List<Vector2> { new Vector2(2f, 3f), new Vector2(6f, 3f) };
+            _stitchable.StartLoopAlongWaypoints(waypoints, LoopPlaybackMode.PingPong);
+
+            Assert.AreEqual(StitchState.Looping, _stitchable.CurrentState);
+            Assert.IsNotNull(_stitchable.LoopHighlight, "LoopHighlight component should be assigned/created.");
+            Assert.IsTrue(_stitchable.LoopHighlight.IsLoopHighlighted, "LoopHighlight should be active while in Looping state.");
+
+            _stitchable.CutThread();
+
+            Assert.AreEqual(StitchState.Idle, _stitchable.CurrentState);
+            Assert.IsFalse(_stitchable.LoopHighlight.IsLoopHighlighted, "LoopHighlight should be deactivated when thread is cut.");
+        }
     }
 }

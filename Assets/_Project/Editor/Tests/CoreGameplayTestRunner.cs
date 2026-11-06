@@ -61,6 +61,9 @@ namespace ThailandHorrorJam.Editor.Tests
             RunTest(() => { t1.SetUp(); t1.ResetToInitialState_WhenForceReset_ResetsEvenIfPreserveLoopTrue(); t1.TearDown(); },
                 "StitchableState: Force Reset Resets Crate To Alcove Even If Preserve Loop True");
 
+            RunTest(() => { t1.SetUp(); t1.StartLoopAlongWaypoints_ActivatesLoopHighlight_AndCutThreadDeactivatesIt(); t1.TearDown(); },
+                "StitchableState: StartLoop Activates Loop Highlight & CutThread Deactivates");
+
             // 2. StitchableWaypointNavigationTests
             var t2 = new StitchableWaypointNavigationTests();
 
@@ -198,6 +201,21 @@ namespace ThailandHorrorJam.Editor.Tests
                 "TetherJump: Falling Fish Slices Tether Thread & Deflects Fish");
             RunTest(() => { t9.SetUp(); t9.CorpseGasVentSuperJump_WhenTetheredOnCrateOverVent_GrantsFullSuperJumpBoostAndReleasesTether(); t9.TearDown(); },
                 "TetherJump: Gas Vent Super Jump Grants Full Boost Velocity Without Joint Damping");
+
+            // 10. LocalizationSystemTests
+            var t10 = new LocalizationSystemTests();
+            RunTest(() => { t10.SetUp(); t10.ParseTSV_ValidString_CorrectlyPopulatesLanguages(); },
+                "Localization: Parse TSV & Language Switching");
+            RunTest(() => { t10.SetUp(); t10.Get_MissingTranslation_ReturnsEnglishFallback(); },
+                "Localization: Missing Translation Falls Back To English");
+            RunTest(() => { t10.SetUp(); t10.Get_MissingKey_ReturnsMissingKeyWarningFormat(); },
+                "Localization: Missing Key Returns Warning Format");
+            RunTest(() => { t10.SetUp(); t10.Get_WithArguments_CorrectlyFormatsString(); },
+                "Localization: String Arguments Formatting");
+            RunTest(() => { t10.SetUp(); t10.SetLanguage_TriggersOnLanguageChangedEvent(); },
+                "Localization: SetLanguage Fires OnLanguageChanged Event");
+            RunTest(() => { t10.SetUp(); t10.CommentLines_StartingWithHash_AreIgnored(); },
+                "Localization: Comment Lines Starting With # Are Ignored");
 
             Debug.Log($"=== Core Stitch & Loop Unit Tests Completed: {passed} Passed, {failed} Failed ===");
             CleanupLeftoverTestObjects();

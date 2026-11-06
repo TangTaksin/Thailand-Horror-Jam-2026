@@ -44,9 +44,16 @@ public class SettingsManager : MonoBehaviour
     private void Update()
     {
         var kb = Keyboard.current;
-        if (kb != null && (kb.pKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame))
+        if (kb != null)
         {
-            ToggleSettingsPanel();
+            if (kb.pKey.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame)
+            {
+                ToggleSettingsPanel();
+            }
+            if (kb.lKey.wasPressedThisFrame)
+            {
+                ToggleLanguage();
+            }
         }
     }
 
@@ -163,6 +170,21 @@ public class SettingsManager : MonoBehaviour
     }
 
     // ─── Button Actions ───
+
+    public void ToggleLanguage()
+    {
+        if (SimpleLocalization.LocalizationManager.CurrentLanguage == SystemLanguage.English)
+        {
+            SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.Thai);
+        }
+        else
+        {
+            SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.English);
+        }
+    }
+
+    public void SetLanguageThai() => SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.Thai);
+    public void SetLanguageEnglish() => SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.English);
 
     public void Resume()
     {

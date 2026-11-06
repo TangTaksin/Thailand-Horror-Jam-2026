@@ -2,6 +2,7 @@
     "name": "ThailandHorrorJam.Editor",
     "rootNamespace": "ThailandHorrorJam.Editor",
     "references": [
+        "SimpleLocalization.Runtime",
         "ThailandHorrorJam.Runtime",
         "Unity.InputSystem",
         "Unity.TextMeshPro",

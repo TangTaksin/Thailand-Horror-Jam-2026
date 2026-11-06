@@ -35,7 +35,8 @@ MonoBehaviour:
   m_defaultTextMeshProUITextContainerSize: {x: 200, y: 50}
   m_autoSizeTextContainer: 0
   m_IsTextObjectScaleStatic: 0
-  m_fallbackFontAssets: []
+  m_fallbackFontAssets:
+  - {fileID: 11400000, guid: 158c67cd35e698741ba8551544e9a34d, type: 2}
   m_matchMaterialPreset: 1
   m_HideSubTextObjects: 0
   m_defaultSpriteAsset: {fileID: 0}

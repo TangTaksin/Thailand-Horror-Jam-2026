@@ -2,6 +2,7 @@
     "name": "ThailandHorrorJam.Runtime",
     "rootNamespace": "ThailandHorrorJam",
     "references": [
+        "SimpleLocalization.Runtime",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "Unity.RenderPipelines.Universal.Runtime",

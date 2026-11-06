@@ -37,6 +37,8 @@ namespace ThailandHorrorJam.Systems.UI
 
         private Vector2 _logoInitialAnchoredPos;
         private bool _hasStarted;
+        private readonly System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult> _raycastResults = new(16);
+        private UnityEngine.EventSystems.PointerEventData _cachedPointerData;
 
         private void Awake()
         {
@@ -57,6 +59,19 @@ namespace ThailandHorrorJam.Systems.UI
 
             if (_hasStarted) return;
 
+            var kb = Keyboard.current;
+            if (kb != null && kb.lKey.wasPressedThisFrame)
+            {
+                if (SimpleLocalization.LocalizationManager.CurrentLanguage == SystemLanguage.English)
+                {
+                    SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.Thai);
+                }
+                else
+                {
+                    SimpleLocalization.LocalizationManager.SetLanguage(SystemLanguage.English);
+                }
+            }
+
             // 2. Pulsing alpha on prompt text
             if (_promptCanvasGroup != null)
             {
@@ -66,18 +81,49 @@ namespace ThailandHorrorJam.Systems.UI
 
             // 3. Pointer / Mouse click anywhere on the screen (New Input System)
             var mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            bool mouseClicked = mouse != null && mouse.leftButton.wasPressedThisFrame;
+            var pointer = Pointer.current;
+            bool pointerPressed = pointer != null && pointer.press.wasPressedThisFrame;
+
+            if (mouseClicked || pointerPressed)
             {
-                StartGame();
-                return;
+                if (!IsPointerOverInteractiveUI())
+                {
+                    StartGame();
+                    return;
+                }
+            }
+        }
+
+        private bool IsPointerOverInteractiveUI()
+        {
+            var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+            if (eventSystem == null) return false;
+
+            Vector2 pointerPos = Vector2.zero;
+            var mouse = Mouse.current;
+            if (mouse != null) pointerPos = mouse.position.ReadValue();
+            else if (Pointer.current != null) pointerPos = Pointer.current.position.ReadValue();
+
+            _cachedPointerData ??= new UnityEngine.EventSystems.PointerEventData(eventSystem);
+
+            _cachedPointerData.position = pointerPos;
+            _raycastResults.Clear();
+            eventSystem.RaycastAll(_cachedPointerData, _raycastResults);
+
+            for (int i = 0; i < _raycastResults.Count; i++)
+            {
+                var go = _raycastResults[i].gameObject;
+                if (go == null || go.name == "FullscreenClickTarget") continue;
+
+                var selectable = go.GetComponentInParent<UnityEngine.UI.Selectable>();
+                if (selectable != null && selectable.gameObject.name != "FullscreenClickTarget")
+                {
+                    return true;
+                }
             }
 
-            var pointer = Pointer.current;
-            if (pointer != null && pointer.press.wasPressedThisFrame)
-            {
-                StartGame();
-                return;
-            }
+            return false;
         }
 
         public void StartGame()

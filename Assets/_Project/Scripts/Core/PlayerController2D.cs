@@ -1383,7 +1383,7 @@ namespace ThailandHorrorJam.Core
                 if (!_isDraggingAudioPlaying)
                 {
                     _isDraggingAudioPlaying = true;
-                    AudioManager.Instance.PlayLoopingSFX(_haulingDragSFXName, 1.0f);
+                    AudioManager.Instance.PlayLoopingSFX(_haulingDragSFXName, _haulingDragVolume);
                 }
             }
             else if (_isDraggingAudioPlaying)
